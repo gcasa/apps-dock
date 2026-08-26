@@ -13,16 +13,38 @@ static CGFloat DockPad = 10.0;
   if (self) {
     _items = [NSMutableArray new];
     _highlightIndex = -1;
+    _gnustepIcon = [[self loadGNUstepIcon] retain];
     [self registerForDraggedTypes:
-      [NSArray arrayWithObjects:NSFilenamesPboardType, nil]];
+      [NSArray arrayWithObjects:NSFilenamesPboardType, NSURLPboardType, nil]];
   }
   return self;
 }
 
 - (void)dealloc
 {
+  [_gnustepIcon release];
   [_items release];
   [super dealloc];
+}
+
+- (NSImage *)loadGNUstepIcon
+{
+  NSArray *paths = [NSArray arrayWithObjects:
+    @"/home/heron/Development/gs-wmaker/WindowMaker/Icons/GNUstep.tiff",
+    @"/usr/GNUstep/Local/Library/WindowMaker/Icons/GNUstep.tiff",
+    @"/usr/GNUstep/System/Library/WindowMaker/Icons/GNUstep.tiff",
+    nil];
+  NSUInteger i;
+
+  for (i = 0; i < [paths count]; i++) {
+    NSImage *image = [[[NSImage alloc] initWithContentsOfFile:
+      [paths objectAtIndex:i]] autorelease];
+    if (image) {
+      return image;
+    }
+  }
+
+  return [NSImage imageNamed:@"GNUstep"];
 }
 
 - (void)setDelegate:(id)delegate
@@ -41,11 +63,20 @@ static CGFloat DockPad = 10.0;
   return NSMakeSize(DockCell, DockCell);
 }
 
-- (NSPoint)cellOriginAtIndex:(NSUInteger)index
+- (NSRect)topTileRect
 {
   NSRect bounds = [self bounds];
+  return NSMakeRect(DockPad,
+                    NSMaxY(bounds) - DockPad - DockCell,
+                    DockCell,
+                    DockCell);
+}
+
+- (NSPoint)cellOriginAtIndex:(NSUInteger)index
+{
+  NSRect topTile = [self topTileRect];
   return NSMakePoint(DockPad,
-                     NSMaxY(bounds) - DockPad - DockCell
+                     NSMinY(topTile) - DockGap - DockCell
                        - index * (DockCell + DockGap));
 }
 
@@ -61,6 +92,29 @@ static CGFloat DockPad = 10.0;
     }
   }
   return NSNotFound;
+}
+
+- (NSArray *)pathsFromPasteboard:(NSPasteboard *)pb
+{
+  NSArray *types = [pb types];
+  NSArray *paths;
+  NSURL *url;
+
+  if ([types containsObject:NSFilenamesPboardType]) {
+    paths = [pb propertyListForType:NSFilenamesPboardType];
+    if ([paths count]) {
+      return paths;
+    }
+  }
+
+  if ([types containsObject:NSURLPboardType]) {
+    url = [NSURL URLFromPasteboard:pb];
+    if ([url isFileURL] && [[url path] length]) {
+      return [NSArray arrayWithObject:[url path]];
+    }
+  }
+
+  return nil;
 }
 
 - (void)drawTileInRect:(NSRect)cell highlighted:(BOOL)highlighted
@@ -106,12 +160,22 @@ static CGFloat DockPad = 10.0;
               fraction:1.0];
 }
 
+- (void)drawTopTile
+{
+  NSRect cell = [self topTileRect];
+
+  [self drawTileInRect:cell highlighted:NO];
+  [self drawImage:_gnustepIcon inCell:cell size:50.0];
+}
+
 - (void)drawRect:(NSRect)dirtyRect
 {
   NSUInteger i;
   NSRect bounds = [self bounds];
   [[NSColor colorWithCalibratedWhite:0.10 alpha:0.96] set];
   NSRectFill(bounds);
+
+  [self drawTopTile];
 
   for (i = 0; i < [_items count]; i++) {
     DockItem *item = [_items objectAtIndex:i];
@@ -132,17 +196,27 @@ static CGFloat DockPad = 10.0;
            withAttributes:attrs];
     }
   }
+
+  if (_highlightIndex == (NSInteger)[_items count]) {
+    NSPoint origin = [self cellOriginAtIndex:[_items count]];
+    [self drawTileInRect:NSMakeRect(origin.x, origin.y, DockCell, DockCell)
+             highlighted:YES];
+  }
 }
 
 - (NSDragOperation)draggingEntered:(id <NSDraggingInfo>)sender
 {
-  NSPasteboard *pb = [sender draggingPasteboard];
-  if ([[pb types] containsObject:NSFilenamesPboardType]) {
+  if ([[self pathsFromPasteboard:[sender draggingPasteboard]] count]) {
     _highlightIndex = [_items count];
     [self setNeedsDisplay:YES];
     return NSDragOperationCopy;
   }
   return NSDragOperationNone;
+}
+
+- (NSDragOperation)draggingUpdated:(id <NSDraggingInfo>)sender
+{
+  return [self draggingEntered:sender];
 }
 
 - (void)draggingExited:(id <NSDraggingInfo>)sender
@@ -153,8 +227,7 @@ static CGFloat DockPad = 10.0;
 
 - (BOOL)performDragOperation:(id <NSDraggingInfo>)sender
 {
-  NSPasteboard *pb = [sender draggingPasteboard];
-  NSArray *paths = [pb propertyListForType:NSFilenamesPboardType];
+  NSArray *paths = [self pathsFromPasteboard:[sender draggingPasteboard]];
   _highlightIndex = -1;
   [self setNeedsDisplay:YES];
 
