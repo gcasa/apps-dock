@@ -119,30 +119,19 @@ static CGFloat DockPad = 10.0;
 
 - (void)drawTileInRect:(NSRect)cell highlighted:(BOOL)highlighted
 {
-  NSRect inner = NSInsetRect(cell, 1.0, 1.0);
-  NSBezierPath *shadowPath;
-  NSBezierPath *innerPath;
+  NSRect inner = NSInsetRect(cell, 2.0, 2.0);
 
   [[NSColor colorWithCalibratedWhite:0.04 alpha:1.0] set];
   NSRectFill(cell);
 
-  [[NSColor colorWithCalibratedWhite:0.74 alpha:1.0] set];
-  NSFrameRect(cell);
-  [[NSColor colorWithCalibratedWhite:0.00 alpha:1.0] set];
-  NSFrameRect(NSInsetRect(cell, 1.0, 1.0));
-
-  shadowPath = [NSBezierPath bezierPathWithRect:inner];
   [[NSColor colorWithCalibratedWhite:(highlighted ? 0.42 : 0.28) alpha:1.0] set];
-  [shadowPath fill];
+  NSRectFill(inner);
 
-  innerPath = [NSBezierPath bezierPathWithRect:NSInsetRect(inner, 3.0, 3.0)];
   [[NSColor colorWithCalibratedWhite:(highlighted ? 0.68 : 0.58) alpha:1.0] set];
-  [innerPath fill];
+  NSRectFill(NSInsetRect(inner, 3.0, 3.0));
 
-  [[NSColor colorWithCalibratedWhite:0.82 alpha:1.0] set];
-  NSFrameRect(NSInsetRect(inner, 3.0, 3.0));
-  [[NSColor colorWithCalibratedWhite:0.18 alpha:1.0] set];
-  NSFrameRect(NSInsetRect(inner, 4.0, 4.0));
+  [[NSColor colorWithCalibratedWhite:(highlighted ? 0.82 : 0.70) alpha:1.0] set];
+  NSFrameRect(cell);
 }
 
 - (void)drawImage:(NSImage *)image inCell:(NSRect)cell size:(CGFloat)size
@@ -158,6 +147,36 @@ static CGFloat DockPad = 10.0;
               fromRect:NSZeroRect
              operation:NSCompositeSourceOver
               fraction:1.0];
+}
+
+- (void)drawStateForItem:(DockItem *)item inCell:(NSRect)cell
+{
+  NSUInteger count = 0;
+  NSUInteger i;
+  CGFloat dotSize = 4.0;
+  CGFloat gap = 3.0;
+  CGFloat width;
+  CGFloat x;
+  CGFloat y = NSMinY(cell) + 6.0;
+
+  if ([item state] == DockItemNotRunning) {
+    count = 3;
+  } else if ([item state] == DockItemHidden) {
+    count = 1;
+  }
+
+  if (!count) {
+    return;
+  }
+
+  width = count * dotSize + (count - 1) * gap;
+  x = NSMidX(cell) - width / 2.0;
+
+  [[NSColor colorWithCalibratedWhite:0.08 alpha:1.0] set];
+  for (i = 0; i < count; i++) {
+    NSRect dot = NSMakeRect(x + i * (dotSize + gap), y, dotSize, dotSize);
+    [[NSBezierPath bezierPathWithOvalInRect:dot] fill];
+  }
 }
 
 - (void)drawTopTile
@@ -186,15 +205,15 @@ static CGFloat DockPad = 10.0;
 
     if ([item kind] == DockItemApplication) {
       NSImage *icon = [[NSWorkspace sharedWorkspace] iconForFile:[item path]];
-      [self drawImage:icon inCell:cell size:48.0];
+      [self drawImage:icon inCell:cell size:46.0];
     } else {
-      NSDictionary *attrs = [NSDictionary dictionaryWithObjectsAndKeys:
-        [NSFont boldSystemFontOfSize:18], NSFontAttributeName,
-        [NSColor colorWithCalibratedRed:0.86 green:0.91 blue:0.98 alpha:1.0],
-        NSForegroundColorAttributeName, nil];
-      [@"X11" drawAtPoint:NSMakePoint(NSMinX(cell) + 15, NSMinY(cell) + 22)
-           withAttributes:attrs];
+      NSImage *icon = [item icon];
+      if (!icon) {
+        icon = [[NSWorkspace sharedWorkspace] iconForFileType:@"app"];
+      }
+      [self drawImage:icon inCell:cell size:46.0];
     }
+    [self drawStateForItem:item inCell:cell];
   }
 
   if (_highlightIndex == (NSInteger)[_items count]) {

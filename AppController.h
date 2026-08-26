@@ -9,6 +9,10 @@
   NSMutableArray *_items;
   X11DockManager *_x11;
   NSTimer *_scanTimer;
+  NSMenu *_dockMenu;
+  NSMenuItem *_leftMenuItem;
+  NSMenuItem *_rightMenuItem;
+  BOOL _dockOnRight;
 }
 
 @end
