@@ -61,7 +61,7 @@ static unsigned int X11DockWidth = 84;
   return YES;
 }
 
-- (void)setDockOnRight:(BOOL)rightSide
+- (void)setDockOnRight:(BOOL)rightSide centered:(BOOL)centered
 {
   Display *display = (Display *)_display;
   int screen;
@@ -69,6 +69,7 @@ static unsigned int X11DockWidth = 84;
   int screenHeight;
   unsigned int height = (unsigned int)NSHeight([_dockView bounds]);
   int x;
+  int y;
 
   if (!display || !_hostWindow) {
     return;
@@ -82,7 +83,8 @@ static unsigned int X11DockWidth = 84;
   }
 
   x = rightSide ? screenWidth - (int)X11DockWidth : 0;
-  XMoveResizeWindow(display, (Window)_hostWindow, x, 0, X11DockWidth, height);
+  y = centered ? (screenHeight - (int)height) / 2 : 0;
+  XMoveResizeWindow(display, (Window)_hostWindow, x, y, X11DockWidth, height);
   XLowerWindow(display, (Window)_hostWindow);
   XFlush(display);
 }

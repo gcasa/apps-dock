@@ -155,7 +155,6 @@ static CGFloat DockPad = 10.0;
   NSUInteger i;
   CGFloat dotSize = 4.0;
   CGFloat gap = 3.0;
-  CGFloat width;
   CGFloat x;
   CGFloat y = NSMinY(cell) + 6.0;
 
@@ -169,8 +168,7 @@ static CGFloat DockPad = 10.0;
     return;
   }
 
-  width = count * dotSize + (count - 1) * gap;
-  x = NSMidX(cell) - width / 2.0;
+  x = NSMinX(cell) + 8.0;
 
   [[NSColor colorWithCalibratedWhite:0.08 alpha:1.0] set];
   for (i = 0; i < count; i++) {
@@ -203,11 +201,11 @@ static CGFloat DockPad = 10.0;
 
     [self drawTileInRect:cell highlighted:((NSInteger)i == _highlightIndex)];
 
-    if ([item kind] == DockItemApplication) {
-      NSImage *icon = [[NSWorkspace sharedWorkspace] iconForFile:[item path]];
-      [self drawImage:icon inCell:cell size:46.0];
-    } else {
+    {
       NSImage *icon = [item icon];
+      if (!icon && [item kind] == DockItemApplication) {
+        icon = [[NSWorkspace sharedWorkspace] iconForFile:[item path]];
+      }
       if (!icon) {
         icon = [[NSWorkspace sharedWorkspace] iconForFileType:@"app"];
       }
@@ -260,7 +258,9 @@ static CGFloat DockPad = 10.0;
 - (void)mouseDown:(NSEvent *)event
 {
   NSUInteger index = [self indexAtPoint:[self convertPoint:[event locationInWindow] fromView:nil]];
-  if (index != NSNotFound && [_delegate respondsToSelector:@selector(dockViewDidActivateItem:)]) {
+  if ([event clickCount] >= 2 &&
+      index != NSNotFound &&
+      [_delegate respondsToSelector:@selector(dockViewDidActivateItem:)]) {
     [_delegate dockViewDidActivateItem:[_items objectAtIndex:index]];
   }
 }

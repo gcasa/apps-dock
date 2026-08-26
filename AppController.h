@@ -12,7 +12,10 @@
   NSMenu *_dockMenu;
   NSMenuItem *_leftMenuItem;
   NSMenuItem *_rightMenuItem;
+  NSMenuItem *_topMenuItem;
+  NSMenuItem *_centerMenuItem;
   BOOL _dockOnRight;
+  BOOL _dockCentered;
 }
 
 @end

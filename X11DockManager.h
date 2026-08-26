@@ -24,7 +24,7 @@
 - (id)initWithDockView:(DockView *)view;
 - (void)setDelegate:(id)delegate;
 - (BOOL)start;
-- (void)setDockOnRight:(BOOL)rightSide;
+- (void)setDockOnRight:(BOOL)rightSide centered:(BOOL)centered;
 - (void)scanForDockApps;
 - (void)dockWindow:(unsigned long)xWindow atIndex:(NSUInteger)index;
 - (void)activateWindow:(unsigned long)xWindow;

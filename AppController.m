@@ -12,7 +12,8 @@ static CGFloat DockWindowHeight = 720.0;
 
   _items = [NSMutableArray new];
   _dockOnRight = [[NSUserDefaults standardUserDefaults] boolForKey:@"DockOnRight"];
-  frame = [self dockWindowFrameForRightSide:_dockOnRight];
+  _dockCentered = [[NSUserDefaults standardUserDefaults] boolForKey:@"DockCentered"];
+  frame = [self dockWindowFrameForRightSide:_dockOnRight centered:_dockCentered];
 
   _window = [[NSWindow alloc] initWithContentRect:frame
                                         styleMask:NSBorderlessWindowMask
@@ -34,7 +35,7 @@ static CGFloat DockWindowHeight = 720.0;
   _x11 = [[X11DockManager alloc] initWithDockView:_dockView];
   [_x11 setDelegate:self];
   if ([_x11 start]) {
-    [_x11 setDockOnRight:_dockOnRight];
+    [_x11 setDockOnRight:_dockOnRight centered:_dockCentered];
     [_window orderFrontRegardless];
     _scanTimer = [NSTimer scheduledTimerWithTimeInterval:1.0
                                                   target:_x11
@@ -61,7 +62,7 @@ static CGFloat DockWindowHeight = 720.0;
   return YES;
 }
 
-- (NSRect)dockWindowFrameForRightSide:(BOOL)rightSide
+- (NSRect)dockWindowFrameForRightSide:(BOOL)rightSide centered:(BOOL)centered
 {
   NSRect screenFrame = [[NSScreen mainScreen] frame];
   CGFloat height = DockWindowHeight;
@@ -73,7 +74,8 @@ static CGFloat DockWindowHeight = 720.0;
   }
 
   x = rightSide ? NSMaxX(screenFrame) - DockWindowWidth : NSMinX(screenFrame);
-  y = NSMaxY(screenFrame) - height;
+  y = centered ? NSMinY(screenFrame) + (NSHeight(screenFrame) - height) / 2.0
+               : NSMaxY(screenFrame) - height;
 
   return NSMakeRect(x, y, DockWindowWidth, height);
 }
@@ -82,6 +84,8 @@ static CGFloat DockWindowHeight = 720.0;
 {
   [_leftMenuItem setState:(_dockOnRight ? NSOffState : NSOnState)];
   [_rightMenuItem setState:(_dockOnRight ? NSOnState : NSOffState)];
+  [_topMenuItem setState:(_dockCentered ? NSOffState : NSOnState)];
+  [_centerMenuItem setState:(_dockCentered ? NSOnState : NSOffState)];
 }
 
 - (NSMenu *)dockMenu
@@ -102,24 +106,42 @@ static CGFloat DockWindowHeight = 720.0;
     [_rightMenuItem setTarget:self];
     [_dockMenu addItem:_rightMenuItem];
     [_rightMenuItem release];
+
+    [_dockMenu addItem:[NSMenuItem separatorItem]];
+
+    _topMenuItem = [[NSMenuItem alloc] initWithTitle:@"Top"
+                                             action:@selector(showDockAtTop:)
+                                      keyEquivalent:@""];
+    [_topMenuItem setTarget:self];
+    [_dockMenu addItem:_topMenuItem];
+    [_topMenuItem release];
+
+    _centerMenuItem = [[NSMenuItem alloc] initWithTitle:@"Center"
+                                                action:@selector(showDockAtCenter:)
+                                         keyEquivalent:@""];
+    [_centerMenuItem setTarget:self];
+    [_dockMenu addItem:_centerMenuItem];
+    [_centerMenuItem release];
   }
 
   [self updateDockMenu];
   return _dockMenu;
 }
 
+- (void)applyDockPlacement
+{
+  [[NSUserDefaults standardUserDefaults] setBool:_dockOnRight forKey:@"DockOnRight"];
+  [[NSUserDefaults standardUserDefaults] setBool:_dockCentered forKey:@"DockCentered"];
+  [_window setFrame:[self dockWindowFrameForRightSide:_dockOnRight centered:_dockCentered]
+            display:YES];
+  [_x11 setDockOnRight:_dockOnRight centered:_dockCentered];
+  [self updateDockMenu];
+}
+
 - (void)setDockOnRight:(BOOL)rightSide
 {
-  if (_dockOnRight == rightSide && NSEqualRects([_window frame], [self dockWindowFrameForRightSide:rightSide])) {
-    [self updateDockMenu];
-    return;
-  }
-
   _dockOnRight = rightSide;
-  [[NSUserDefaults standardUserDefaults] setBool:_dockOnRight forKey:@"DockOnRight"];
-  [_window setFrame:[self dockWindowFrameForRightSide:_dockOnRight] display:YES];
-  [_x11 setDockOnRight:_dockOnRight];
-  [self updateDockMenu];
+  [self applyDockPlacement];
 }
 
 - (void)showDockOnLeft:(id)sender
@@ -130,6 +152,22 @@ static CGFloat DockWindowHeight = 720.0;
 - (void)showDockOnRight:(id)sender
 {
   [self setDockOnRight:YES];
+}
+
+- (void)setDockCentered:(BOOL)centered
+{
+  _dockCentered = centered;
+  [self applyDockPlacement];
+}
+
+- (void)showDockAtTop:(id)sender
+{
+  [self setDockCentered:NO];
+}
+
+- (void)showDockAtCenter:(id)sender
+{
+  [self setDockCentered:YES];
 }
 
 - (void)refreshDock
