@@ -10,12 +10,8 @@
   X11DockManager *_x11;
   NSTimer *_scanTimer;
   NSMenu *_dockMenu;
-  NSMenuItem *_leftMenuItem;
-  NSMenuItem *_rightMenuItem;
-  NSMenuItem *_topMenuItem;
-  NSMenuItem *_centerMenuItem;
-  BOOL _dockOnRight;
-  BOOL _dockCentered;
+  NSMutableArray *_placementMenuItems;
+  DockPlacement _dockPlacement;
 }
 
 @end

@@ -4,8 +4,6 @@
 #import <X11/Xatom.h>
 #import <X11/Xutil.h>
 
-static unsigned int X11DockWidth = 84;
-
 @implementation X11DockManager
 
 - (id)initWithDockView:(DockView *)view
@@ -50,7 +48,8 @@ static unsigned int X11DockWidth = 84;
   attrs.background_pixel = BlackPixel(display, screen);
   attrs.event_mask = SubstructureNotifyMask | ExposureMask;
 
-  _hostWindow = XCreateWindow(display, root, 0, 0, X11DockWidth,
+  _hostWindow = XCreateWindow(display, root, 0, 0,
+                             (unsigned int)NSWidth([_dockView bounds]),
                              (unsigned int)NSHeight([_dockView bounds]), 0,
                              CopyFromParent, InputOutput, CopyFromParent,
                              CWOverrideRedirect | CWBackPixel | CWEventMask,
@@ -61,12 +60,13 @@ static unsigned int X11DockWidth = 84;
   return YES;
 }
 
-- (void)setDockOnRight:(BOOL)rightSide centered:(BOOL)centered
+- (void)setDockPlacement:(DockPlacement)placement
 {
   Display *display = (Display *)_display;
   int screen;
   int screenWidth;
   int screenHeight;
+  unsigned int width = (unsigned int)NSWidth([_dockView bounds]);
   unsigned int height = (unsigned int)NSHeight([_dockView bounds]);
   int x;
   int y;
@@ -78,13 +78,46 @@ static unsigned int X11DockWidth = 84;
   screen = DefaultScreen(display);
   screenWidth = DisplayWidth(display, screen);
   screenHeight = DisplayHeight(display, screen);
+  if (width > (unsigned int)screenWidth) {
+    width = (unsigned int)screenWidth;
+  }
   if (height > (unsigned int)screenHeight) {
     height = (unsigned int)screenHeight;
   }
 
-  x = rightSide ? screenWidth - (int)X11DockWidth : 0;
-  y = centered ? (screenHeight - (int)height) / 2 : 0;
-  XMoveResizeWindow(display, (Window)_hostWindow, x, y, X11DockWidth, height);
+  switch (placement) {
+    case DockPlacementRightTop:
+    case DockPlacementRightCenter:
+      x = screenWidth - (int)width;
+      break;
+    case DockPlacementTopCenter:
+    case DockPlacementBottomCenter:
+      x = (screenWidth - (int)width) / 2;
+      break;
+    case DockPlacementLeftTop:
+    case DockPlacementLeftCenter:
+    default:
+      x = 0;
+      break;
+  }
+
+  switch (placement) {
+    case DockPlacementLeftCenter:
+    case DockPlacementRightCenter:
+      y = (screenHeight - (int)height) / 2;
+      break;
+    case DockPlacementBottomCenter:
+      y = screenHeight - (int)height;
+      break;
+    case DockPlacementLeftTop:
+    case DockPlacementRightTop:
+    case DockPlacementTopCenter:
+    default:
+      y = 0;
+      break;
+  }
+
+  XMoveResizeWindow(display, (Window)_hostWindow, x, y, width, height);
   XLowerWindow(display, (Window)_hostWindow);
   XFlush(display);
 }

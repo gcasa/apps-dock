@@ -58,6 +58,19 @@ static CGFloat DockPad = 10.0;
   [self setNeedsDisplay:YES];
 }
 
+- (void)setHorizontal:(BOOL)horizontal
+{
+  if (_horizontal != horizontal) {
+    _horizontal = horizontal;
+    [self setNeedsDisplay:YES];
+  }
+}
+
+- (BOOL)isHorizontal
+{
+  return _horizontal;
+}
+
 - (NSSize)cellSize
 {
   return NSMakeSize(DockCell, DockCell);
@@ -66,18 +79,30 @@ static CGFloat DockPad = 10.0;
 - (NSRect)topTileRect
 {
   NSRect bounds = [self bounds];
-  return NSMakeRect(DockPad,
-                    NSMaxY(bounds) - DockPad - DockCell,
-                    DockCell,
-                    DockCell);
+  if (_horizontal) {
+    return NSMakeRect(DockPad,
+                      DockPad,
+                      DockCell,
+                      DockCell);
+  } else {
+    return NSMakeRect(DockPad,
+                      NSMaxY(bounds) - DockPad - DockCell,
+                      DockCell,
+                      DockCell);
+  }
 }
 
 - (NSPoint)cellOriginAtIndex:(NSUInteger)index
 {
   NSRect topTile = [self topTileRect];
-  return NSMakePoint(DockPad,
-                     NSMinY(topTile) - DockGap - DockCell
-                       - index * (DockCell + DockGap));
+  if (_horizontal) {
+    return NSMakePoint(NSMaxX(topTile) + DockGap + index * (DockCell + DockGap),
+                       NSMinY(topTile));
+  } else {
+    return NSMakePoint(DockPad,
+                       NSMinY(topTile) - DockGap - DockCell
+                         - index * (DockCell + DockGap));
+  }
 }
 
 - (NSUInteger)indexAtPoint:(NSPoint)p

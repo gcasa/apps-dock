@@ -3,6 +3,15 @@
 @class DockView;
 @class DockItem;
 
+typedef enum {
+  DockPlacementLeftTop = 0,
+  DockPlacementLeftCenter,
+  DockPlacementRightTop,
+  DockPlacementRightCenter,
+  DockPlacementTopCenter,
+  DockPlacementBottomCenter
+} DockPlacement;
+
 @protocol X11DockManagerDelegate
 - (void)x11DockManagerDidDiscoverWindowWithTitle:(NSString *)title
                                           window:(unsigned long)xWindow
@@ -24,7 +33,7 @@
 - (id)initWithDockView:(DockView *)view;
 - (void)setDelegate:(id)delegate;
 - (BOOL)start;
-- (void)setDockOnRight:(BOOL)rightSide centered:(BOOL)centered;
+- (void)setDockPlacement:(DockPlacement)placement;
 - (void)scanForDockApps;
 - (void)dockWindow:(unsigned long)xWindow atIndex:(NSUInteger)index;
 - (void)activateWindow:(unsigned long)xWindow;
