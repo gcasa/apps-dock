@@ -221,29 +221,11 @@ static CGFloat DockPad = 10.0;
 
 - (void)drawDockTileForItem:(DockItem *)item inCell:(NSRect)cell size:(CGFloat)size
 {
-  NSDockTile *dockTile = [item dockTile];
-  NSView *contentView = [dockTile contentView];
-  NSRect destRect = NSMakeRect(NSMidX(cell) - size / 2.0,
-                               NSMidY(cell) - size / 2.0,
-                               size,
-                               size);
+  NSImage *icon = [item icon];
 
-  if (!contentView) {
+  if (![self drawImage:icon inCell:cell size:size]) {
     [self drawFallbackIconForItem:item inCell:cell];
-    return;
   }
-
-  [dockTile display];
-  [NSGraphicsContext saveGraphicsState];
-  {
-    NSAffineTransform *transform = [NSAffineTransform transform];
-    [transform translateXBy:NSMinX(destRect) yBy:NSMinY(destRect)];
-    [transform concat];
-  }
-  [contentView setFrame:NSMakeRect(0, 0, size, size)];
-  [contentView setBounds:NSMakeRect(0, 0, size, size)];
-  [contentView drawRect:[contentView bounds]];
-  [NSGraphicsContext restoreGraphicsState];
 }
 
 - (void)drawStateForItem:(DockItem *)item inCell:(NSRect)cell
@@ -295,8 +277,6 @@ static CGFloat DockPad = 10.0;
     DockItem *item = [_items objectAtIndex:i];
     NSPoint origin = [self cellOriginAtIndex:i];
     NSRect cell = NSMakeRect(origin.x, origin.y, DockCell, DockCell);
-
-    [self drawTileInRect:cell highlighted:((NSInteger)i == _highlightIndex)];
 
     [self drawDockTileForItem:item inCell:cell size:46.0];
     [self drawStateForItem:item inCell:cell];
