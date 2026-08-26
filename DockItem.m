@@ -1,5 +1,108 @@
 #import "DockItem.h"
 
+@interface DockTileIconView : NSView
+{
+  NSImage *_icon;
+  NSString *_title;
+}
+- (void)setIcon:(NSImage *)icon;
+- (void)setTitle:(NSString *)title;
+@end
+
+@implementation DockTileIconView
+
+- (void)dealloc
+{
+  [_icon release];
+  [_title release];
+  [super dealloc];
+}
+
+- (void)setIcon:(NSImage *)icon
+{
+  if (_icon != icon) {
+    [_icon release];
+    _icon = [icon retain];
+    [self setNeedsDisplay:YES];
+  }
+}
+
+- (void)setTitle:(NSString *)title
+{
+  if (_title != title) {
+    [_title release];
+    _title = [title copy];
+    [self setNeedsDisplay:YES];
+  }
+}
+
+- (BOOL)drawImage:(NSImage *)image inRect:(NSRect)rect
+{
+  NSSize imageSize;
+  NSImageRep *rep;
+  NSRect sourceRect;
+
+  if (!image || (![[image representations] count] && ![image isValid])) {
+    return NO;
+  }
+
+  imageSize = [image size];
+  if (imageSize.width <= 0.0 || imageSize.height <= 0.0) {
+    rep = [[image representations] count] ? [[image representations] objectAtIndex:0] : nil;
+    if (rep) {
+      imageSize = NSMakeSize([rep pixelsWide], [rep pixelsHigh]);
+      [image setSize:imageSize];
+    }
+  }
+
+  if (imageSize.width <= 0.0 || imageSize.height <= 0.0) {
+    return NO;
+  }
+
+  rep = [image bestRepresentationForDevice:nil];
+  sourceRect = NSMakeRect(0, 0, imageSize.width, imageSize.height);
+  if (rep && [rep respondsToSelector:@selector(drawInRect:)]) {
+    [rep drawInRect:rect];
+  } else {
+    [image drawInRect:rect
+             fromRect:sourceRect
+            operation:NSCompositeSourceOver
+             fraction:1.0];
+  }
+  return YES;
+}
+
+- (void)drawFallbackInRect:(NSRect)rect
+{
+  NSString *title = [_title length] ? _title : @"?";
+  NSString *label = [[title substringToIndex:MIN((NSUInteger)2, [title length])] uppercaseString];
+  NSDictionary *attrs = [NSDictionary dictionaryWithObjectsAndKeys:
+    [NSFont boldSystemFontOfSize:18], NSFontAttributeName,
+    [NSColor colorWithCalibratedWhite:0.95 alpha:1.0], NSForegroundColorAttributeName,
+    nil];
+  NSSize size = [label sizeWithAttributes:attrs];
+
+  [label drawAtPoint:NSMakePoint(NSMidX(rect) - size.width / 2.0,
+                                 NSMidY(rect) - size.height / 2.0)
+      withAttributes:attrs];
+}
+
+- (void)drawRect:(NSRect)rect
+{
+  NSRect bounds = [self bounds];
+  CGFloat size = MIN(NSWidth(bounds), NSHeight(bounds));
+  NSRect iconRect = NSMakeRect(NSMidX(bounds) - size / 2.0,
+                               NSMidY(bounds) - size / 2.0,
+                               size,
+                               size);
+
+  if (![self drawImage:_icon inRect:iconRect]) {
+    [self drawFallbackInRect:bounds];
+  }
+}
+
+@end
+
 @implementation DockItem
 
 + (BOOL)imageIsDrawable:(NSImage *)image
@@ -203,19 +306,21 @@
     icon = [self fallbackApplicationIcon];
   }
 
-  NSLog(@"Dock item icon for %@: bundle=%@ icon=%@ reps=%lu valid=%d",
-        path,
-        bundlePath ? bundlePath : @"(none)",
-        icon,
-        (unsigned long)[[icon representations] count],
-        icon ? [icon isValid] : 0);
-
   item->_kind = DockItemApplication;
   item->_state = DockItemNotRunning;
   item->_path = [path copy];
   item->_iconPath = [iconPath copy];
   item->_title = [[[path lastPathComponent] stringByDeletingPathExtension] copy];
   item->_icon = [icon retain];
+  item->_dockTile = [[NSDockTile alloc] init];
+  [item->_dockTile setOwner:item];
+  {
+    DockTileIconView *iconView = [[[DockTileIconView alloc]
+      initWithFrame:NSMakeRect(0, 0, 46, 46)] autorelease];
+    [iconView setIcon:icon];
+    [iconView setTitle:item->_title];
+    [item->_dockTile setContentView:iconView];
+  }
   return item;
 }
 
@@ -227,6 +332,15 @@
   item->_xWindow = xWindow;
   item->_title = [[title length] ? title : [NSString stringWithFormat:@"0x%lx", xWindow] copy];
   item->_icon = [icon retain];
+  item->_dockTile = [[NSDockTile alloc] init];
+  [item->_dockTile setOwner:item];
+  {
+    DockTileIconView *iconView = [[[DockTileIconView alloc]
+      initWithFrame:NSMakeRect(0, 0, 46, 46)] autorelease];
+    [iconView setIcon:icon];
+    [iconView setTitle:item->_title];
+    [item->_dockTile setContentView:iconView];
+  }
   return item;
 }
 
@@ -236,6 +350,7 @@
   [_path release];
   [_iconPath release];
   [_icon release];
+  [_dockTile release];
   [super dealloc];
 }
 
@@ -251,8 +366,13 @@
   if (_icon != icon) {
     [_icon release];
     _icon = [icon retain];
+    if ([[_dockTile contentView] respondsToSelector:@selector(setIcon:)]) {
+      [(DockTileIconView *)[_dockTile contentView] setIcon:icon];
+    }
+    [_dockTile display];
   }
 }
+- (NSDockTile *)dockTile { return _dockTile; }
 - (unsigned long)xWindow { return _xWindow; }
 - (void)setXWindow:(unsigned long)xWindow { _xWindow = xWindow; }
 

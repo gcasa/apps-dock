@@ -14,6 +14,8 @@
   NSInteger _highlightIndex;
   NSImage *_gnustepIcon;
   BOOL _horizontal;
+  NSUInteger _lastMouseDownIndex;
+  NSTimeInterval _lastMouseDownTime;
 }
 
 - (void)setDelegate:(id)delegate;

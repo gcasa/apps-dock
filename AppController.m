@@ -256,7 +256,6 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     NSString *path = [paths objectAtIndex:i];
     BOOL isDir = NO;
     if ([[NSFileManager defaultManager] fileExistsAtPath:path isDirectory:&isDir]) {
-      NSLog(@"Adding dock item for dropped path %@", path);
       [_items addObject:[DockItem applicationItemWithPath:path]];
     }
   }

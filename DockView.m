@@ -13,6 +13,8 @@ static CGFloat DockPad = 10.0;
   if (self) {
     _items = [NSMutableArray new];
     _highlightIndex = -1;
+    _lastMouseDownIndex = NSNotFound;
+    _lastMouseDownTime = 0.0;
     _gnustepIcon = [[self loadGNUstepIcon] retain];
     [self registerForDraggedTypes:
       [NSArray arrayWithObjects:NSFilenamesPboardType, NSURLPboardType, nil]];
@@ -217,6 +219,33 @@ static CGFloat DockPad = 10.0;
       withAttributes:attrs];
 }
 
+- (void)drawDockTileForItem:(DockItem *)item inCell:(NSRect)cell size:(CGFloat)size
+{
+  NSDockTile *dockTile = [item dockTile];
+  NSView *contentView = [dockTile contentView];
+  NSRect destRect = NSMakeRect(NSMidX(cell) - size / 2.0,
+                               NSMidY(cell) - size / 2.0,
+                               size,
+                               size);
+
+  if (!contentView) {
+    [self drawFallbackIconForItem:item inCell:cell];
+    return;
+  }
+
+  [dockTile display];
+  [NSGraphicsContext saveGraphicsState];
+  {
+    NSAffineTransform *transform = [NSAffineTransform transform];
+    [transform translateXBy:NSMinX(destRect) yBy:NSMinY(destRect)];
+    [transform concat];
+  }
+  [contentView setFrame:NSMakeRect(0, 0, size, size)];
+  [contentView setBounds:NSMakeRect(0, 0, size, size)];
+  [contentView drawRect:[contentView bounds]];
+  [NSGraphicsContext restoreGraphicsState];
+}
+
 - (void)drawStateForItem:(DockItem *)item inCell:(NSRect)cell
 {
   NSUInteger count = 0;
@@ -269,28 +298,7 @@ static CGFloat DockPad = 10.0;
 
     [self drawTileInRect:cell highlighted:((NSInteger)i == _highlightIndex)];
 
-    {
-      NSImage *icon = [item icon];
-      if ((!icon || (![[icon representations] count] && ![icon isValid])) &&
-          [item kind] == DockItemApplication) {
-        icon = [[NSWorkspace sharedWorkspace] iconForFile:[item iconPath]];
-        if (![[icon representations] count] && ![icon isValid]) {
-          icon = nil;
-        }
-      }
-      if (!icon || (![[icon representations] count] && ![icon isValid])) {
-        icon = [[NSWorkspace sharedWorkspace] iconForFileType:@"app"];
-        if (![[icon representations] count] && ![icon isValid]) {
-          icon = nil;
-        }
-      }
-      if (!icon) {
-        icon = _gnustepIcon;
-      }
-      if (![self drawImage:icon inCell:cell size:46.0]) {
-        [self drawFallbackIconForItem:item inCell:cell];
-      }
-    }
+    [self drawDockTileForItem:item inCell:cell size:46.0];
     [self drawStateForItem:item inCell:cell];
   }
 
@@ -338,11 +346,30 @@ static CGFloat DockPad = 10.0;
 - (void)mouseDown:(NSEvent *)event
 {
   NSUInteger index = [self indexAtPoint:[self convertPoint:[event locationInWindow] fromView:nil]];
-  if ([event clickCount] >= 2 &&
-      index != NSNotFound &&
+  NSTimeInterval eventTime = [event timestamp];
+  NSTimeInterval doubleClickInterval = 0.5;
+  BOOL isDoubleClick = NO;
+
+  if (index != NSNotFound) {
+    if ([event clickCount] >= 2) {
+      isDoubleClick = YES;
+    } else if (index == _lastMouseDownIndex &&
+               _lastMouseDownTime > 0.0 &&
+               eventTime - _lastMouseDownTime <= doubleClickInterval) {
+      isDoubleClick = YES;
+    }
+  }
+
+  if (isDoubleClick &&
       [_delegate respondsToSelector:@selector(dockViewDidActivateItem:)]) {
     [_delegate dockViewDidActivateItem:[_items objectAtIndex:index]];
+    _lastMouseDownIndex = NSNotFound;
+    _lastMouseDownTime = 0.0;
+    return;
   }
+
+  _lastMouseDownIndex = index;
+  _lastMouseDownTime = eventTime;
 }
 
 @end

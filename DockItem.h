@@ -19,6 +19,7 @@ typedef enum {
   NSString *_path;
   NSString *_iconPath;
   NSImage *_icon;
+  NSDockTile *_dockTile;
   unsigned long _xWindow;
 }
 
@@ -33,6 +34,7 @@ typedef enum {
 - (NSString *)iconPath;
 - (NSImage *)icon;
 - (void)setIcon:(NSImage *)icon;
+- (NSDockTile *)dockTile;
 - (unsigned long)xWindow;
 - (void)setXWindow:(unsigned long)xWindow;
 
