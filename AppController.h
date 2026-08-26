@@ -11,7 +11,10 @@
   NSTimer *_scanTimer;
   NSMenu *_dockMenu;
   NSMutableArray *_placementMenuItems;
+  NSMenuItem *_blackBackgroundMenuItem;
+  NSMenuItem *_transparentBackgroundMenuItem;
   DockPlacement _dockPlacement;
+  DockBackgroundMode _backgroundMode;
 }
 
 @end

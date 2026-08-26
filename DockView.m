@@ -21,6 +21,7 @@ static NSUInteger DockTopIconClickIndex = NSUIntegerMax - 1;
     _performedDragOperation = NO;
     _lastMouseDownIndex = NSNotFound;
     _lastMouseDownTime = 0.0;
+    _backgroundMode = DockBackgroundBlack;
     _gnustepIcon = [[self loadGNUstepIcon] retain];
     [self registerForDraggedTypes:
       [NSArray arrayWithObjects:NSFilenamesPboardType,
@@ -38,6 +39,7 @@ static NSUInteger DockTopIconClickIndex = NSUIntegerMax - 1;
 
 - (void)dealloc
 {
+  [_backgroundImage release];
   [_gnustepIcon release];
   [_items release];
   [super dealloc];
@@ -77,6 +79,23 @@ static NSUInteger DockTopIconClickIndex = NSUIntegerMax - 1;
 {
   [_items setArray:items];
   [self setNeedsDisplay:YES];
+}
+
+- (void)setBackgroundImage:(NSImage *)image
+{
+  if (_backgroundImage != image) {
+    [_backgroundImage release];
+    _backgroundImage = [image retain];
+    [self setNeedsDisplay:YES];
+  }
+}
+
+- (void)setBackgroundMode:(DockBackgroundMode)mode
+{
+  if (_backgroundMode != mode) {
+    _backgroundMode = mode;
+    [self setNeedsDisplay:YES];
+  }
 }
 
 - (void)setHorizontal:(BOOL)horizontal
@@ -409,6 +428,19 @@ static NSUInteger DockTopIconClickIndex = NSUIntegerMax - 1;
 - (void)drawRect:(NSRect)dirtyRect
 {
   NSUInteger i;
+
+  if (_backgroundMode == DockBackgroundSimulatedTransparency &&
+      _backgroundImage) {
+    [_backgroundImage drawInRect:[self bounds]
+                         fromRect:NSMakeRect(0, 0,
+                                             [_backgroundImage size].width,
+                                             [_backgroundImage size].height)
+                        operation:NSCompositeSourceOver
+                         fraction:1.0];
+  } else if (_backgroundMode == DockBackgroundBlack) {
+    [[NSColor blackColor] set];
+    NSRectFill([self bounds]);
+  }
 
   [self drawTopTile];
 

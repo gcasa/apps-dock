@@ -34,6 +34,7 @@ typedef enum {
 - (void)setDelegate:(id)delegate;
 - (BOOL)start;
 - (void)setDockPlacement:(DockPlacement)placement;
+- (NSImage *)backgroundImageForDockPlacement:(DockPlacement)placement;
 - (void)scanForDockApps;
 - (void)dockWindow:(unsigned long)xWindow atIndex:(NSUInteger)index;
 - (void)activateWindow:(unsigned long)xWindow;

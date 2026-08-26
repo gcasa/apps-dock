@@ -6,6 +6,7 @@ static CGFloat DockCell = 64.0;
 static CGFloat DockGap = 2.0;
 static CGFloat DockPad = 10.0;
 static NSString *DockApplicationsDefaultsKey = @"DockApplications";
+static NSString *DockBackgroundModeDefaultsKey = @"DockBackgroundMode";
 
 static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 {
@@ -21,6 +22,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   _items = [NSMutableArray new];
   [self loadPersistedApplications];
   _dockPlacement = [self savedDockPlacement];
+  _backgroundMode = [self savedBackgroundMode];
   frame = [self dockWindowFrameForPlacement:_dockPlacement];
 
   _window = [[NSWindow alloc] initWithContentRect:frame
@@ -37,15 +39,17 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
                                                          NSHeight(frame))];
   [_dockView setDelegate:self];
   [_dockView setHorizontal:DockPlacementIsHorizontal(_dockPlacement)];
+  [_dockView setBackgroundMode:_backgroundMode];
   [_dockView setItems:_items];
   [_dockView setMenu:[self dockMenu]];
   [_window setContentView:_dockView];
-  [_window makeKeyAndOrderFront:nil];
 
   _x11 = [[X11DockManager alloc] initWithDockView:_dockView];
   [_x11 setDelegate:self];
   if ([_x11 start]) {
     [_x11 setDockPlacement:_dockPlacement];
+    [self updateDockBackgroundHidingWindow:NO];
+    [_window makeKeyAndOrderFront:nil];
     [_window orderFrontRegardless];
     _scanTimer = [NSTimer scheduledTimerWithTimeInterval:1.0
                                                   target:_x11
@@ -53,12 +57,16 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
                                                 userInfo:nil
                                                  repeats:YES];
     [_x11 scanForDockApps];
+  } else {
+    [_window makeKeyAndOrderFront:nil];
   }
 }
 
 - (void)dealloc
 {
   [_scanTimer invalidate];
+  [_transparentBackgroundMenuItem release];
+  [_blackBackgroundMenuItem release];
   [_dockMenu release];
   [_placementMenuItems release];
   [_x11 release];
@@ -90,6 +98,22 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   }
 
   return [defaults boolForKey:@"DockCentered"] ? DockPlacementLeftCenter : DockPlacementLeftTop;
+}
+
+- (DockBackgroundMode)savedBackgroundMode
+{
+  NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+  id savedMode = [defaults objectForKey:DockBackgroundModeDefaultsKey];
+
+  if (savedMode) {
+    NSInteger mode = [defaults integerForKey:DockBackgroundModeDefaultsKey];
+    if (mode >= DockBackgroundBlack &&
+        mode <= DockBackgroundSimulatedTransparency) {
+      return (DockBackgroundMode)mode;
+    }
+  }
+
+  return DockBackgroundBlack;
 }
 
 - (void)loadPersistedApplications
@@ -217,6 +241,11 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     NSMenuItem *item = [_placementMenuItems objectAtIndex:i];
     [item setState:([item tag] == _dockPlacement ? NSOnState : NSOffState)];
   }
+
+  [_blackBackgroundMenuItem setState:
+    (_backgroundMode == DockBackgroundBlack ? NSOnState : NSOffState)];
+  [_transparentBackgroundMenuItem setState:
+    (_backgroundMode == DockBackgroundSimulatedTransparency ? NSOnState : NSOffState)];
 }
 
 - (NSMenu *)dockMenu
@@ -245,6 +274,24 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
       [_placementMenuItems addObject:item];
       [item release];
     }
+
+    [_dockMenu addItem:[NSMenuItem separatorItem]];
+
+    _blackBackgroundMenuItem =
+      [[NSMenuItem alloc] initWithTitle:@"Black Background"
+                                 action:@selector(selectBackgroundMode:)
+                          keyEquivalent:@""];
+    [_blackBackgroundMenuItem setTarget:self];
+    [_blackBackgroundMenuItem setTag:DockBackgroundBlack];
+    [_dockMenu addItem:_blackBackgroundMenuItem];
+
+    _transparentBackgroundMenuItem =
+      [[NSMenuItem alloc] initWithTitle:@"Simulated Transparency"
+                                 action:@selector(selectBackgroundMode:)
+                          keyEquivalent:@""];
+    [_transparentBackgroundMenuItem setTarget:self];
+    [_transparentBackgroundMenuItem setTag:DockBackgroundSimulatedTransparency];
+    [_dockMenu addItem:_transparentBackgroundMenuItem];
   }
 
   [self updateDockMenu];
@@ -261,6 +308,49 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
                                  NSWidth([_window frame]),
                                  NSHeight([_window frame]))];
   [_x11 setDockPlacement:_dockPlacement];
+  [self updateDockBackgroundHidingWindow:YES];
+  [self updateDockMenu];
+}
+
+- (void)updateDockBackgroundHidingWindow:(BOOL)hideWindow
+{
+  NSImage *image;
+  BOOL wasVisible;
+
+  [_dockView setBackgroundMode:_backgroundMode];
+
+  if (_backgroundMode == DockBackgroundBlack) {
+    [_dockView setBackgroundImage:nil];
+    return;
+  }
+
+  if (!_x11) {
+    return;
+  }
+
+  wasVisible = [_window isVisible];
+  if (hideWindow && wasVisible) {
+    [_window orderOut:nil];
+    [[NSRunLoop currentRunLoop] runUntilDate:
+      [NSDate dateWithTimeIntervalSinceNow:0.02]];
+  }
+
+  image = [_x11 backgroundImageForDockPlacement:_dockPlacement];
+  [_dockView setBackgroundImage:image];
+
+  if (hideWindow && wasVisible) {
+    [_window orderFrontRegardless];
+  }
+}
+
+- (void)selectBackgroundMode:(id)sender
+{
+  NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+
+  _backgroundMode = (DockBackgroundMode)[sender tag];
+  [defaults setInteger:_backgroundMode forKey:DockBackgroundModeDefaultsKey];
+  [defaults synchronize];
+  [self updateDockBackgroundHidingWindow:YES];
   [self updateDockMenu];
 }
 

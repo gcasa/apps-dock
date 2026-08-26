@@ -83,6 +83,26 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 - (void)setDockPlacement:(DockPlacement)placement
 {
   Display *display = (Display *)_display;
+  NSRect frame;
+
+  if (!display || !_hostWindow) {
+    return;
+  }
+
+  frame = [self x11FrameForDockPlacement:placement];
+  XMoveResizeWindow(display,
+                    (Window)_hostWindow,
+                    (int)NSMinX(frame),
+                    (int)NSMinY(frame),
+                    (unsigned int)NSWidth(frame),
+                    (unsigned int)NSHeight(frame));
+  XLowerWindow(display, (Window)_hostWindow);
+  XFlush(display);
+}
+
+- (NSRect)x11FrameForDockPlacement:(DockPlacement)placement
+{
+  Display *display = (Display *)_display;
   int screen;
   int screenWidth;
   int screenHeight;
@@ -91,8 +111,8 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   int x;
   int y;
 
-  if (!display || !_hostWindow) {
-    return;
+  if (!display) {
+    return NSZeroRect;
   }
 
   screen = DefaultScreen(display);
@@ -137,9 +157,111 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
       break;
   }
 
-  XMoveResizeWindow(display, (Window)_hostWindow, x, y, width, height);
-  XLowerWindow(display, (Window)_hostWindow);
-  XFlush(display);
+  return NSMakeRect(x, y, width, height);
+}
+
+- (unsigned char)componentFromPixel:(unsigned long)pixel mask:(unsigned long)mask
+{
+  unsigned long value;
+  unsigned int shift = 0;
+  unsigned int bits = 0;
+
+  if (!mask) {
+    return 0;
+  }
+
+  while (((mask >> shift) & 1UL) == 0) {
+    shift++;
+  }
+
+  value = (pixel & mask) >> shift;
+  while (((mask >> (shift + bits)) & 1UL) != 0) {
+    bits++;
+  }
+
+  if (bits >= 8) {
+    return (unsigned char)(value >> (bits - 8));
+  }
+
+  return (unsigned char)((value * 255UL) / ((1UL << bits) - 1UL));
+}
+
+- (NSImage *)backgroundImageForDockPlacement:(DockPlacement)placement
+{
+  Display *display = (Display *)_display;
+  int screen;
+  Window root;
+  NSRect frame;
+  XImage *ximage;
+  NSBitmapImageRep *rep;
+  NSImage *image;
+  NSInteger width;
+  NSInteger height;
+  NSInteger x;
+  NSInteger y;
+  unsigned char *bitmapData;
+  NSInteger bytesPerRow;
+
+  if (!display) {
+    return nil;
+  }
+
+  frame = [self x11FrameForDockPlacement:placement];
+  width = (NSInteger)NSWidth(frame);
+  height = (NSInteger)NSHeight(frame);
+  if (width <= 0 || height <= 0) {
+    return nil;
+  }
+
+  screen = DefaultScreen(display);
+  root = RootWindow(display, screen);
+  XSync(display, False);
+  ximage = XGetImage(display, root,
+                     (int)NSMinX(frame),
+                     (int)NSMinY(frame),
+                     (unsigned int)width,
+                     (unsigned int)height,
+                     AllPlanes,
+                     ZPixmap);
+  if (!ximage) {
+    return nil;
+  }
+
+  rep = [[[NSBitmapImageRep alloc]
+    initWithBitmapDataPlanes:NULL
+                  pixelsWide:width
+                  pixelsHigh:height
+               bitsPerSample:8
+             samplesPerPixel:4
+                    hasAlpha:YES
+                    isPlanar:NO
+              colorSpaceName:NSDeviceRGBColorSpace
+                 bytesPerRow:0
+                bitsPerPixel:32] autorelease];
+  if (!rep) {
+    XDestroyImage(ximage);
+    return nil;
+  }
+
+  bitmapData = [rep bitmapData];
+  bytesPerRow = [rep bytesPerRow];
+  for (y = 0; y < height; y++) {
+    for (x = 0; x < width; x++) {
+      unsigned long pixel = XGetPixel(ximage, (int)x, (int)y);
+      unsigned char *dst = bitmapData + y * bytesPerRow + x * 4;
+
+      dst[0] = [self componentFromPixel:pixel mask:ximage->red_mask];
+      dst[1] = [self componentFromPixel:pixel mask:ximage->green_mask];
+      dst[2] = [self componentFromPixel:pixel mask:ximage->blue_mask];
+      dst[3] = 255;
+    }
+  }
+
+  XDestroyImage(ximage);
+
+  image = [[[NSImage alloc] initWithSize:NSMakeSize(width, height)] autorelease];
+  [image addRepresentation:rep];
+  return image;
 }
 
 - (NSString *)titleForWindow:(Window)window
