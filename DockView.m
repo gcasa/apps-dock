@@ -303,14 +303,12 @@ static NSString *GWDockIconPboardType = @"DockIconPboardType";
 {
   NSSize imageSize;
   NSRect sourceRect;
-  NSImageRep *bestRep;
   NSRect destRect;
 
   if (!image || (![[image representations] count] && ![image isValid])) {
     return NO;
   }
 
-  bestRep = [image bestRepresentationForDevice:nil];
   imageSize = [image size];
   if (imageSize.width <= 0.0 || imageSize.height <= 0.0) {
     NSImageRep *rep = [[image representations] count]
@@ -331,14 +329,10 @@ static NSString *GWDockIconPboardType = @"DockIconPboardType";
                         size,
                         size);
 
-  if (bestRep && [bestRep respondsToSelector:@selector(drawInRect:)]) {
-    [bestRep drawInRect:destRect];
-  } else {
-    [image drawInRect:destRect
-             fromRect:sourceRect
-            operation:NSCompositeSourceOver
-             fraction:1.0];
-  }
+  [image drawInRect:destRect
+           fromRect:sourceRect
+          operation:NSCompositeSourceOver
+           fraction:1.0];
   return YES;
 }
 

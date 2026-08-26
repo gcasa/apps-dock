@@ -59,16 +59,11 @@
     return NO;
   }
 
-  rep = [image bestRepresentationForDevice:nil];
   sourceRect = NSMakeRect(0, 0, imageSize.width, imageSize.height);
-  if (rep && [rep respondsToSelector:@selector(drawInRect:)]) {
-    [rep drawInRect:rect];
-  } else {
-    [image drawInRect:rect
-             fromRect:sourceRect
-            operation:NSCompositeSourceOver
-             fraction:1.0];
-  }
+  [image drawInRect:rect
+           fromRect:sourceRect
+          operation:NSCompositeSourceOver
+           fraction:1.0];
   return YES;
 }
 
