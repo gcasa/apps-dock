@@ -201,6 +201,7 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   NSInteger y;
   unsigned char *bitmapData;
   NSInteger bytesPerRow;
+  BOOL sawNonBlackPixel = NO;
 
   if (!display) {
     return nil;
@@ -254,10 +255,17 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
       dst[1] = [self componentFromPixel:pixel mask:ximage->green_mask];
       dst[2] = [self componentFromPixel:pixel mask:ximage->blue_mask];
       dst[3] = 255;
+      if (dst[0] || dst[1] || dst[2]) {
+        sawNonBlackPixel = YES;
+      }
     }
   }
 
   XDestroyImage(ximage);
+
+  if (!sawNonBlackPixel) {
+    return nil;
+  }
 
   image = [[[NSImage alloc] initWithSize:NSMakeSize(width, height)] autorelease];
   [image addRepresentation:rep];

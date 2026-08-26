@@ -81,6 +81,12 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   return YES;
 }
 
+- (void)applicationWillTerminate:(NSNotification *)notification
+{
+  [self savePersistedApplications];
+  [[NSUserDefaults standardUserDefaults] synchronize];
+}
+
 - (DockPlacement)savedDockPlacement
 {
   NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
@@ -260,14 +266,15 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
       @"Bottom Center",
       nil];
     NSUInteger i;
+    NSMenuItem *item;
 
     _dockMenu = [[NSMenu alloc] initWithTitle:@"Dock"];
     _placementMenuItems = [NSMutableArray new];
 
     for (i = 0; i < [titles count]; i++) {
-      NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:[titles objectAtIndex:i]
-                                                    action:@selector(selectDockPlacement:)
-                                             keyEquivalent:@""];
+      item = [[NSMenuItem alloc] initWithTitle:[titles objectAtIndex:i]
+                                        action:@selector(selectDockPlacement:)
+                                 keyEquivalent:@""];
       [item setTarget:self];
       [item setTag:(NSInteger)i];
       [_dockMenu addItem:item];
@@ -292,6 +299,15 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     [_transparentBackgroundMenuItem setTarget:self];
     [_transparentBackgroundMenuItem setTag:DockBackgroundSimulatedTransparency];
     [_dockMenu addItem:_transparentBackgroundMenuItem];
+
+    [_dockMenu addItem:[NSMenuItem separatorItem]];
+
+    item = [[NSMenuItem alloc] initWithTitle:@"Quit"
+                                      action:@selector(quitDock:)
+                               keyEquivalent:@""];
+    [item setTarget:self];
+    [_dockMenu addItem:item];
+    [item release];
   }
 
   [self updateDockMenu];
@@ -336,7 +352,11 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   }
 
   image = [_x11 backgroundImageForDockPlacement:_dockPlacement];
-  [_dockView setBackgroundImage:image];
+  if (image) {
+    [_dockView setBackgroundImage:image];
+  } else if (!wasVisible) {
+    [_dockView setBackgroundImage:nil];
+  }
 
   if (hideWindow && wasVisible) {
     [_window orderFrontRegardless];
@@ -358,6 +378,13 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 {
   _dockPlacement = (DockPlacement)[sender tag];
   [self applyDockPlacement];
+}
+
+- (void)quitDock:(id)sender
+{
+  [self savePersistedApplications];
+  [[NSUserDefaults standardUserDefaults] synchronize];
+  [NSApp terminate:sender];
 }
 
 - (void)refreshDock
@@ -469,7 +496,9 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   for (i = 0; i < [paths count]; i++) {
     NSString *path = [paths objectAtIndex:i];
     if ([[NSFileManager defaultManager] fileExistsAtPath:path]) {
-      [[NSWorkspace sharedWorkspace] openFile:path];
+      if (![[NSWorkspace sharedWorkspace] launchApplication:path]) {
+        [[NSWorkspace sharedWorkspace] openFile:path];
+      }
       return;
     }
   }
