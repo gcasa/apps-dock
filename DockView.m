@@ -5,6 +5,10 @@ static CGFloat DockCell = 64.0;
 static CGFloat DockGap = 2.0;
 static CGFloat DockPad = 10.0;
 
+static NSString *GWRemoteFilenamesPboardType = @"GWRemoteFilenamesPboardType";
+static NSString *GWLSFolderPboardType = @"GWLSFolderPboardType";
+static NSString *GWDockIconPboardType = @"DockIconPboardType";
+
 @implementation DockView
 
 - (id)initWithFrame:(NSRect)frame
@@ -12,12 +16,21 @@ static CGFloat DockPad = 10.0;
   self = [super initWithFrame:frame];
   if (self) {
     _items = [NSMutableArray new];
-    _highlightIndex = -1;
+    _draggingPaths = NO;
+    _performedDragOperation = NO;
     _lastMouseDownIndex = NSNotFound;
     _lastMouseDownTime = 0.0;
     _gnustepIcon = [[self loadGNUstepIcon] retain];
     [self registerForDraggedTypes:
-      [NSArray arrayWithObjects:NSFilenamesPboardType, NSURLPboardType, nil]];
+      [NSArray arrayWithObjects:NSFilenamesPboardType,
+                                NSURLPboardType,
+                                NSStringPboardType,
+                                @"text/uri-list",
+                                @"text/plain",
+                                GWRemoteFilenamesPboardType,
+                                GWLSFolderPboardType,
+                                GWDockIconPboardType,
+                                nil]];
   }
   return self;
 }
@@ -125,7 +138,10 @@ static CGFloat DockPad = 10.0;
 {
   NSArray *types = [pb types];
   NSArray *paths;
+  NSMutableArray *collectedPaths = [NSMutableArray array];
+  NSString *string;
   NSURL *url;
+  NSUInteger i;
 
   if ([types containsObject:NSFilenamesPboardType]) {
     paths = [pb propertyListForType:NSFilenamesPboardType];
@@ -141,24 +157,146 @@ static CGFloat DockPad = 10.0;
     }
   }
 
+  if ([types containsObject:GWRemoteFilenamesPboardType]) {
+    NSData *data = [pb dataForType:GWRemoteFilenamesPboardType];
+    id dict = data ? [NSUnarchiver unarchiveObjectWithData:data] : nil;
+    if ([dict isKindOfClass:[NSDictionary class]]) {
+      [self addPathsFromPasteboardObject:[dict objectForKey:@"paths"]
+                                 toArray:collectedPaths];
+    }
+  }
+
+  if ([types containsObject:GWLSFolderPboardType]) {
+    NSData *data = [pb dataForType:GWLSFolderPboardType];
+    id dict = data ? [NSUnarchiver unarchiveObjectWithData:data] : nil;
+    if ([dict isKindOfClass:[NSDictionary class]]) {
+      [self addPathsFromPasteboardObject:[dict objectForKey:@"paths"]
+                                 toArray:collectedPaths];
+    }
+  }
+
+  if ([types containsObject:GWDockIconPboardType]) {
+    NSData *data = [pb dataForType:GWDockIconPboardType];
+    id dict = data ? [NSUnarchiver unarchiveObjectWithData:data] : nil;
+    if ([dict isKindOfClass:[NSDictionary class]]) {
+      [self addPathsFromPasteboardObject:[dict objectForKey:@"path"]
+                                 toArray:collectedPaths];
+    }
+  }
+
+  for (i = 0; i < [types count]; i++) {
+    NSString *type = [types objectAtIndex:i];
+    id plist = [pb propertyListForType:type];
+
+    [self addPathsFromPasteboardObject:plist toArray:collectedPaths];
+
+    string = [pb stringForType:type];
+    if ([string length]) {
+      [self addPathsFromPasteboardString:string toArray:collectedPaths];
+    }
+  }
+
+  if ([collectedPaths count]) {
+    return collectedPaths;
+  }
+
   return nil;
 }
 
-- (void)drawTileInRect:(NSRect)cell highlighted:(BOOL)highlighted
+- (BOOL)pasteboardHasSupportedType:(NSPasteboard *)pb
 {
-  NSRect inner = NSInsetRect(cell, 2.0, 2.0);
+  NSArray *supportedTypes = [NSArray arrayWithObjects:NSFilenamesPboardType,
+                                                       NSURLPboardType,
+                                                       NSStringPboardType,
+                                                       @"text/uri-list",
+                                                       @"text/plain",
+                                                       GWRemoteFilenamesPboardType,
+                                                       GWLSFolderPboardType,
+                                                       GWDockIconPboardType,
+                                                       nil];
+  return [pb availableTypeFromArray:supportedTypes] != nil;
+}
 
-  [[NSColor colorWithCalibratedWhite:0.04 alpha:1.0] set];
-  NSRectFill(cell);
+- (void)addPathsFromPasteboardObject:(id)object toArray:(NSMutableArray *)paths
+{
+  if ([object isKindOfClass:[NSString class]]) {
+    [self addPathsFromPasteboardString:object toArray:paths];
+  } else if ([object isKindOfClass:[NSArray class]]) {
+    NSUInteger i;
+    for (i = 0; i < [object count]; i++) {
+      [self addPathsFromPasteboardObject:[object objectAtIndex:i] toArray:paths];
+    }
+  } else if ([object isKindOfClass:[NSDictionary class]]) {
+    NSEnumerator *enumerator = [object objectEnumerator];
+    id value;
 
-  [[NSColor colorWithCalibratedWhite:(highlighted ? 0.42 : 0.28) alpha:1.0] set];
-  NSRectFill(inner);
+    while ((value = [enumerator nextObject])) {
+      [self addPathsFromPasteboardObject:value toArray:paths];
+    }
+  }
+}
 
-  [[NSColor colorWithCalibratedWhite:(highlighted ? 0.68 : 0.58) alpha:1.0] set];
-  NSRectFill(NSInsetRect(inner, 3.0, 3.0));
+- (void)addPathsFromPasteboardString:(NSString *)string toArray:(NSMutableArray *)paths
+{
+  NSArray *lines;
+  NSUInteger i;
 
-  [[NSColor colorWithCalibratedWhite:(highlighted ? 0.82 : 0.70) alpha:1.0] set];
-  NSFrameRect(cell);
+  if (![string length]) {
+    return;
+  }
+
+  lines = [string componentsSeparatedByCharactersInSet:
+    [NSCharacterSet newlineCharacterSet]];
+
+  for (i = 0; i < [lines count]; i++) {
+    NSString *line = [[lines objectAtIndex:i]
+      stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    NSString *path = nil;
+
+    if (![line length] || [line hasPrefix:@"#"]) {
+      continue;
+    }
+
+    if ([line hasPrefix:@"\""] && [line hasSuffix:@"\""] && [line length] > 1) {
+      line = [line substringWithRange:NSMakeRange(1, [line length] - 2)];
+    }
+
+    if ([line hasPrefix:@"file:"]) {
+      NSURL *fileURL = [NSURL URLWithString:line];
+      if ([fileURL isFileURL]) {
+        path = [fileURL path];
+      }
+    } else if ([line isAbsolutePath]) {
+      path = line;
+    }
+
+    if ([path length] && ![paths containsObject:path]) {
+      [paths addObject:path];
+    }
+  }
+}
+
+- (NSDragOperation)dragOperationForSender:(id <NSDraggingInfo>)sender
+{
+  NSDragOperation mask = [sender draggingSourceOperationMask];
+
+  if (mask & NSDragOperationMove) {
+    return NSDragOperationMove;
+  }
+  if (mask & NSDragOperationCopy) {
+    return NSDragOperationCopy;
+  }
+  if (mask & NSDragOperationLink) {
+    return NSDragOperationLink;
+  }
+  if (mask & NSDragOperationGeneric) {
+    return NSDragOperationGeneric;
+  }
+  if (mask & NSDragOperationPrivate) {
+    return NSDragOperationPrivate;
+  }
+
+  return NSDragOperationMove;
 }
 
 - (BOOL)drawImage:(NSImage *)image inCell:(NSRect)cell size:(CGFloat)size
@@ -281,19 +419,15 @@ static CGFloat DockPad = 10.0;
     [self drawStateForItem:item inCell:cell];
   }
 
-  if (_highlightIndex == (NSInteger)[_items count]) {
-    NSPoint origin = [self cellOriginAtIndex:[_items count]];
-    [self drawTileInRect:NSMakeRect(origin.x, origin.y, DockCell, DockCell)
-             highlighted:YES];
-  }
 }
 
 - (NSDragOperation)draggingEntered:(id <NSDraggingInfo>)sender
 {
-  if ([[self pathsFromPasteboard:[sender draggingPasteboard]] count]) {
-    _highlightIndex = [_items count];
+  if ([self pasteboardHasSupportedType:[sender draggingPasteboard]]) {
+    _draggingPaths = YES;
+    _performedDragOperation = NO;
     [self setNeedsDisplay:YES];
-    return NSDragOperationCopy;
+    return [self dragOperationForSender:sender];
   }
   return NSDragOperationNone;
 }
@@ -305,21 +439,43 @@ static CGFloat DockPad = 10.0;
 
 - (void)draggingExited:(id <NSDraggingInfo>)sender
 {
-  _highlightIndex = -1;
+  _draggingPaths = NO;
+  _performedDragOperation = NO;
   [self setNeedsDisplay:YES];
+}
+
+- (BOOL)prepareForDragOperation:(id <NSDraggingInfo>)sender
+{
+  return [self pasteboardHasSupportedType:[sender draggingPasteboard]];
 }
 
 - (BOOL)performDragOperation:(id <NSDraggingInfo>)sender
 {
   NSArray *paths = [self pathsFromPasteboard:[sender draggingPasteboard]];
-  _highlightIndex = -1;
+  _draggingPaths = NO;
   [self setNeedsDisplay:YES];
 
   if ([paths count] && [_delegate respondsToSelector:@selector(dockViewDidReceivePaths:)]) {
     [_delegate dockViewDidReceivePaths:paths];
+    _performedDragOperation = YES;
     return YES;
   }
   return NO;
+}
+
+- (void)concludeDragOperation:(id <NSDraggingInfo>)sender
+{
+  if (!_performedDragOperation) {
+    NSArray *paths = [self pathsFromPasteboard:[sender draggingPasteboard]];
+    if ([paths count] &&
+        [_delegate respondsToSelector:@selector(dockViewDidReceivePaths:)]) {
+      [_delegate dockViewDidReceivePaths:paths];
+    }
+  }
+
+  _draggingPaths = NO;
+  _performedDragOperation = NO;
+  [self setNeedsDisplay:YES];
 }
 
 - (void)mouseDown:(NSEvent *)event

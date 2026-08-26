@@ -11,7 +11,8 @@
 {
   NSMutableArray *_items;
   id _delegate;
-  NSInteger _highlightIndex;
+  BOOL _draggingPaths;
+  BOOL _performedDragOperation;
   NSImage *_gnustepIcon;
   BOOL _horizontal;
   NSUInteger _lastMouseDownIndex;
