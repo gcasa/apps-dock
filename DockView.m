@@ -404,9 +404,6 @@ static NSUInteger DockTopIconClickIndex = NSUIntegerMax - 1;
 - (void)drawRect:(NSRect)dirtyRect
 {
   NSUInteger i;
-  NSRect bounds = [self bounds];
-  [[NSColor colorWithCalibratedWhite:0.10 alpha:0.96] set];
-  NSRectFill(bounds);
 
   [self drawTopTile];
 
