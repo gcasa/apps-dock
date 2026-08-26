@@ -2,6 +2,12 @@
 
 @implementation DockItem
 
++ (BOOL)imageIsDrawable:(NSImage *)image
+{
+  return image && ([[image representations] count] > 0 ||
+                   [image isValid]);
+}
+
 + (NSImage *)imageAtPath:(NSString *)path
 {
   NSImage *image;
@@ -11,7 +17,7 @@
   }
 
   image = [[[NSImage alloc] initWithContentsOfFile:path] autorelease];
-  return image;
+  return [self imageIsDrawable:image] ? image : nil;
 }
 
 + (NSImage *)imageNamed:(NSString *)name inApplicationPath:(NSString *)path
@@ -42,6 +48,23 @@
         return image;
       }
     }
+  }
+
+  return nil;
+}
+
++ (NSString *)applicationBundlePathForPath:(NSString *)path
+{
+  NSString *candidate = path;
+  BOOL isDir = NO;
+
+  while ([candidate length] && ![candidate isEqualToString:@"/"]) {
+    if ([[[candidate pathExtension] lowercaseString] isEqualToString:@"app"] &&
+        [[NSFileManager defaultManager] fileExistsAtPath:candidate isDirectory:&isDir] &&
+        isDir) {
+      return candidate;
+    }
+    candidate = [candidate stringByDeletingLastPathComponent];
   }
 
   return nil;
@@ -83,6 +106,48 @@
         inApplicationPath:path];
 }
 
++ (NSImage *)iconForDesktopFile:(NSString *)path
+{
+  NSString *contents = [NSString stringWithContentsOfFile:path];
+  NSArray *lines = [contents componentsSeparatedByCharactersInSet:
+    [NSCharacterSet newlineCharacterSet]];
+  NSArray *searchPaths = [NSArray arrayWithObjects:
+    [[path stringByDeletingLastPathComponent] stringByAppendingPathComponent:@"Resources"],
+    [path stringByDeletingLastPathComponent],
+    @"/usr/GNUstep/Local/Applications",
+    @"/usr/GNUstep/System/Applications",
+    @"/usr/GNUstep/Local/Library/WindowMaker/Icons",
+    @"/usr/GNUstep/System/Library/WindowMaker/Icons",
+    nil];
+  NSUInteger i, j;
+
+  for (i = 0; i < [lines count]; i++) {
+    NSString *line = [lines objectAtIndex:i];
+    NSString *iconName;
+
+    if (![line hasPrefix:@"Icon="]) {
+      continue;
+    }
+
+    iconName = [line substringFromIndex:5];
+    if ([iconName isAbsolutePath]) {
+      NSImage *image = [self imageAtPath:iconName];
+      if (image) {
+        return image;
+      }
+    }
+
+    for (j = 0; j < [searchPaths count]; j++) {
+      NSImage *image = [self imageNamed:iconName inApplicationPath:[searchPaths objectAtIndex:j]];
+      if (image) {
+        return image;
+      }
+    }
+  }
+
+  return nil;
+}
+
 + (NSImage *)fallbackApplicationIcon
 {
   NSArray *paths = [NSArray arrayWithObjects:
@@ -99,35 +164,56 @@
     }
   }
 
-  return [NSImage imageNamed:@"NSApplicationIcon"];
+  return [self imageIsDrawable:[NSImage imageNamed:@"NSApplicationIcon"]]
+    ? [NSImage imageNamed:@"NSApplicationIcon"] : nil;
 }
 
 + (id)applicationItemWithPath:(NSString *)path
 {
   DockItem *item = [[[self alloc] init] autorelease];
   NSImage *icon = nil;
-  BOOL isDir = NO;
+  NSString *bundlePath = [self applicationBundlePathForPath:path];
+  NSString *iconPath = bundlePath ? bundlePath : path;
 
-  [[NSFileManager defaultManager] fileExistsAtPath:path isDirectory:&isDir];
-  if (isDir || [[path pathExtension] isEqualToString:@"app"]) {
-    icon = [self iconForApplicationPath:path];
+  if (bundlePath) {
+    icon = [self iconForApplicationPath:bundlePath];
+  }
+  if (!icon && [[[path pathExtension] lowercaseString] isEqualToString:@"desktop"]) {
+    icon = [self iconForDesktopFile:path];
   }
   if (!icon) {
     icon = [[NSWorkspace sharedWorkspace] iconForFile:path];
+    if (![self imageIsDrawable:icon]) {
+      icon = nil;
+    }
   }
   if (!icon) {
     icon = [[NSWorkspace sharedWorkspace] iconForFileType:[path pathExtension]];
+    if (![self imageIsDrawable:icon]) {
+      icon = nil;
+    }
   }
   if (!icon) {
     icon = [[NSWorkspace sharedWorkspace] iconForFileType:@"app"];
+    if (![self imageIsDrawable:icon]) {
+      icon = nil;
+    }
   }
   if (!icon) {
     icon = [self fallbackApplicationIcon];
   }
 
+  NSLog(@"Dock item icon for %@: bundle=%@ icon=%@ reps=%lu valid=%d",
+        path,
+        bundlePath ? bundlePath : @"(none)",
+        icon,
+        (unsigned long)[[icon representations] count],
+        icon ? [icon isValid] : 0);
+
   item->_kind = DockItemApplication;
   item->_state = DockItemNotRunning;
   item->_path = [path copy];
+  item->_iconPath = [iconPath copy];
   item->_title = [[[path lastPathComponent] stringByDeletingPathExtension] copy];
   item->_icon = [icon retain];
   return item;
@@ -148,6 +234,7 @@
 {
   [_title release];
   [_path release];
+  [_iconPath release];
   [_icon release];
   [super dealloc];
 }
@@ -157,6 +244,7 @@
 - (void)setState:(DockItemState)state { _state = state; }
 - (NSString *)title { return _title; }
 - (NSString *)path { return _path; }
+- (NSString *)iconPath { return _iconPath; }
 - (NSImage *)icon { return _icon; }
 - (void)setIcon:(NSImage *)icon
 {

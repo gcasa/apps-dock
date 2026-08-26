@@ -17,6 +17,7 @@ typedef enum {
   DockItemState _state;
   NSString *_title;
   NSString *_path;
+  NSString *_iconPath;
   NSImage *_icon;
   unsigned long _xWindow;
 }
@@ -29,6 +30,7 @@ typedef enum {
 - (void)setState:(DockItemState)state;
 - (NSString *)title;
 - (NSString *)path;
+- (NSString *)iconPath;
 - (NSImage *)icon;
 - (void)setIcon:(NSImage *)icon;
 - (unsigned long)xWindow;

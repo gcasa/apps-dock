@@ -159,19 +159,62 @@ static CGFloat DockPad = 10.0;
   NSFrameRect(cell);
 }
 
-- (void)drawImage:(NSImage *)image inCell:(NSRect)cell size:(CGFloat)size
+- (BOOL)drawImage:(NSImage *)image inCell:(NSRect)cell size:(CGFloat)size
 {
-  if (!image) {
-    return;
+  NSSize imageSize;
+  NSRect sourceRect;
+  NSImageRep *bestRep;
+  NSRect destRect;
+
+  if (!image || (![[image representations] count] && ![image isValid])) {
+    return NO;
   }
 
-  [image drawInRect:NSMakeRect(NSMidX(cell) - size / 2.0,
-                               NSMidY(cell) - size / 2.0,
-                               size,
-                               size)
-              fromRect:NSZeroRect
-             operation:NSCompositeSourceOver
-              fraction:1.0];
+  bestRep = [image bestRepresentationForDevice:nil];
+  imageSize = [image size];
+  if (imageSize.width <= 0.0 || imageSize.height <= 0.0) {
+    NSImageRep *rep = [[image representations] count]
+      ? [[image representations] objectAtIndex:0] : nil;
+    if (rep) {
+      imageSize = NSMakeSize([rep pixelsWide], [rep pixelsHigh]);
+      [image setSize:imageSize];
+    }
+  }
+
+  if (imageSize.width <= 0.0 || imageSize.height <= 0.0) {
+    return NO;
+  }
+
+  sourceRect = NSMakeRect(0, 0, imageSize.width, imageSize.height);
+  destRect = NSMakeRect(NSMidX(cell) - size / 2.0,
+                        NSMidY(cell) - size / 2.0,
+                        size,
+                        size);
+
+  if (bestRep && [bestRep respondsToSelector:@selector(drawInRect:)]) {
+    [bestRep drawInRect:destRect];
+  } else {
+    [image drawInRect:destRect
+             fromRect:sourceRect
+            operation:NSCompositeSourceOver
+             fraction:1.0];
+  }
+  return YES;
+}
+
+- (void)drawFallbackIconForItem:(DockItem *)item inCell:(NSRect)cell
+{
+  NSDictionary *attrs = [NSDictionary dictionaryWithObjectsAndKeys:
+    [NSFont boldSystemFontOfSize:18], NSFontAttributeName,
+    [NSColor colorWithCalibratedWhite:0.95 alpha:1.0], NSForegroundColorAttributeName,
+    nil];
+  NSString *title = [[item title] length] ? [item title] : @"?";
+  NSString *label = [[title substringToIndex:MIN((NSUInteger)2, [title length])] uppercaseString];
+  NSSize size = [label sizeWithAttributes:attrs];
+
+  [label drawAtPoint:NSMakePoint(NSMidX(cell) - size.width / 2.0,
+                                 NSMidY(cell) - size.height / 2.0)
+      withAttributes:attrs];
 }
 
 - (void)drawStateForItem:(DockItem *)item inCell:(NSRect)cell
@@ -228,13 +271,25 @@ static CGFloat DockPad = 10.0;
 
     {
       NSImage *icon = [item icon];
-      if (!icon && [item kind] == DockItemApplication) {
-        icon = [[NSWorkspace sharedWorkspace] iconForFile:[item path]];
+      if ((!icon || (![[icon representations] count] && ![icon isValid])) &&
+          [item kind] == DockItemApplication) {
+        icon = [[NSWorkspace sharedWorkspace] iconForFile:[item iconPath]];
+        if (![[icon representations] count] && ![icon isValid]) {
+          icon = nil;
+        }
+      }
+      if (!icon || (![[icon representations] count] && ![icon isValid])) {
+        icon = [[NSWorkspace sharedWorkspace] iconForFileType:@"app"];
+        if (![[icon representations] count] && ![icon isValid]) {
+          icon = nil;
+        }
       }
       if (!icon) {
-        icon = [[NSWorkspace sharedWorkspace] iconForFileType:@"app"];
+        icon = _gnustepIcon;
       }
-      [self drawImage:icon inCell:cell size:46.0];
+      if (![self drawImage:icon inCell:cell size:46.0]) {
+        [self drawFallbackIconForItem:item inCell:cell];
+      }
     }
     [self drawStateForItem:item inCell:cell];
   }

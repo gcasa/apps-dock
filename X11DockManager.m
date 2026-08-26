@@ -4,6 +4,13 @@
 #import <X11/Xatom.h>
 #import <X11/Xutil.h>
 
+static int X11DockManagerLastErrorCode = 0;
+static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
+{
+  X11DockManagerLastErrorCode = event->error_code;
+  return 0;
+}
+
 @implementation X11DockManager
 
 - (id)initWithDockView:(DockView *)view
@@ -57,7 +64,20 @@
   XMapWindow(display, (Window)_hostWindow);
   XFlush(display);
   _display = display;
+  XSetErrorHandler(X11DockManagerHandleError);
   return YES;
+}
+
+- (BOOL)x11ErrorOccurred
+{
+  Display *display = (Display *)_display;
+  XSync(display, False);
+  return X11DockManagerLastErrorCode != 0;
+}
+
+- (void)clearX11Error
+{
+  X11DockManagerLastErrorCode = 0;
 }
 
 - (void)setDockPlacement:(DockPlacement)placement
@@ -128,14 +148,23 @@
   char *name = NULL;
   NSString *title = nil;
 
+  [self clearX11Error];
   if (XFetchName(display, window, &name) && name) {
+    if ([self x11ErrorOccurred]) {
+      if (name) XFree(name);
+      return nil;
+    }
     title = [NSString stringWithUTF8String:name];
     XFree(name);
   }
 
   if (![title length]) {
     XClassHint hint;
+    [self clearX11Error];
     if (XGetClassHint(display, window, &hint)) {
+      if ([self x11ErrorOccurred]) {
+        return nil;
+      }
       if (hint.res_class) {
         title = [NSString stringWithUTF8String:hint.res_class];
       } else if (hint.res_name) {
@@ -159,9 +188,14 @@
   unsigned char *data = NULL;
   BOOL found = NO;
 
+  [self clearX11Error];
   if (XGetWindowProperty(display, window, property, 0, 2, False, property,
                          &actualType, &actualFormat, &itemCount, &bytesAfter,
                          &data) == Success && data) {
+    if ([self x11ErrorOccurred]) {
+      if (data) XFree(data);
+      return NO;
+    }
     if (actualFormat == 32 && itemCount >= 1) {
       *state = ((long *)data)[0];
       found = YES;
@@ -181,7 +215,11 @@
   if ([self wmStateForWindow:window state:&state] && state == IconicState) {
     return YES;
   }
+  [self clearX11Error];
   if (XGetWindowAttributes(display, window, &attr) && attr.map_state != IsViewable) {
+    if ([self x11ErrorOccurred]) {
+      return NO;
+    }
     return YES;
   }
   return NO;
@@ -198,9 +236,14 @@
   NSImage *netWmIcon = nil;
   NSImage *icon = [[NSWorkspace sharedWorkspace] iconForFileType:@"app"];
 
+  [self clearX11Error];
   if (XGetWindowProperty(display, window, property, 0, 65536, False, XA_CARDINAL,
                          &actualType, &actualFormat, &itemCount, &bytesAfter,
                          &data) == Success && data) {
+    if ([self x11ErrorOccurred]) {
+      if (data) XFree(data);
+      return icon ? icon : [NSImage imageNamed:@"NSApplicationIcon"];
+    }
     if (actualFormat == 32 && itemCount >= 3) {
       unsigned long *values = (unsigned long *)data;
       unsigned long offset = 0;
@@ -276,11 +319,19 @@
   XWMHints *hints;
   BOOL result = NO;
 
+  [self clearX11Error];
   if (!XGetWindowAttributes(display, window, &attr)) {
     return NO;
   }
+  if ([self x11ErrorOccurred]) {
+    return NO;
+  }
 
+  [self clearX11Error];
   hints = XGetWMHints(display, window);
+  if ([self x11ErrorOccurred]) {
+    return NO;
+  }
   if (hints) {
     if ((hints->flags & IconWindowHint) && hints->icon_window != None) {
       result = YES;
@@ -304,7 +355,11 @@
   if (window == (Window)_hostWindow) {
     return NO;
   }
+  [self clearX11Error];
   if (!XGetWindowAttributes(display, window, &attr)) {
+    return NO;
+  }
+  if ([self x11ErrorOccurred]) {
     return NO;
   }
   if (attr.override_redirect) {
@@ -332,6 +387,10 @@
   for (i = 0; i < count; i++) {
     NSNumber *key = [NSNumber numberWithUnsignedLong:(unsigned long)children[i]];
     if ([_knownWindows containsObject:key]) {
+      if (![self windowLooksManageable:children[i]]) {
+        [_knownWindows removeObject:key];
+        continue;
+      }
       if ([_delegate respondsToSelector:@selector(x11DockManagerDidUpdateWindow:hidden:)]) {
         [_delegate x11DockManagerDidUpdateWindow:(unsigned long)children[i]
                                           hidden:[self windowIsHidden:children[i]]];

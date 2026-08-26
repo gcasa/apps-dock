@@ -2,7 +2,9 @@
 #import "DockItem.h"
 
 static CGFloat DockWindowWidth = 84.0;
-static CGFloat DockWindowHeight = 720.0;
+static CGFloat DockCell = 64.0;
+static CGFloat DockGap = 2.0;
+static CGFloat DockPad = 10.0;
 
 static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 {
@@ -90,8 +92,10 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 - (NSRect)dockWindowFrameForPlacement:(DockPlacement)placement
 {
   NSRect screenFrame = [[NSScreen mainScreen] frame];
-  CGFloat width = DockPlacementIsHorizontal(placement) ? DockWindowHeight : DockWindowWidth;
-  CGFloat height = DockPlacementIsHorizontal(placement) ? DockWindowWidth : DockWindowHeight;
+  NSUInteger cellCount = [_items count] + 1;
+  CGFloat length = DockPad * 2.0 + cellCount * DockCell + (cellCount - 1) * DockGap;
+  CGFloat width = DockPlacementIsHorizontal(placement) ? length : DockWindowWidth;
+  CGFloat height = DockPlacementIsHorizontal(placement) ? DockWindowWidth : length;
   CGFloat x;
   CGFloat y;
 
@@ -201,6 +205,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 - (void)refreshDock
 {
   [_dockView setItems:_items];
+  [self applyDockPlacement];
 }
 
 - (DockItem *)itemForXWindow:(unsigned long)xWindow
@@ -251,6 +256,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     NSString *path = [paths objectAtIndex:i];
     BOOL isDir = NO;
     if ([[NSFileManager defaultManager] fileExistsAtPath:path isDirectory:&isDir]) {
+      NSLog(@"Adding dock item for dropped path %@", path);
       [_items addObject:[DockItem applicationItemWithPath:path]];
     }
   }
