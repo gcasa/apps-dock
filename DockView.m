@@ -68,6 +68,11 @@ static NSUInteger DockTopIconClickIndex = NSUIntegerMax - 1;
   _delegate = delegate;
 }
 
+- (BOOL)acceptsFirstMouse:(NSEvent *)event
+{
+  return YES;
+}
+
 - (void)setItems:(NSArray *)items
 {
   [_items setArray:items];
@@ -485,6 +490,10 @@ static NSUInteger DockTopIconClickIndex = NSUIntegerMax - 1;
   BOOL isDoubleClick = NO;
   BOOL topIconClicked = [self topIconContainsPoint:location];
 
+  if (eventTime <= 0.0) {
+    eventTime = [NSDate timeIntervalSinceReferenceDate];
+  }
+
   if (topIconClicked) {
     clickedIndex = DockTopIconClickIndex;
   }
@@ -499,13 +508,12 @@ static NSUInteger DockTopIconClickIndex = NSUIntegerMax - 1;
     }
   }
 
-  if (isDoubleClick &&
-      [_delegate respondsToSelector:@selector(dockViewDidActivateItem:)]) {
+  if (isDoubleClick) {
     if (topIconClicked) {
       if ([_delegate respondsToSelector:@selector(dockViewDidActivateTopIcon)]) {
         [_delegate dockViewDidActivateTopIcon];
       }
-    } else {
+    } else if ([_delegate respondsToSelector:@selector(dockViewDidActivateItem:)]) {
       [_delegate dockViewDidActivateItem:[_items objectAtIndex:index]];
     }
     _lastMouseDownIndex = NSNotFound;

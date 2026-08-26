@@ -343,15 +343,20 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 {
   if ([item kind] == DockItemApplication) {
     NSString *path = [item path];
+    NSString *extension = [[path pathExtension] lowercaseString];
     BOOL isDir = NO;
     if ([item xWindow] && [item state] != DockItemNotRunning) {
       [_x11 activateWindow:[item xWindow]];
       return;
     }
     [[NSFileManager defaultManager] fileExistsAtPath:path isDirectory:&isDir];
-    if ([[path pathExtension] isEqualToString:@"desktop"]) {
+    if ([extension isEqualToString:@"desktop"]) {
       [self launchDesktopFile:path];
-    } else if (isDir || [[path pathExtension] isEqualToString:@"app"]) {
+    } else if ([extension isEqualToString:@"app"]) {
+      if (![[NSWorkspace sharedWorkspace] launchApplication:path]) {
+        [[NSWorkspace sharedWorkspace] openFile:path];
+      }
+    } else if (isDir) {
       [[NSWorkspace sharedWorkspace] openFile:path];
     } else if ([[NSFileManager defaultManager] isExecutableFileAtPath:path]) {
       [NSTask launchedTaskWithLaunchPath:path arguments:[NSArray array]];
