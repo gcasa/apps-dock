@@ -5,6 +5,7 @@
 @protocol DockViewDelegate
 - (void)dockViewDidReceivePaths:(NSArray *)paths;
 - (void)dockViewDidActivateItem:(DockItem *)item;
+- (void)dockViewDidActivateTopIcon;
 @end
 
 @interface DockView : NSView

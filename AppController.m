@@ -5,6 +5,7 @@ static CGFloat DockWindowWidth = 84.0;
 static CGFloat DockCell = 64.0;
 static CGFloat DockGap = 2.0;
 static CGFloat DockPad = 10.0;
+static NSString *DockApplicationsDefaultsKey = @"DockApplications";
 
 static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 {
@@ -18,6 +19,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   NSRect frame;
 
   _items = [NSMutableArray new];
+  [self loadPersistedApplications];
   _dockPlacement = [self savedDockPlacement];
   frame = [self dockWindowFrameForPlacement:_dockPlacement];
 
@@ -35,6 +37,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
                                                          NSHeight(frame))];
   [_dockView setDelegate:self];
   [_dockView setHorizontal:DockPlacementIsHorizontal(_dockPlacement)];
+  [_dockView setItems:_items];
   [_dockView setMenu:[self dockMenu]];
   [_window setContentView:_dockView];
   [_window makeKeyAndOrderFront:nil];
@@ -87,6 +90,71 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   }
 
   return [defaults boolForKey:@"DockCentered"] ? DockPlacementLeftCenter : DockPlacementLeftTop;
+}
+
+- (void)loadPersistedApplications
+{
+  NSArray *paths = [[NSUserDefaults standardUserDefaults]
+    objectForKey:DockApplicationsDefaultsKey];
+  NSUInteger i;
+
+  if (![paths isKindOfClass:[NSArray class]]) {
+    return;
+  }
+
+  for (i = 0; i < [paths count]; i++) {
+    id path = [paths objectAtIndex:i];
+    BOOL isDir = NO;
+
+    if (![path isKindOfClass:[NSString class]]) {
+      continue;
+    }
+
+    if ([[NSFileManager defaultManager] fileExistsAtPath:path
+                                             isDirectory:&isDir]) {
+      [_items addObject:[DockItem applicationItemWithPath:path]];
+    }
+  }
+}
+
+- (void)savePersistedApplications
+{
+  NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+  NSMutableArray *paths = [NSMutableArray array];
+  NSUInteger i;
+
+  for (i = 0; i < [_items count]; i++) {
+    DockItem *item = [_items objectAtIndex:i];
+    NSString *path = [item path];
+
+    if ([item kind] == DockItemApplication &&
+        [path length] &&
+        ![paths containsObject:path]) {
+      [paths addObject:path];
+    }
+  }
+
+  [defaults setObject:paths forKey:DockApplicationsDefaultsKey];
+  [defaults synchronize];
+}
+
+- (BOOL)dockHasApplicationPath:(NSString *)path
+{
+  NSUInteger i;
+
+  if (![path length]) {
+    return NO;
+  }
+
+  for (i = 0; i < [_items count]; i++) {
+    DockItem *item = [_items objectAtIndex:i];
+    if ([item kind] == DockItemApplication &&
+        [[item path] isEqualToString:path]) {
+      return YES;
+    }
+  }
+
+  return NO;
 }
 
 - (NSRect)dockWindowFrameForPlacement:(DockPlacement)placement
@@ -252,14 +320,23 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 - (void)dockViewDidReceivePaths:(NSArray *)paths
 {
   NSUInteger i;
+  BOOL added = NO;
+
   for (i = 0; i < [paths count]; i++) {
     NSString *path = [paths objectAtIndex:i];
     BOOL isDir = NO;
-    if ([[NSFileManager defaultManager] fileExistsAtPath:path isDirectory:&isDir]) {
+
+    if ([[NSFileManager defaultManager] fileExistsAtPath:path isDirectory:&isDir] &&
+        ![self dockHasApplicationPath:path]) {
       [_items addObject:[DockItem applicationItemWithPath:path]];
+      added = YES;
     }
   }
-  [self refreshDock];
+
+  if (added) {
+    [self savePersistedApplications];
+    [self refreshDock];
+  }
 }
 
 - (void)dockViewDidActivateItem:(DockItem *)item
@@ -283,6 +360,23 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     }
   } else {
     [_x11 activateWindow:[item xWindow]];
+  }
+}
+
+- (void)dockViewDidActivateTopIcon
+{
+  NSArray *paths = [NSArray arrayWithObjects:
+    @"/usr/GNUstep/System/Applications/GWorkspace.app",
+    @"/usr/GNUstep/Local/Applications/GWorkspace.app",
+    nil];
+  NSUInteger i;
+
+  for (i = 0; i < [paths count]; i++) {
+    NSString *path = [paths objectAtIndex:i];
+    if ([[NSFileManager defaultManager] fileExistsAtPath:path]) {
+      [[NSWorkspace sharedWorkspace] openFile:path];
+      return;
+    }
   }
 }
 

@@ -8,6 +8,7 @@ static CGFloat DockPad = 10.0;
 static NSString *GWRemoteFilenamesPboardType = @"GWRemoteFilenamesPboardType";
 static NSString *GWLSFolderPboardType = @"GWLSFolderPboardType";
 static NSString *GWDockIconPboardType = @"DockIconPboardType";
+static NSUInteger DockTopIconClickIndex = NSUIntegerMax - 1;
 
 @implementation DockView
 
@@ -132,6 +133,11 @@ static NSString *GWDockIconPboardType = @"DockIconPboardType";
     }
   }
   return NSNotFound;
+}
+
+- (BOOL)topIconContainsPoint:(NSPoint)p
+{
+  return NSPointInRect(p, [self topTileRect]);
 }
 
 - (NSArray *)pathsFromPasteboard:(NSPasteboard *)pb
@@ -280,9 +286,6 @@ static NSString *GWDockIconPboardType = @"DockIconPboardType";
 {
   NSDragOperation mask = [sender draggingSourceOperationMask];
 
-  if (mask & NSDragOperationMove) {
-    return NSDragOperationMove;
-  }
   if (mask & NSDragOperationCopy) {
     return NSDragOperationCopy;
   }
@@ -295,8 +298,11 @@ static NSString *GWDockIconPboardType = @"DockIconPboardType";
   if (mask & NSDragOperationPrivate) {
     return NSDragOperationPrivate;
   }
+  if (mask & NSDragOperationMove) {
+    return NSDragOperationMove;
+  }
 
-  return NSDragOperationMove;
+  return NSDragOperationCopy;
 }
 
 - (BOOL)drawImage:(NSImage *)image inCell:(NSRect)cell size:(CGFloat)size
@@ -474,15 +480,22 @@ static NSString *GWDockIconPboardType = @"DockIconPboardType";
 
 - (void)mouseDown:(NSEvent *)event
 {
-  NSUInteger index = [self indexAtPoint:[self convertPoint:[event locationInWindow] fromView:nil]];
+  NSPoint location = [self convertPoint:[event locationInWindow] fromView:nil];
+  NSUInteger index = [self indexAtPoint:location];
   NSTimeInterval eventTime = [event timestamp];
   NSTimeInterval doubleClickInterval = 0.5;
+  NSUInteger clickedIndex = index;
   BOOL isDoubleClick = NO;
+  BOOL topIconClicked = [self topIconContainsPoint:location];
 
-  if (index != NSNotFound) {
+  if (topIconClicked) {
+    clickedIndex = DockTopIconClickIndex;
+  }
+
+  if (clickedIndex != NSNotFound) {
     if ([event clickCount] >= 2) {
       isDoubleClick = YES;
-    } else if (index == _lastMouseDownIndex &&
+    } else if (clickedIndex == _lastMouseDownIndex &&
                _lastMouseDownTime > 0.0 &&
                eventTime - _lastMouseDownTime <= doubleClickInterval) {
       isDoubleClick = YES;
@@ -491,13 +504,19 @@ static NSString *GWDockIconPboardType = @"DockIconPboardType";
 
   if (isDoubleClick &&
       [_delegate respondsToSelector:@selector(dockViewDidActivateItem:)]) {
-    [_delegate dockViewDidActivateItem:[_items objectAtIndex:index]];
+    if (topIconClicked) {
+      if ([_delegate respondsToSelector:@selector(dockViewDidActivateTopIcon)]) {
+        [_delegate dockViewDidActivateTopIcon];
+      }
+    } else {
+      [_delegate dockViewDidActivateItem:[_items objectAtIndex:index]];
+    }
     _lastMouseDownIndex = NSNotFound;
     _lastMouseDownTime = 0.0;
     return;
   }
 
-  _lastMouseDownIndex = index;
+  _lastMouseDownIndex = clickedIndex;
   _lastMouseDownTime = eventTime;
 }
 
