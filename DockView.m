@@ -260,7 +260,6 @@ static CGFloat DockPad = 10.0;
 {
   NSRect cell = [self topTileRect];
 
-  [self drawTileInRect:cell highlighted:NO];
   [self drawImage:_gnustepIcon inCell:cell size:50.0];
 }
 
