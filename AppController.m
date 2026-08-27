@@ -460,12 +460,63 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   if (changed) {
     [self refreshDock];
   }
+
+  [self updateRecyclerState];
+}
+
+- (NSArray *)recyclerPaths
+{
+  NSString *home = NSHomeDirectory();
+  return [NSArray arrayWithObjects:
+    [home stringByAppendingPathComponent:@".Trash"],
+    [home stringByAppendingPathComponent:@".local/share/Trash/files"],
+    [home stringByAppendingPathComponent:@"GNUstep/Library/Recycler"],
+    nil];
+}
+
+- (BOOL)directoryHasVisibleContentsAtPath:(NSString *)path
+{
+  NSArray *entries = [[NSFileManager defaultManager] directoryContentsAtPath:path];
+  NSUInteger i;
+
+  for (i = 0; i < [entries count]; i++) {
+    NSString *entry = [entries objectAtIndex:i];
+
+    if ([entry isEqualToString:@"."] ||
+        [entry isEqualToString:@".."] ||
+        [entry isEqualToString:@".gwdir"]) {
+      continue;
+    }
+
+    return YES;
+  }
+
+  return NO;
+}
+
+- (BOOL)recyclerHasContents
+{
+  NSArray *paths = [self recyclerPaths];
+  NSUInteger i;
+
+  for (i = 0; i < [paths count]; i++) {
+    if ([self directoryHasVisibleContentsAtPath:[paths objectAtIndex:i]]) {
+      return YES;
+    }
+  }
+
+  return NO;
+}
+
+- (void)updateRecyclerState
+{
+  [_dockView setRecyclerHasContents:[self recyclerHasContents]];
 }
 
 - (NSRect)dockWindowFrameForPlacement:(DockPlacement)placement
 {
   NSRect screenFrame = [[NSScreen mainScreen] frame];
-  NSUInteger cellCount = [_items count] + 1;
+  NSUInteger cellCount = [_items count] + 2;
   CGFloat length = DockPad * 2.0 + cellCount * DockCell + (cellCount - 1) * DockGap;
   CGFloat width = DockPlacementIsHorizontal(placement) ? length : DockWindowWidth;
   CGFloat height = DockPlacementIsHorizontal(placement) ? DockWindowWidth : length;

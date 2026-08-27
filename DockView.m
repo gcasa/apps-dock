@@ -1,5 +1,6 @@
 #import "DockView.h"
 #import "DockItem.h"
+#import <math.h>
 
 static CGFloat DockCell = 64.0;
 static CGFloat DockGap = 2.0;
@@ -23,6 +24,7 @@ static NSUInteger DockTopIconClickIndex = NSUIntegerMax - 1;
     _lastMouseDownTime = 0.0;
     _backgroundMode = DockBackgroundBlack;
     _gnustepIcon = [[self loadGNUstepIcon] retain];
+    _recyclerIcon = [[self loadRecyclerIcon] retain];
     [self registerForDraggedTypes:
       [NSArray arrayWithObjects:NSFilenamesPboardType,
                                 NSURLPboardType,
@@ -41,6 +43,7 @@ static NSUInteger DockTopIconClickIndex = NSUIntegerMax - 1;
 {
   [_backgroundImage release];
   [_gnustepIcon release];
+  [_recyclerIcon release];
   [_items release];
   [super dealloc];
 }
@@ -63,6 +66,26 @@ static NSUInteger DockTopIconClickIndex = NSUIntegerMax - 1;
   }
 
   return [NSImage imageNamed:@"GNUstep"];
+}
+
+- (NSImage *)loadRecyclerIcon
+{
+  NSArray *paths = [NSArray arrayWithObjects:
+    @"/home/heron/GNUstep/Library/WindowMaker/CachedPixmaps/Recycler.GNUstep.xpm",
+    @"/usr/GNUstep/Local/Library/WindowMaker/Icons/Recycler.xpm",
+    @"/usr/GNUstep/System/Library/WindowMaker/Icons/Recycler.xpm",
+    nil];
+  NSUInteger i;
+
+  for (i = 0; i < [paths count]; i++) {
+    NSImage *image = [[[NSImage alloc] initWithContentsOfFile:
+      [paths objectAtIndex:i]] autorelease];
+    if (image) {
+      return image;
+    }
+  }
+
+  return nil;
 }
 
 - (void)setDelegate:(id)delegate
@@ -94,6 +117,14 @@ static NSUInteger DockTopIconClickIndex = NSUIntegerMax - 1;
 {
   if (_backgroundMode != mode) {
     _backgroundMode = mode;
+    [self setNeedsDisplay:YES];
+  }
+}
+
+- (void)setRecyclerHasContents:(BOOL)hasContents
+{
+  if (_recyclerHasContents != hasContents) {
+    _recyclerHasContents = hasContents;
     [self setNeedsDisplay:YES];
   }
 }
@@ -145,6 +176,12 @@ static NSUInteger DockTopIconClickIndex = NSUIntegerMax - 1;
   }
 }
 
+- (NSRect)recyclerTileRect
+{
+  NSPoint origin = [self cellOriginAtIndex:[_items count]];
+  return NSMakeRect(origin.x, origin.y, DockCell, DockCell);
+}
+
 - (NSUInteger)indexAtPoint:(NSPoint)p
 {
   NSUInteger i;
@@ -157,6 +194,11 @@ static NSUInteger DockTopIconClickIndex = NSUIntegerMax - 1;
     }
   }
   return NSNotFound;
+}
+
+- (BOOL)recyclerContainsPoint:(NSPoint)p
+{
+  return NSPointInRect(p, [self recyclerTileRect]);
 }
 
 - (BOOL)topIconContainsPoint:(NSPoint)p
@@ -419,6 +461,75 @@ static NSUInteger DockTopIconClickIndex = NSUIntegerMax - 1;
   [self drawImage:_gnustepIcon inCell:cell size:50.0];
 }
 
+- (void)drawRecyclerFallbackInCell:(NSRect)cell
+{
+  NSPoint center = NSMakePoint(NSMidX(cell), NSMidY(cell));
+  CGFloat radius = 18.0;
+  NSUInteger i;
+
+  [[NSColor colorWithCalibratedWhite:0.88 alpha:0.95] set];
+
+  for (i = 0; i < 3; i++) {
+    CGFloat angle = (CGFloat)i * 120.0;
+    CGFloat start = angle + 18.0;
+    CGFloat end = angle + 92.0;
+    CGFloat arrowAngle = end * M_PI / 180.0;
+    NSBezierPath *arc = [NSBezierPath bezierPath];
+    NSPoint arrowPoint = NSMakePoint(center.x + cos(arrowAngle) * radius,
+                                     center.y + sin(arrowAngle) * radius);
+    NSBezierPath *head = [NSBezierPath bezierPath];
+
+    [arc appendBezierPathWithArcWithCenter:center
+                                    radius:radius
+                                startAngle:start
+                                  endAngle:end];
+    [arc setLineWidth:3.0];
+    [arc stroke];
+
+    [head moveToPoint:arrowPoint];
+    [head relativeLineToPoint:NSMakePoint(-8.0 * sin(arrowAngle) -
+                                          4.0 * cos(arrowAngle),
+                                          8.0 * cos(arrowAngle) -
+                                          4.0 * sin(arrowAngle))];
+    [head relativeLineToPoint:NSMakePoint(8.0 * cos(arrowAngle),
+                                          8.0 * sin(arrowAngle))];
+    [head closePath];
+    [head fill];
+  }
+}
+
+- (void)drawRecyclerContentsIndicatorInCell:(NSRect)cell
+{
+  CGFloat dotSize = 8.0;
+  CGFloat x = NSMidX(cell) - dotSize / 2.0;
+  CGFloat y = NSMidY(cell) - dotSize / 2.0;
+
+  if (!_recyclerHasContents) {
+    return;
+  }
+
+  [[NSColor colorWithCalibratedWhite:0.0 alpha:0.70] set];
+  [[NSBezierPath bezierPathWithOvalInRect:
+    NSMakeRect(x - 1.0, y - 1.0, dotSize + 2.0, dotSize + 2.0)] fill];
+
+  [[NSColor colorWithCalibratedRed:0.10
+                             green:0.80
+                              blue:0.35
+                             alpha:0.96] set];
+  [[NSBezierPath bezierPathWithOvalInRect:
+    NSMakeRect(x, y, dotSize, dotSize)] fill];
+}
+
+- (void)drawRecyclerTile
+{
+  NSRect cell = [self recyclerTileRect];
+
+  if (![self drawImage:_recyclerIcon inCell:cell size:46.0]) {
+    [self drawRecyclerFallbackInCell:cell];
+  }
+  [self drawRecyclerContentsIndicatorInCell:cell];
+}
+
 - (void)drawRect:(NSRect)dirtyRect
 {
   NSUInteger i;
@@ -447,10 +558,17 @@ static NSUInteger DockTopIconClickIndex = NSUIntegerMax - 1;
     [self drawStateForItem:item inCell:cell];
   }
 
+  [self drawRecyclerTile];
 }
 
 - (NSDragOperation)draggingEntered:(id <NSDraggingInfo>)sender
 {
+  NSPoint location = [self convertPoint:[sender draggingLocation] fromView:nil];
+
+  if ([self recyclerContainsPoint:location]) {
+    return NSDragOperationNone;
+  }
+
   if ([self pasteboardHasSupportedType:[sender draggingPasteboard]]) {
     _draggingPaths = YES;
     _performedDragOperation = NO;
@@ -474,14 +592,22 @@ static NSUInteger DockTopIconClickIndex = NSUIntegerMax - 1;
 
 - (BOOL)prepareForDragOperation:(id <NSDraggingInfo>)sender
 {
-  return [self pasteboardHasSupportedType:[sender draggingPasteboard]];
+  NSPoint location = [self convertPoint:[sender draggingLocation] fromView:nil];
+
+  return ![self recyclerContainsPoint:location] &&
+    [self pasteboardHasSupportedType:[sender draggingPasteboard]];
 }
 
 - (BOOL)performDragOperation:(id <NSDraggingInfo>)sender
 {
   NSArray *paths = [self pathsFromPasteboard:[sender draggingPasteboard]];
+  NSPoint location = [self convertPoint:[sender draggingLocation] fromView:nil];
   _draggingPaths = NO;
   [self setNeedsDisplay:YES];
+
+  if ([self recyclerContainsPoint:location]) {
+    return NO;
+  }
 
   if ([paths count] && [_delegate respondsToSelector:@selector(dockViewDidReceivePaths:)]) {
     [_delegate dockViewDidReceivePaths:paths];
@@ -495,7 +621,9 @@ static NSUInteger DockTopIconClickIndex = NSUIntegerMax - 1;
 {
   if (!_performedDragOperation) {
     NSArray *paths = [self pathsFromPasteboard:[sender draggingPasteboard]];
-    if ([paths count] &&
+    NSPoint location = [self convertPoint:[sender draggingLocation] fromView:nil];
+    if (![self recyclerContainsPoint:location] &&
+        [paths count] &&
         [_delegate respondsToSelector:@selector(dockViewDidReceivePaths:)]) {
       [_delegate dockViewDidReceivePaths:paths];
     }
