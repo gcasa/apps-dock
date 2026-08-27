@@ -28,6 +28,8 @@ main(int argc, const char **argv)
   NSApplication *app;
 
   ENTER_POOL
+  [[NSUserDefaults standardUserDefaults] setBool: YES
+                                          forKey: @"GSSuppressAppIcon"];
   app = [NSApplication sharedApplication];
   delegate = [AppController new];
 

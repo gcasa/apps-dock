@@ -28,18 +28,6 @@
 #import <string.h>
 #import <unistd.h>
 
-typedef struct {
-    unsigned long flags;
-    unsigned long window_style;
-    unsigned long window_level;
-    unsigned long reserved;
-    Pixmap miniaturize_pixmap;
-    Pixmap close_pixmap;
-    Pixmap miniaturize_mask;
-    Pixmap close_mask;
-    unsigned long extra_flags;
-} DockGNUstepWMAttributes;
-
 #define DockGSWindowStyleAttr (1UL << 0)
 #define DockNSIconWindowMask 64UL
 
@@ -802,16 +790,16 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 
   [self clearX11Error];
   if (XGetWindowProperty(display, window, property, 0,
-                         sizeof(DockGNUstepWMAttributes) / sizeof(long),
+                         2,
                          False, property, &actualType, &actualFormat,
                          &itemCount, &bytesAfter, &data) == Success && data) {
     if (![self x11ErrorOccurred] &&
         actualFormat == 32 &&
         itemCount >= 2) {
-      DockGNUstepWMAttributes *attrs = (DockGNUstepWMAttributes *)data;
+      unsigned long *attrs = (unsigned long *)data;
 
-      if ((attrs->flags & DockGSWindowStyleAttr) &&
-          (attrs->window_style & DockNSIconWindowMask)) {
+      if ((attrs[0] & DockGSWindowStyleAttr) &&
+          (attrs[1] & DockNSIconWindowMask)) {
         result = YES;
       }
     }
@@ -1005,8 +993,7 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
     return nil;
   }
 
-  return [self imageFromWindowContents:
-    (Window)[windowKey unsignedLongValue]];
+  return [self imageFromWindowContents:(Window)[windowKey unsignedLongValue]];
 }
 
 - (BOOL) rememberApplicationIconWindow: (Window)window
@@ -1052,6 +1039,15 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   [_knownWindows removeObject:windowKey];
 
   icon = [self imageFromWindowContents:window];
+  XMoveWindow((Display *)_display, window, -10000, -10000);
+  XUnmapWindow((Display *)_display, window);
+  [self suppressWindowManagerIconShells];
+
+  if (processIdentifier == getpid()) {
+    XFlush((Display *)_display);
+    return YES;
+  }
+
   if (icon && [_delegate respondsToSelector:
         @selector(x11DockManagerDidUpdateApplicationIcon:processIdentifier:title:)]) {
     [_delegate x11DockManagerDidUpdateApplicationIcon:icon
@@ -1161,6 +1157,8 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   unsigned int count = 0, i;
 
   if (!display) return;
+  [self suppressOwnApplicationIconWindows];
+  [self suppressWindowManagerIconShells];
   [self scanApplicationIconWindows];
   [self scanKnownWindows];
 
@@ -1249,6 +1247,12 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 
   [_iconWindowsByProcessID setObject:windowKey forKey:processKey];
   [_knownWindows removeObject:windowKey];
+  if (_display) {
+    XMoveWindow((Display *)_display, (Window)aWindowNumber, -10000, -10000);
+    XUnmapWindow((Display *)_display, (Window)aWindowNumber);
+    [self suppressWindowManagerIconShells];
+    XFlush((Display *)_display);
+  }
 
   return NSMakeRect(-10000, -10000, 64, 64);
 }
@@ -1319,9 +1323,149 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   Display *display = (Display *)_display;
 
   if (!display) return;
-  XMoveWindow(display, (Window)xWindow, -1000, -1000);
-  XMapWindow(display, (Window)xWindow);
+  XMoveWindow(display, (Window)xWindow, -10000, -10000);
+  XUnmapWindow(display, (Window)xWindow);
+  [self suppressWindowManagerIconShells];
   XFlush(display);
+}
+
+- (void) suppressOwnApplicationIconWindows
+{
+  Display *display = (Display *)_display;
+  Window root, parent, *children = NULL;
+  unsigned int count = 0, i;
+  int pid = getpid();
+
+  if (!display) {
+    return;
+  }
+
+  root = RootWindow(display, DefaultScreen(display));
+  if (!XQueryTree(display, root, &root, &parent, &children, &count)) {
+    return;
+  }
+
+  for (i = 0; i < count; i++) {
+    XWindowAttributes attr;
+    NSString *className;
+    NSString *title;
+    BOOL iconStyle;
+
+    if (children[i] == (Window)_hostWindow) {
+      continue;
+    }
+    if ([self processIdentifierForWindow:children[i]] != pid) {
+      continue;
+    }
+
+    className = [self classNameForWindow:children[i]];
+    if (!className ||
+        ![[className lowercaseString] isEqualToString:@"dockwm"]) {
+      continue;
+    }
+
+    [self clearX11Error];
+    if (!XGetWindowAttributes(display, children[i], &attr) ||
+        [self x11ErrorOccurred]) {
+      continue;
+    }
+    if (attr.width <= 0 || attr.height <= 0 || attr.width > 512 ||
+        attr.height > 512 || attr.x != 0 ||
+        attr.y < DisplayHeight(display, DefaultScreen(display)) - attr.height - 128) {
+      continue;
+    }
+
+    iconStyle = [self windowHasGNUstepIconStyle:children[i]];
+    title = [self titleForWindow:children[i]];
+    if (!iconStyle &&
+        (!title || ![title isEqualToString:@"Window"])) {
+      continue;
+    }
+
+    [_knownWindows removeObject:
+      [NSNumber numberWithUnsignedLong:(unsigned long)children[i]]];
+    XUnmapWindow(display, children[i]);
+    XMoveWindow(display, children[i], -10000, -10000);
+  }
+
+  if (children) {
+    XFree(children);
+  }
+  XFlush(display);
+}
+
+- (void) suppressWindowManagerIconShells
+{
+  Display *display = (Display *)_display;
+  Window root, parent, *children = NULL;
+  unsigned int count = 0, i;
+  int screen;
+  int screenHeight;
+
+  if (!display) {
+    return;
+  }
+
+  screen = DefaultScreen(display);
+  root = RootWindow(display, screen);
+  screenHeight = DisplayHeight(display, screen);
+  if (!XQueryTree(display, root, &root, &parent, &children, &count)) {
+    return;
+  }
+
+  for (i = 0; i < count; i++) {
+    XWindowAttributes attr;
+    XClassHint hint;
+    char *name = NULL;
+    BOOL hasName = NO;
+    BOOL hasClass = NO;
+
+    if (children[i] == (Window)_hostWindow) {
+      continue;
+    }
+
+    [self clearX11Error];
+    if (!XGetWindowAttributes(display, children[i], &attr) ||
+        [self x11ErrorOccurred]) {
+      continue;
+    }
+
+    if (!attr.override_redirect ||
+        attr.width != 64 ||
+        attr.height != 64 ||
+        attr.y < screenHeight - 128) {
+      continue;
+    }
+
+    [self clearX11Error];
+    if (XFetchName(display, children[i], &name) && name) {
+      hasName = strlen(name) > 0;
+      XFree(name);
+    }
+    if ([self x11ErrorOccurred]) {
+      continue;
+    }
+
+    memset(&hint, 0, sizeof(hint));
+    [self clearX11Error];
+    if (XGetClassHint(display, children[i], &hint)) {
+      hasClass = (hint.res_name && hint.res_name[0]) ||
+                 (hint.res_class && hint.res_class[0]);
+      if (hint.res_name) XFree(hint.res_name);
+      if (hint.res_class) XFree(hint.res_class);
+    }
+    if ([self x11ErrorOccurred]) {
+      continue;
+    }
+
+    if (!hasName && !hasClass) {
+      XMoveWindow(display, children[i], -10000, -10000);
+    }
+  }
+
+  if (children) {
+    XFree(children);
+  }
 }
 
 - (void) suppressWindow: (unsigned long)xWindow atIndex: (NSUInteger)index
@@ -1333,9 +1477,57 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 {
   Display *display = (Display *)_display;
   if (!display) return;
+  if ([self windowIsRegisteredIconWindow:(Window)xWindow] ||
+      [self windowHasGNUstepIconStyle:(Window)xWindow]) {
+    [self suppressWindow:xWindow];
+    return;
+  }
   XMapRaised(display, (Window)xWindow);
   XSetInputFocus(display, (Window)xWindow, RevertToParent, CurrentTime);
   XFlush(display);
+}
+
+- (BOOL) activateApplicationWithProcessIdentifiers: (NSArray *)processIdentifiers
+{
+  Display *display = (Display *)_display;
+  Window root, parent, *children = NULL;
+  unsigned int count = 0, i;
+  BOOL activated = NO;
+
+  if (!display || ![processIdentifiers count]) {
+    return NO;
+  }
+
+  root = RootWindow(display, DefaultScreen(display));
+  if (!XQueryTree(display, root, &root, &parent, &children, &count)) {
+    return NO;
+  }
+
+  for (i = count; i > 0; i--) {
+    Window window = children[i - 1];
+    int processIdentifier;
+
+    if ([self windowIsRegisteredIconWindow:window] ||
+        [self windowHasGNUstepIconStyle:window] ||
+        [self windowLooksLikeDockApp:window] ||
+        ![self windowLooksManageable:window]) {
+      continue;
+    }
+
+    processIdentifier = [self processIdentifierForWindow:window];
+    if (processIdentifier > 0 &&
+        [processIdentifiers containsObject:
+          [NSNumber numberWithInt:processIdentifier]]) {
+      [self activateWindow:(unsigned long)window];
+      activated = YES;
+      break;
+    }
+  }
+
+  if (children) {
+    XFree(children);
+  }
+  return activated;
 }
 
 - (void) closeWindow: (unsigned long)xWindow

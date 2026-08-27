@@ -69,8 +69,11 @@ typedef enum
 - (void) moveDockedWindow: (unsigned long)xWindow toIndex: (NSUInteger)index;
 - (void) hideWindow: (unsigned long)xWindow;
 - (void) suppressWindow: (unsigned long)xWindow;
+- (void) suppressOwnApplicationIconWindows;
+- (void) suppressWindowManagerIconShells;
 - (void) suppressWindow: (unsigned long)xWindow atIndex: (NSUInteger)index;
 - (void) activateWindow: (unsigned long)xWindow;
+- (BOOL) activateApplicationWithProcessIdentifiers: (NSArray *)processIdentifiers;
 - (void) closeWindow: (unsigned long)xWindow;
 
 @end

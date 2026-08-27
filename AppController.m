@@ -73,10 +73,13 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [_dockView setMenu:[self dockMenu]];
   [_window setContentView:_dockView];
 
+  [self scanRunningApplications];
+
   _x11 = [[X11DockManager alloc] initWithDockView:_dockView];
   [_x11 setDelegate:self];
   if ([_x11 start]) {
     [_x11 setDockPlacement:_dockPlacement];
+    [_x11 suppressWindowManagerIconShells];
     [self updateDockBackgroundHidingWindow:NO];
     [_window makeKeyAndOrderFront:nil];
     [_window orderFrontRegardless];
@@ -101,7 +104,6 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
                                    selector:@selector(refreshDockBackground:)
                                    userInfo:nil
                                     repeats:YES];
-  [self scanRunningApplications];
   [self launchOpenAtLoginApplications];
 }
 
@@ -763,9 +765,8 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
       continue;
     }
 
-    if ([self launchApplicationAtPath:path]) {
-      [self rememberLaunchedApplicationPath:path];
-    }
+    [self rememberLaunchedApplicationPath:path];
+    [self launchApplicationAtPath:path];
   }
 }
 
@@ -1609,6 +1610,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 {
   if ([item kind] == DockItemApplication) {
     NSString *path = [item path];
+    NSArray *processIds;
     BOOL launched = NO;
 
     if ([item xWindow] && [item state] != DockItemNotRunning) {
@@ -1616,10 +1618,20 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
       return;
     }
 
+    processIds = [self runningProcessIdentifiersForApplicationItem:item];
+    if ([processIds count]) {
+      if (![_x11 activateApplicationWithProcessIdentifiers:processIds]) {
+        [_x11 suppressWindowManagerIconShells];
+      }
+      [item setState:DockItemRunning];
+      [self refreshDock];
+      return;
+    }
+
+    [self rememberLaunchedApplicationPath:path];
     launched = [self launchApplicationAtPath:path];
 
     if (launched) {
-      [self rememberLaunchedApplicationPath:path];
       [item setState:DockItemRunning];
       [_dockView startWiggleForItem:item];
       [self refreshDock];
@@ -1640,10 +1652,10 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   for (i = 0; i < [paths count]; i++) {
     NSString *path = [paths objectAtIndex:i];
     if ([[NSFileManager defaultManager] fileExistsAtPath:path]) {
+      [self rememberLaunchedApplicationPath:path];
       if (![[NSWorkspace sharedWorkspace] launchApplication:path]) {
         [[NSWorkspace sharedWorkspace] openFile:path];
       }
-      [self rememberLaunchedApplicationPath:path];
       return;
     }
   }
@@ -1686,12 +1698,12 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 {
   DockItem *item = [self applicationItemMatchingExecutablePath:path];
   NSUInteger itemIndex;
-  BOOL matchedPinnedApplication;
+  BOOL matchedApplication;
 
   if (!item) {
     item = [self applicationItemMatchingTitle:title];
   }
-  matchedPinnedApplication = item && [item kind] == DockItemApplication && [item isPinned];
+  matchedApplication = item && [item kind] == DockItemApplication;
 
   if (dockApp &&
       ([self applicationBundlePathIsDockWM:path] ||
@@ -1699,11 +1711,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     if (item) {
       itemIndex = [self indexForItem:item];
       [self setSuppressedXWindow:xWindow forItem:item];
-      if (itemIndex != NSNotFound) {
-        [_x11 suppressWindow:xWindow atIndex:itemIndex];
-      } else {
-        [_x11 suppressWindow:xWindow];
-      }
+      [_x11 suppressWindow:xWindow];
       [item setState:DockItemRunning];
       if (icon) {
         [item setIcon:icon];
@@ -1715,7 +1723,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
   if (item) {
     [item setState: (hidden ? DockItemHidden : DockItemRunning)];
-    if (!(dockApp && matchedPinnedApplication)) {
+    if (!(dockApp && matchedApplication)) {
       [item setXWindow:xWindow];
     }
     if (icon) {
@@ -1741,14 +1749,10 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
   [self refreshDock];
   if (dockApp) {
-    if (matchedPinnedApplication) {
+    if ([item kind] == DockItemApplication) {
       itemIndex = [self indexForItem:item];
       [self setSuppressedXWindow:xWindow forItem:item];
-      if (itemIndex != NSNotFound) {
-        [_x11 suppressWindow:xWindow atIndex:itemIndex];
-      } else {
-        [_x11 suppressWindow:xWindow];
-      }
+      [_x11 suppressWindow:xWindow];
     } else {
       itemIndex = [self indexForItem:item];
       if (itemIndex != NSNotFound) {
@@ -1778,7 +1782,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     }
     if (itemIndex != NSNotFound) {
       if (suppressedWindow) {
-        [_x11 suppressWindow:xWindow atIndex:itemIndex];
+        [_x11 suppressWindow:xWindow];
       } else {
         [_x11 moveDockedWindow:xWindow toIndex:itemIndex];
       }
