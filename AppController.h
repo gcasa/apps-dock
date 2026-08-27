@@ -29,6 +29,7 @@
   NSMutableSet *_launchedApplicationPaths;
   NSMutableDictionary *_suppressedWindowItems;
   X11DockManager *_x11;
+  NSTimer *_x11EventTimer;
   NSTimer *_scanTimer;
   NSTimer *_processScanTimer;
   NSTimer *_backgroundRefreshTimer;

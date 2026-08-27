@@ -83,12 +83,18 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     [self updateDockBackgroundHidingWindow:NO];
     [_window makeKeyAndOrderFront:nil];
     [_window orderFrontRegardless];
+    _x11EventTimer = [NSTimer scheduledTimerWithTimeInterval:0.005
+                                                      target:_x11
+                                                    selector:@selector(processPendingEvents)
+                                                    userInfo:nil
+                                                     repeats:YES];
     _scanTimer = [NSTimer scheduledTimerWithTimeInterval:1.0
                                                   target:_x11
                                                 selector:@selector(scanForDockApps)
                                                 userInfo:nil
                                                  repeats:YES];
     [_x11 scanForDockApps];
+    [_x11 drainTransientIconEvents];
   } else {
     [_window makeKeyAndOrderFront:nil];
   }
@@ -109,6 +115,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
 - (void) dealloc
 {
+  [_x11EventTimer invalidate];
   [_scanTimer invalidate];
   [_processScanTimer invalidate];
   [_backgroundRefreshTimer invalidate];
@@ -718,6 +725,16 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   if ([extension isEqualToString:@"desktop"]) {
     return [self launchDesktopFile:path];
   } else if ([extension isEqualToString:@"app"]) {
+    NSString *executablePath = [self executablePathForApplicationPath:path];
+
+    if ([[NSFileManager defaultManager] isExecutableFileAtPath:executablePath]) {
+      [NSTask launchedTaskWithLaunchPath:executablePath
+                               arguments:[NSArray arrayWithObjects:
+                                 @"-GSSuppressAppIcon", @"YES",
+                                 @"-GSUseIconManager", @"YES",
+                                 nil]];
+      return YES;
+    }
     if ([[NSWorkspace sharedWorkspace] launchApplication:path]) {
       return YES;
     }
@@ -767,6 +784,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
     [self rememberLaunchedApplicationPath:path];
     [self launchApplicationAtPath:path];
+    [_x11 drainTransientIconEvents];
   }
 }
 
@@ -1614,15 +1632,19 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     BOOL launched = NO;
 
     if ([item xWindow] && [item state] != DockItemNotRunning) {
+      [_x11 drainTransientIconEvents];
       [_x11 activateWindow:[item xWindow]];
+      [_x11 drainTransientIconEvents];
       return;
     }
 
     processIds = [self runningProcessIdentifiersForApplicationItem:item];
     if ([processIds count]) {
+      [_x11 drainTransientIconEvents];
       if (![_x11 activateApplicationWithProcessIdentifiers:processIds]) {
         [_x11 suppressWindowManagerIconShells];
       }
+      [_x11 drainTransientIconEvents];
       [item setState:DockItemRunning];
       [self refreshDock];
       return;
@@ -1630,6 +1652,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
     [self rememberLaunchedApplicationPath:path];
     launched = [self launchApplicationAtPath:path];
+    [_x11 drainTransientIconEvents];
 
     if (launched) {
       [item setState:DockItemRunning];
@@ -1637,7 +1660,9 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
       [self refreshDock];
     }
   } else {
+    [_x11 drainTransientIconEvents];
     [_x11 activateWindow:[item xWindow]];
+    [_x11 drainTransientIconEvents];
   }
 }
 
@@ -1656,6 +1681,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
       if (![[NSWorkspace sharedWorkspace] launchApplication:path]) {
         [[NSWorkspace sharedWorkspace] openFile:path];
       }
+      [_x11 drainTransientIconEvents];
       return;
     }
   }

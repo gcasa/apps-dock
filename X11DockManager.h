@@ -64,6 +64,8 @@ typedef enum
 - (BOOL) start;
 - (void) setDockPlacement: (DockPlacement)placement;
 - (NSImage *) backgroundImageForDockFrame: (NSRect)dockFrame;
+- (void) processPendingEvents;
+- (void) drainTransientIconEvents;
 - (void) scanForDockApps;
 - (void) dockWindow: (unsigned long)xWindow atIndex: (NSUInteger)index;
 - (void) moveDockedWindow: (unsigned long)xWindow toIndex: (NSUInteger)index;
