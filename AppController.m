@@ -651,23 +651,33 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     NSString *path = [item path];
     NSString *extension = [[path pathExtension] lowercaseString];
     BOOL isDir = NO;
+    BOOL launched = NO;
+
     if ([item xWindow] && [item state] != DockItemNotRunning) {
       [_x11 activateWindow:[item xWindow]];
       return;
     }
+
     [[NSFileManager defaultManager] fileExistsAtPath:path isDirectory:&isDir];
     if ([extension isEqualToString:@"desktop"]) {
-      [self launchDesktopFile:path];
+      launched = [self launchDesktopFile:path];
     } else if ([extension isEqualToString:@"app"]) {
-      if (![[NSWorkspace sharedWorkspace] launchApplication:path]) {
-        [[NSWorkspace sharedWorkspace] openFile:path];
+      launched = [[NSWorkspace sharedWorkspace] launchApplication:path];
+      if (!launched) {
+        launched = [[NSWorkspace sharedWorkspace] openFile:path];
       }
     } else if (isDir) {
-      [[NSWorkspace sharedWorkspace] openFile:path];
+      launched = [[NSWorkspace sharedWorkspace] openFile:path];
     } else if ([[NSFileManager defaultManager] isExecutableFileAtPath:path]) {
       [NSTask launchedTaskWithLaunchPath:path arguments:[NSArray array]];
+      launched = YES;
     } else {
-      [[NSWorkspace sharedWorkspace] openFile:path];
+      launched = [[NSWorkspace sharedWorkspace] openFile:path];
+    }
+
+    if (launched) {
+      [item setState:DockItemRunning];
+      [self refreshDock];
     }
   } else {
     [_x11 activateWindow:[item xWindow]];
@@ -693,12 +703,16 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   }
 }
 
-- (void)launchDesktopFile:(NSString *)path
+- (BOOL)launchDesktopFile:(NSString *)path
 {
   NSString *contents = [NSString stringWithContentsOfFile:path];
   NSArray *lines = [contents componentsSeparatedByCharactersInSet:
     [NSCharacterSet newlineCharacterSet]];
   NSUInteger i;
+
+  if (![contents length]) {
+    return NO;
+  }
 
   for (i = 0; i < [lines count]; i++) {
     NSString *line = [lines objectAtIndex:i];
@@ -708,10 +722,13 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
       if ([command length]) {
         [NSTask launchedTaskWithLaunchPath:@"/bin/sh"
                                   arguments:[NSArray arrayWithObjects:@"-lc", command, nil]];
+        return YES;
       }
-      return;
+      return NO;
     }
   }
+
+  return NO;
 }
 
 - (void)x11DockManagerDidDiscoverWindowWithTitle:(NSString *)title
