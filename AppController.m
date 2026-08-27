@@ -916,6 +916,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
     if (launched) {
       [item setState:DockItemRunning];
+      [_dockView startWiggleForItem:item];
       [self refreshDock];
     }
   } else {

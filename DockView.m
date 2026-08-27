@@ -5,6 +5,7 @@
 static CGFloat DockCell = 64.0;
 static CGFloat DockGap = 2.0;
 static CGFloat DockPad = 10.0;
+static NSTimeInterval DockWiggleDuration = 0.8;
 
 static NSString *GWRemoteFilenamesPboardType = @"GWRemoteFilenamesPboardType";
 static NSString *GWLSFolderPboardType = @"GWLSFolderPboardType";
@@ -54,6 +55,9 @@ static NSInteger DockHoverRecycler = -3;
 {
   [_tooltipTimer invalidate];
   [_tooltipTimer release];
+  [_wiggleTimer invalidate];
+  [_wiggleTimer release];
+  [_wiggleItem release];
   if (_trackingRectTag) {
     [self removeTrackingRect:_trackingRectTag];
   }
@@ -141,6 +145,49 @@ static NSInteger DockHoverRecycler = -3;
 {
   [_items setArray:items];
   [self hideTooltip];
+  [self setNeedsDisplay:YES];
+}
+
+- (void)stopWiggle
+{
+  [_wiggleTimer invalidate];
+  [_wiggleTimer release];
+  _wiggleTimer = nil;
+  [_wiggleItem release];
+  _wiggleItem = nil;
+  _wiggleStartTime = 0.0;
+  [self setNeedsDisplay:YES];
+}
+
+- (void)stepWiggle:(NSTimer *)timer
+{
+  NSTimeInterval now = [NSDate timeIntervalSinceReferenceDate];
+
+  if (!_wiggleItem || now - _wiggleStartTime >= DockWiggleDuration) {
+    [self stopWiggle];
+    return;
+  }
+
+  [self setNeedsDisplay:YES];
+}
+
+- (void)startWiggleForItem:(DockItem *)item
+{
+  if (!item) {
+    return;
+  }
+
+  [_wiggleTimer invalidate];
+  [_wiggleTimer release];
+  _wiggleTimer = nil;
+  [_wiggleItem release];
+  _wiggleItem = [item retain];
+  _wiggleStartTime = [NSDate timeIntervalSinceReferenceDate];
+  _wiggleTimer = [[NSTimer scheduledTimerWithTimeInterval:1.0 / 30.0
+                                                   target:self
+                                                 selector:@selector(stepWiggle:)
+                                                 userInfo:nil
+                                                  repeats:YES] retain];
   [self setNeedsDisplay:YES];
 }
 
@@ -579,7 +626,10 @@ static NSInteger DockHoverRecycler = -3;
   return [[pb types] containsObject:DockReorderPboardType];
 }
 
-- (BOOL)drawImage:(NSImage *)image inCell:(NSRect)cell size:(CGFloat)size
+- (BOOL)drawImage:(NSImage *)image
+           inCell:(NSRect)cell
+             size:(CGFloat)size
+            angle:(CGFloat)angle
 {
   NSSize imageSize;
   NSRect sourceRect;
@@ -609,11 +659,29 @@ static NSInteger DockHoverRecycler = -3;
                         size,
                         size);
 
+  if (angle != 0.0) {
+    NSAffineTransform *transform = [NSAffineTransform transform];
+
+    [NSGraphicsContext saveGraphicsState];
+    [transform translateXBy:NSMidX(destRect) yBy:NSMidY(destRect)];
+    [transform rotateByDegrees:angle];
+    [transform translateXBy:-NSMidX(destRect) yBy:-NSMidY(destRect)];
+    [transform concat];
+  }
+
   [image drawInRect:destRect
            fromRect:sourceRect
           operation:NSCompositeSourceOver
            fraction:1.0];
+  if (angle != 0.0) {
+    [NSGraphicsContext restoreGraphicsState];
+  }
   return YES;
+}
+
+- (BOOL)drawImage:(NSImage *)image inCell:(NSRect)cell size:(CGFloat)size
+{
+  return [self drawImage:image inCell:cell size:size angle:0.0];
 }
 
 - (void)drawFallbackIconForItem:(DockItem *)item inCell:(NSRect)cell
@@ -634,8 +702,17 @@ static NSInteger DockHoverRecycler = -3;
 - (void)drawDockTileForItem:(DockItem *)item inCell:(NSRect)cell size:(CGFloat)size
 {
   NSImage *icon = [item icon];
+  CGFloat angle = 0.0;
 
-  if (![self drawImage:icon inCell:cell size:size]) {
+  if (item == _wiggleItem) {
+    NSTimeInterval elapsed = [NSDate timeIntervalSinceReferenceDate] - _wiggleStartTime;
+    CGFloat progress = (CGFloat)(elapsed / DockWiggleDuration);
+    CGFloat decay = MAX(0.0, 1.0 - progress);
+
+    angle = sin(progress * 8.0 * M_PI) * 8.0 * decay;
+  }
+
+  if (![self drawImage:icon inCell:cell size:size angle:angle]) {
     [self drawFallbackIconForItem:item inCell:cell];
   }
 }
@@ -945,7 +1022,6 @@ static NSInteger DockHoverRecycler = -3;
 
   if ([self pasteboardHasSupportedType:pasteboard]) {
     _draggingPaths = YES;
-    _performedDragOperation = NO;
     _dropIndex = [self insertionIndexAtPoint:location];
     [self setNeedsDisplay:YES];
     return [self dragOperationForSender:sender];

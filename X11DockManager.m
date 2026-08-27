@@ -627,6 +627,29 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   return YES;
 }
 
+- (BOOL)windowShouldBeIgnoredWithTitle:(NSString *)title path:(NSString *)path
+{
+  NSString *lowerTitle = [title lowercaseString];
+  NSString *lowerPath = [path lowercaseString];
+  NSString *lowerName = [[path lastPathComponent] lowercaseString];
+
+  if ([lowerTitle isEqualToString:@"gworkspace"] ||
+      [lowerTitle isEqualToString:@"dockwm"] ||
+      [lowerName isEqualToString:@"gworkspace"] ||
+      [lowerName isEqualToString:@"dockwm"] ||
+      [lowerPath rangeOfString:@"/gworkspace.app/"].location != NSNotFound ||
+      [lowerPath rangeOfString:@"/dockwm.app/"].location != NSNotFound) {
+    return YES;
+  }
+
+  if ([lowerTitle rangeOfString:@"drag"].location != NSNotFound &&
+      [lowerName isEqualToString:@"gworkspace"]) {
+    return YES;
+  }
+
+  return NO;
+}
+
 - (void)scanForDockApps
 {
   Display *display = (Display *)_display;
@@ -656,13 +679,20 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
     if ([self windowLooksManageable:children[i]]) {
       BOOL dockApp = [self windowLooksLikeDockApp:children[i]];
       BOOL hidden = [self windowIsHidden:children[i]];
+      NSString *title = [self titleForWindow:children[i]];
+      NSString *path = [self executablePathForWindow:children[i]];
+
+      if ([self windowShouldBeIgnoredWithTitle:title path:path]) {
+        continue;
+      }
+
       [_knownWindows addObject:key];
       if ([_delegate respondsToSelector:@selector(x11DockManagerDidDiscoverWindowWithTitle:window:hidden:icon:path:dockApp:)]) {
-        [_delegate x11DockManagerDidDiscoverWindowWithTitle:[self titleForWindow:children[i]]
+        [_delegate x11DockManagerDidDiscoverWindowWithTitle:title
                                                      window:(unsigned long)children[i]
                                                      hidden:hidden
                                                        icon:[self iconForWindow:children[i]]
-                                                       path:[self executablePathForWindow:children[i]]
+                                                       path:path
                                                     dockApp:dockApp];
       }
     }
