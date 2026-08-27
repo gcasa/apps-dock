@@ -1008,6 +1008,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
   if (recycled) {
     [self updateRecyclerState];
+    [_dockView startRecyclerWiggle];
     [self refreshDock];
     [[NSSound soundNamed:@"Pop"] play];
   } else {
@@ -1062,6 +1063,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   }
 
   [self updateRecyclerState];
+  [_dockView startRecyclerWiggle];
   [self refreshDock];
   [[NSSound soundNamed:@"Glass"] play];
 }

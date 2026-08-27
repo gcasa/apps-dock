@@ -79,6 +79,8 @@ static NSInteger DockHoverRecycler = -3;
   DESTROY(_tooltipTimer);
   [_wiggleTimer invalidate];
   DESTROY(_wiggleTimer);
+  [_recyclerWiggleTimer invalidate];
+  DESTROY(_recyclerWiggleTimer);
   DESTROY(_wiggleItem);
   if (_trackingRectTag) {
     [self removeTrackingRect:_trackingRectTag];
@@ -222,6 +224,41 @@ static NSInteger DockHoverRecycler = -3;
                                                 userInfo:nil
                                                 repeats:YES];
   _wiggleTimer = RETAIN(_wiggleTimer);
+  [self setNeedsDisplay:YES];
+}
+
+- (void) stopRecyclerWiggle
+{
+  [_recyclerWiggleTimer invalidate];
+  DESTROY(_recyclerWiggleTimer);
+  _recyclerWiggleStartTime = 0.0;
+  [self setNeedsDisplay:YES];
+}
+
+- (void) stepRecyclerWiggle: (NSTimer *)timer
+{
+  NSTimeInterval now = [NSDate timeIntervalSinceReferenceDate];
+
+  if (!_recyclerWiggleStartTime ||
+      now - _recyclerWiggleStartTime >= DockWiggleDuration) {
+    [self stopRecyclerWiggle];
+    return;
+  }
+
+  [self setNeedsDisplay:YES];
+}
+
+- (void) startRecyclerWiggle
+{
+  [_recyclerWiggleTimer invalidate];
+  DESTROY(_recyclerWiggleTimer);
+  _recyclerWiggleStartTime = [NSDate timeIntervalSinceReferenceDate];
+  _recyclerWiggleTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 / 30.0
+                                                          target:self
+                                                        selector:@selector(stepRecyclerWiggle:)
+                                                        userInfo:nil
+                                                         repeats:YES];
+  _recyclerWiggleTimer = RETAIN(_recyclerWiggleTimer);
   [self setNeedsDisplay:YES];
 }
 
@@ -954,9 +991,31 @@ static NSInteger DockHoverRecycler = -3;
 - (void) drawRecyclerTile
 {
   NSRect cell = [self recyclerTileRect];
+  CGFloat angle = 0.0;
 
-  if (![self drawImage:_recyclerIcon inCell:cell size:46.0]) {
-    [self drawRecyclerFallbackInCell:cell];
+  if (_recyclerWiggleStartTime) {
+    NSTimeInterval elapsed = [NSDate timeIntervalSinceReferenceDate] -
+      _recyclerWiggleStartTime;
+    CGFloat progress = (CGFloat)(elapsed / DockWiggleDuration);
+    CGFloat decay = MAX(0.0, 1.0 - progress);
+
+    angle = sin(progress * 8.0 * M_PI) * 8.0 * decay;
+  }
+
+  if (![self drawImage:_recyclerIcon inCell:cell size:46.0 angle:angle]) {
+    if (angle != 0.0) {
+      NSAffineTransform *transform = [NSAffineTransform transform];
+
+      [NSGraphicsContext saveGraphicsState];
+      [transform translateXBy:NSMidX(cell) yBy:NSMidY(cell)];
+      [transform rotateByDegrees:angle];
+      [transform translateXBy:-NSMidX(cell) yBy:-NSMidY(cell)];
+      [transform concat];
+      [self drawRecyclerFallbackInCell:cell];
+      [NSGraphicsContext restoreGraphicsState];
+    } else {
+      [self drawRecyclerFallbackInCell:cell];
+    }
   }
   [self drawRecyclerContentsIndicatorInCell:cell];
 }

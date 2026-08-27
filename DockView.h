@@ -58,8 +58,10 @@ typedef enum
   BOOL _horizontal;
   NSTimer *_tooltipTimer;
   NSTimer *_wiggleTimer;
+  NSTimer *_recyclerWiggleTimer;
   DockItem *_wiggleItem;
   NSTimeInterval _wiggleStartTime;
+  NSTimeInterval _recyclerWiggleStartTime;
   NSInteger _hoveredItemIndex;
   NSInteger _tooltipItemIndex;
   NSTrackingRectTag _trackingRectTag;
@@ -79,6 +81,7 @@ typedef enum
 - (void) setBackgroundMode: (DockBackgroundMode)mode;
 - (void) setRecyclerHasContents: (BOOL)hasContents;
 - (void) startWiggleForItem: (DockItem *)item;
+- (void) startRecyclerWiggle;
 - (void) setHorizontal: (BOOL)horizontal;
 - (BOOL) isHorizontal;
 - (NSRect) topTileRect;
