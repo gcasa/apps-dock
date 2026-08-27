@@ -26,6 +26,7 @@
   NSWindow *_window;
   DockView *_dockView;
   NSMutableArray *_items;
+  NSMutableSet *_launchedApplicationPaths;
   X11DockManager *_x11;
   NSTimer *_scanTimer;
   NSTimer *_processScanTimer;

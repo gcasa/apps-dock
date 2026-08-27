@@ -708,6 +708,22 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
       NSString *path = [self executablePathForWindow:children[i]];
 
       if ([self windowShouldBeIgnoredWithTitle:title path:path]) {
+        if (dockApp) {
+          NSString *lowerPath = [path lowercaseString];
+          NSString *lowerName = [[path lastPathComponent] lowercaseString];
+          NSString *lowerTitle = [title lowercaseString];
+
+          if (([lowerPath length] &&
+               ([lowerPath rangeOfString:@"/dockwm.app/"].location != NSNotFound ||
+                [lowerPath rangeOfString:@"/gworkspace.app/"].location != NSNotFound)) ||
+              [lowerName isEqualToString:@"dockwm"] ||
+              [lowerName isEqualToString:@"gworkspace"] ||
+              [lowerTitle isEqualToString:@"dockwm"] ||
+              [lowerTitle isEqualToString:@"gworkspace"]) {
+            XUnmapWindow(display, children[i]);
+            XFlush(display);
+          }
+        }
         continue;
       }
 

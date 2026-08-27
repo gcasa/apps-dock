@@ -43,6 +43,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   NSRect frame;
 
   _items = [NSMutableArray new];
+  _launchedApplicationPaths = [NSMutableSet new];
   [self loadPersistedApplications];
   _dockPlacement = [self savedDockPlacement];
   _backgroundMode = [self savedBackgroundMode];
@@ -106,6 +107,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   DESTROY(_x11);
   DESTROY(_dockView);
   DESTROY(_window);
+  DESTROY(_launchedApplicationPaths);
   DESTROY(_items);
   DEALLOC;
 }
@@ -519,6 +521,38 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   }
 
   return [bundleName isEqualToString:@"dockwm.app"];
+}
+
+- (void) rememberLaunchedApplicationPath: (NSString *)path
+{
+  NSString *normalizedPath = [self normalizedPath:path];
+  NSString *executablePath = [self executablePathForApplicationPath:path];
+
+  if ([normalizedPath length]) {
+    [_launchedApplicationPaths addObject:normalizedPath];
+  }
+  if ([executablePath length]) {
+    [_launchedApplicationPaths addObject:executablePath];
+  }
+}
+
+- (BOOL) windowPathMatchesLaunchedApplication: (NSString *)path
+{
+  NSString *normalizedPath = [self normalizedPath:path];
+  NSString *bundlePath = [DockItem applicationBundlePathForPath:path];
+  NSString *normalizedBundlePath = [self normalizedPath:bundlePath];
+
+  if ([normalizedPath length] &&
+      [_launchedApplicationPaths containsObject:normalizedPath]) {
+    return YES;
+  }
+
+  if ([normalizedBundlePath length] &&
+      [_launchedApplicationPaths containsObject:normalizedBundlePath]) {
+    return YES;
+  }
+
+  return NO;
 }
 
 - (void) scanRunningApplications
@@ -1119,6 +1153,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     }
 
     if (launched) {
+      [self rememberLaunchedApplicationPath:path];
       [item setState:DockItemRunning];
       [_dockView startWiggleForItem:item];
       [self refreshDock];
@@ -1142,6 +1177,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
       if (![[NSWorkspace sharedWorkspace] launchApplication:path]) {
         [[NSWorkspace sharedWorkspace] openFile:path];
       }
+      [self rememberLaunchedApplicationPath:path];
       return;
     }
   }
@@ -1190,6 +1226,20 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     item = [self applicationItemMatchingTitle:title];
   }
   matchedPinnedApplication = item && [item kind] == DockItemApplication && [item isPinned];
+
+  if (dockApp &&
+      ([self applicationBundlePathIsDockWM:path] ||
+       [self windowPathMatchesLaunchedApplication:path])) {
+    [_x11 hideWindow:xWindow];
+    if (item) {
+      [item setState:DockItemRunning];
+      if (icon) {
+        [item setIcon:icon];
+      }
+      [self refreshDock];
+    }
+    return;
+  }
 
   if (item) {
     [item setState: (hidden ? DockItemHidden : DockItemRunning)];
