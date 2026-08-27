@@ -27,9 +27,11 @@
   DockView *_dockView;
   NSMutableArray *_items;
   NSMutableSet *_launchedApplicationPaths;
+  NSMutableDictionary *_suppressedWindowItems;
   X11DockManager *_x11;
   NSTimer *_scanTimer;
   NSTimer *_processScanTimer;
+  NSTimer *_backgroundRefreshTimer;
   NSMenu *_dockMenu;
   NSMutableArray *_placementMenuItems;
   NSMenuItem *_blackBackgroundMenuItem;
@@ -37,6 +39,7 @@
   NSMenuItem *_emptyRecyclerMenuItem;
   DockPlacement _dockPlacement;
   DockBackgroundMode _backgroundMode;
+  BOOL _updatingDockBackground;
 }
 
 @end

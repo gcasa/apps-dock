@@ -57,11 +57,14 @@ typedef enum
 - (void) setDelegate: (id)delegate;
 - (BOOL) start;
 - (void) setDockPlacement: (DockPlacement)placement;
-- (NSImage *) backgroundImageForDockPlacement: (DockPlacement)placement;
+- (NSImage *) backgroundImageForDockFrame: (NSRect)dockFrame;
 - (void) scanForDockApps;
 - (void) dockWindow: (unsigned long)xWindow atIndex: (NSUInteger)index;
 - (void) moveDockedWindow: (unsigned long)xWindow toIndex: (NSUInteger)index;
 - (void) hideWindow: (unsigned long)xWindow;
+- (void) suppressWindow: (unsigned long)xWindow;
+- (void) suppressWindow: (unsigned long)xWindow atIndex: (NSUInteger)index;
 - (void) activateWindow: (unsigned long)xWindow;
+- (void) closeWindow: (unsigned long)xWindow;
 
 @end

@@ -22,6 +22,7 @@
 #import <GNUstepBase/GNUstep.h>
 #import <ctype.h>
 #import <limits.h>
+#import <signal.h>
 #import <unistd.h>
 
 static CGFloat DockWindowWidth = 84.0;
@@ -29,6 +30,7 @@ static CGFloat DockCell = 64.0;
 static CGFloat DockGap = 2.0;
 static CGFloat DockPad = 10.0;
 static NSString *DockApplicationsDefaultsKey = @"DockApplications";
+static NSString *DockOpenAtLoginApplicationsDefaultsKey = @"DockOpenAtLoginApplications";
 static NSString *DockBackgroundModeDefaultsKey = @"DockBackgroundMode";
 
 static BOOL DockPlacementIsHorizontal(DockPlacement placement)
@@ -44,6 +46,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
   _items = [NSMutableArray new];
   _launchedApplicationPaths = [NSMutableSet new];
+  _suppressedWindowItems = [NSMutableDictionary new];
   [self loadPersistedApplications];
   _dockPlacement = [self savedDockPlacement];
   _backgroundMode = [self savedBackgroundMode];
@@ -92,13 +95,21 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
                                                      selector:@selector(scanRunningApplications)
                                                      userInfo:nil
                                                       repeats:YES];
+  _backgroundRefreshTimer =
+    [NSTimer scheduledTimerWithTimeInterval:0.25
+                                     target:self
+                                   selector:@selector(refreshDockBackground:)
+                                   userInfo:nil
+                                    repeats:YES];
   [self scanRunningApplications];
+  [self launchOpenAtLoginApplications];
 }
 
 - (void) dealloc
 {
   [_scanTimer invalidate];
   [_processScanTimer invalidate];
+  [_backgroundRefreshTimer invalidate];
   DESTROY(_transparentBackgroundMenuItem);
   DESTROY(_blackBackgroundMenuItem);
   DESTROY(_emptyRecyclerMenuItem);
@@ -107,6 +118,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   DESTROY(_x11);
   DESTROY(_dockView);
   DESTROY(_window);
+  DESTROY(_suppressedWindowItems);
   DESTROY(_launchedApplicationPaths);
   DESTROY(_items);
   DEALLOC;
@@ -432,6 +444,43 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   return paths;
 }
 
+- (NSArray *) runningProcessIdentifiersForApplicationItem: (DockItem *)item
+{
+  NSArray *entries = [[NSFileManager defaultManager]
+    directoryContentsAtPath:@"/proc"];
+  NSMutableArray *processIds = [NSMutableArray array];
+  NSUInteger i;
+
+  for (i = 0; i < [entries count]; i++) {
+    NSString *entry = [entries objectAtIndex:i];
+    NSString *linkPath;
+    char target[PATH_MAX];
+    ssize_t length;
+    NSString *processPath;
+
+    if (![self stringIsProcessIdentifier:entry]) {
+      continue;
+    }
+
+    linkPath = [[@"/proc" stringByAppendingPathComponent:entry]
+      stringByAppendingPathComponent:@"exe"];
+    length = readlink([linkPath fileSystemRepresentation],
+                      target,
+                      sizeof(target) - 1);
+    if (length <= 0) {
+      continue;
+    }
+
+    target[length] = '\0';
+    processPath = [self normalizedPath:[NSString stringWithUTF8String:target]];
+    if ([self applicationItem:item matchesRunningProcessPath:processPath]) {
+      [processIds addObject:[NSNumber numberWithInt:[entry intValue]]];
+    }
+  }
+
+  return processIds;
+}
+
 - (BOOL) applicationItem: (DockItem *)item matchesRunningProcessPath: (NSString *)processPath
 {
   NSString *itemPath = [self normalizedPath:[item path]];
@@ -553,6 +602,130 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   }
 
   return NO;
+}
+
+- (NSArray *) openAtLoginApplicationPaths
+{
+  NSArray *paths = [[NSUserDefaults standardUserDefaults]
+    objectForKey:DockOpenAtLoginApplicationsDefaultsKey];
+
+  return [paths isKindOfClass:[NSArray class]] ? paths : [NSArray array];
+}
+
+- (BOOL) applicationPathIsOpenAtLogin: (NSString *)path
+{
+  NSArray *paths = [self openAtLoginApplicationPaths];
+  NSString *normalizedPath = [self normalizedPath:path];
+  NSUInteger i;
+
+  if (![normalizedPath length]) {
+    return NO;
+  }
+
+  for (i = 0; i < [paths count]; i++) {
+    if ([normalizedPath isEqualToString:
+          [self normalizedPath:[paths objectAtIndex:i]]]) {
+      return YES;
+    }
+  }
+
+  return NO;
+}
+
+- (void) setApplicationPath: (NSString *)path openAtLogin: (BOOL)openAtLogin
+{
+  NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+  NSArray *savedPaths = [self openAtLoginApplicationPaths];
+  NSMutableArray *paths = [NSMutableArray array];
+  NSString *normalizedPath = [self normalizedPath:path];
+  NSUInteger i;
+  BOOL found = NO;
+
+  if (![normalizedPath length]) {
+    return;
+  }
+
+  for (i = 0; i < [savedPaths count]; i++) {
+    NSString *savedPath = [savedPaths objectAtIndex:i];
+
+    if ([[self normalizedPath:savedPath] isEqualToString:normalizedPath]) {
+      found = YES;
+      if (openAtLogin) {
+        [paths addObject:savedPath];
+      }
+    } else {
+      [paths addObject:savedPath];
+    }
+  }
+
+  if (openAtLogin && !found) {
+    [paths addObject:path];
+  }
+
+  [defaults setObject:paths forKey:DockOpenAtLoginApplicationsDefaultsKey];
+  [defaults synchronize];
+}
+
+- (BOOL) launchApplicationAtPath: (NSString *)path
+{
+  NSString *extension = [[path pathExtension] lowercaseString];
+  BOOL isDir = NO;
+
+  [[NSFileManager defaultManager] fileExistsAtPath:path isDirectory:&isDir];
+  if ([extension isEqualToString:@"desktop"]) {
+    return [self launchDesktopFile:path];
+  } else if ([extension isEqualToString:@"app"]) {
+    if ([[NSWorkspace sharedWorkspace] launchApplication:path]) {
+      return YES;
+    }
+    return [[NSWorkspace sharedWorkspace] openFile:path];
+  } else if (isDir) {
+    return [[NSWorkspace sharedWorkspace] openFile:path];
+  } else if ([[NSFileManager defaultManager] isExecutableFileAtPath:path]) {
+    [NSTask launchedTaskWithLaunchPath:path arguments:[NSArray array]];
+    return YES;
+  }
+
+  return [[NSWorkspace sharedWorkspace] openFile:path];
+}
+
+- (void) terminateApplicationItemProcesses: (DockItem *)item
+{
+  NSArray *processIds = [self runningProcessIdentifiersForApplicationItem:item];
+  NSUInteger i;
+
+  for (i = 0; i < [processIds count]; i++) {
+    int processId = [[processIds objectAtIndex:i] intValue];
+
+    if (processId > 0 && processId != getpid()) {
+      kill((pid_t)processId, SIGTERM);
+    }
+  }
+}
+
+- (void) launchOpenAtLoginApplications
+{
+  NSArray *paths = [self openAtLoginApplicationPaths];
+  NSArray *processPaths = [self runningProcessExecutablePaths];
+  NSUInteger i;
+
+  for (i = 0; i < [paths count]; i++) {
+    NSString *path = [paths objectAtIndex:i];
+    DockItem *item;
+
+    if (![[NSFileManager defaultManager] fileExistsAtPath:path]) {
+      continue;
+    }
+
+    item = [DockItem applicationItemWithPath:path];
+    if ([self applicationItemHasRunningProcess:item paths:processPaths]) {
+      continue;
+    }
+
+    if ([self launchApplicationAtPath:path]) {
+      [self rememberLaunchedApplicationPath:path];
+    }
+  }
 }
 
 - (void) scanRunningApplications
@@ -865,10 +1038,21 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [self updateDockMenu];
 }
 
+- (void) refreshDockBackground: (NSTimer *)timer
+{
+  if (_backgroundMode == DockBackgroundSimulatedTransparency) {
+    [self updateDockBackgroundHidingWindow:NO];
+  }
+}
+
 - (void) updateDockBackgroundHidingWindow: (BOOL)hideWindow
 {
   NSImage *image;
   BOOL wasVisible;
+
+  if (_updatingDockBackground) {
+    return;
+  }
 
   [_dockView setBackgroundMode:_backgroundMode];
 
@@ -881,6 +1065,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     return;
   }
 
+  _updatingDockBackground = YES;
   wasVisible = [_window isVisible];
   if (hideWindow && wasVisible) {
     [_window orderOut:nil];
@@ -888,7 +1073,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
       [NSDate dateWithTimeIntervalSinceNow:0.02]];
   }
 
-  image = [_x11 backgroundImageForDockPlacement:_dockPlacement];
+  image = [_x11 backgroundImageForDockFrame:[_window frame]];
   if (image) {
     [_dockView setBackgroundImage:image];
   } else if (!wasVisible) {
@@ -898,6 +1083,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   if (hideWindow && wasVisible) {
     [_window orderFrontRegardless];
   }
+  _updatingDockBackground = NO;
 }
 
 - (void) selectBackgroundMode: (id)sender
@@ -942,6 +1128,22 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     }
   }
   return nil;
+}
+
+- (DockItem *) itemForSuppressedXWindow: (unsigned long)xWindow
+{
+  return [_suppressedWindowItems objectForKey:
+    [NSNumber numberWithUnsignedLong:xWindow]];
+}
+
+- (void) setSuppressedXWindow: (unsigned long)xWindow forItem: (DockItem *)item
+{
+  if (!item || !xWindow) {
+    return;
+  }
+
+  [_suppressedWindowItems setObject:item
+                             forKey:[NSNumber numberWithUnsignedLong:xWindow]];
 }
 
 - (NSUInteger) indexForItem: (DockItem *)targetItem
@@ -1122,12 +1324,69 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [self refreshDock];
 }
 
+- (BOOL) dockView: (id)dockView itemIsOpenAtLogin: (DockItem *)item
+{
+  return [self applicationPathIsOpenAtLogin:[item path]];
+}
+
+- (void) dockView: (id)dockView didToggleOpenAtLoginForItem: (DockItem *)item
+{
+  BOOL openAtLogin;
+
+  if (![[item path] length]) {
+    return;
+  }
+
+  openAtLogin = ![self applicationPathIsOpenAtLogin:[item path]];
+  [self setApplicationPath:[item path] openAtLogin:openAtLogin];
+}
+
+- (void) dockView: (id)dockView didShowItemInFileViewer: (DockItem *)item
+{
+  NSString *path = [item path];
+  NSString *directory;
+
+  if (![path length]) {
+    return;
+  }
+
+  directory = [path stringByDeletingLastPathComponent];
+  [[NSWorkspace sharedWorkspace] selectFile:path
+                   inFileViewerRootedAtPath:directory];
+}
+
+- (void) dockView: (id)dockView didQuitItem: (DockItem *)item
+{
+  NSUInteger index;
+
+  if ([item xWindow]) {
+    [_x11 closeWindow:[item xWindow]];
+  }
+
+  if ([item kind] == DockItemApplication) {
+    [self terminateApplicationItemProcesses:item];
+  }
+
+  [item setState:DockItemNotRunning];
+  if (![item isPinned]) {
+    index = [self indexForItem:item];
+    if (index != NSNotFound) {
+      [_items removeObjectAtIndex:index];
+    }
+  }
+
+  [self refreshDock];
+}
+
+- (void) dockViewDidEmptyRecycler: (id)dockView
+{
+  [self emptyRecycler:dockView];
+}
+
 - (void) dockViewDidActivateItem: (DockItem *)item
 {
   if ([item kind] == DockItemApplication) {
     NSString *path = [item path];
-    NSString *extension = [[path pathExtension] lowercaseString];
-    BOOL isDir = NO;
     BOOL launched = NO;
 
     if ([item xWindow] && [item state] != DockItemNotRunning) {
@@ -1135,22 +1394,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
       return;
     }
 
-    [[NSFileManager defaultManager] fileExistsAtPath:path isDirectory:&isDir];
-    if ([extension isEqualToString:@"desktop"]) {
-      launched = [self launchDesktopFile:path];
-    } else if ([extension isEqualToString:@"app"]) {
-      launched = [[NSWorkspace sharedWorkspace] launchApplication:path];
-      if (!launched) {
-        launched = [[NSWorkspace sharedWorkspace] openFile:path];
-      }
-    } else if (isDir) {
-      launched = [[NSWorkspace sharedWorkspace] openFile:path];
-    } else if ([[NSFileManager defaultManager] isExecutableFileAtPath:path]) {
-      [NSTask launchedTaskWithLaunchPath:path arguments:[NSArray array]];
-      launched = YES;
-    } else {
-      launched = [[NSWorkspace sharedWorkspace] openFile:path];
-    }
+    launched = [self launchApplicationAtPath:path];
 
     if (launched) {
       [self rememberLaunchedApplicationPath:path];
@@ -1230,8 +1474,14 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   if (dockApp &&
       ([self applicationBundlePathIsDockWM:path] ||
        [self windowPathMatchesLaunchedApplication:path])) {
-    [_x11 hideWindow:xWindow];
     if (item) {
+      itemIndex = [self indexForItem:item];
+      [self setSuppressedXWindow:xWindow forItem:item];
+      if (itemIndex != NSNotFound) {
+        [_x11 suppressWindow:xWindow atIndex:itemIndex];
+      } else {
+        [_x11 suppressWindow:xWindow];
+      }
       [item setState:DockItemRunning];
       if (icon) {
         [item setIcon:icon];
@@ -1270,7 +1520,13 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [self refreshDock];
   if (dockApp) {
     if (matchedPinnedApplication) {
-      [_x11 hideWindow:xWindow];
+      itemIndex = [self indexForItem:item];
+      [self setSuppressedXWindow:xWindow forItem:item];
+      if (itemIndex != NSNotFound) {
+        [_x11 suppressWindow:xWindow atIndex:itemIndex];
+      } else {
+        [_x11 suppressWindow:xWindow];
+      }
     } else {
       itemIndex = [self indexForItem:item];
       if (itemIndex != NSNotFound) {
@@ -1285,6 +1541,12 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
                                   icon: (NSImage *)icon
 {
   DockItem *item = [self itemForXWindow:xWindow];
+  BOOL suppressedWindow = NO;
+
+  if (!item) {
+    item = [self itemForSuppressedXWindow:xWindow];
+    suppressedWindow = item != nil;
+  }
   if (item) {
     NSUInteger itemIndex = [self indexForItem:item];
 
@@ -1293,7 +1555,11 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
       [item setIcon:icon];
     }
     if (itemIndex != NSNotFound) {
-      [_x11 moveDockedWindow:xWindow toIndex:itemIndex];
+      if (suppressedWindow) {
+        [_x11 suppressWindow:xWindow atIndex:itemIndex];
+      } else {
+        [_x11 moveDockedWindow:xWindow toIndex:itemIndex];
+      }
     }
     [self refreshDock];
   }

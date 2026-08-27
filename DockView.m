@@ -433,6 +433,102 @@ static NSInteger DockHoverRecycler = -3;
   }
 }
 
+- (NSMenuItem *) menuItemWithTitle: (NSString *)title
+                            action: (SEL)action
+                              item: (DockItem *)item
+{
+  NSMenuItem *menuItem;
+
+  menuItem = AUTORELEASE([[NSMenuItem alloc] initWithTitle:title
+                                                     action:action
+                                              keyEquivalent:@""]);
+  [menuItem setTarget:self];
+  [menuItem setRepresentedObject:item];
+  return menuItem;
+}
+
+- (NSMenu *) menuForDockItem: (DockItem *)item
+{
+  NSMenu *menu = AUTORELEASE([[NSMenu alloc] initWithTitle:@"Application"]);
+  NSMenuItem *menuItem;
+  BOOL hasPath = [[item path] length] > 0;
+  BOOL openAtLogin = NO;
+
+  if ([_delegate respondsToSelector:
+        @selector(dockView:itemIsOpenAtLogin:)]) {
+    openAtLogin = [_delegate dockView:self itemIsOpenAtLogin:item];
+  }
+
+  menuItem = [self menuItemWithTitle:@"Open At Login"
+                              action:@selector(toggleOpenAtLogin:)
+                                item:item];
+  [menuItem setState: (openAtLogin ? NSOnState : NSOffState)];
+  [menuItem setEnabled:hasPath];
+  [menu addItem:menuItem];
+
+  menuItem = [self menuItemWithTitle:@"Show In File Viewer"
+                              action:@selector(showItemInFileViewer:)
+                                item:item];
+  [menuItem setEnabled:hasPath];
+  [menu addItem:menuItem];
+
+  menuItem = [self menuItemWithTitle:@"Quit"
+                              action:@selector(quitItem:)
+                                item:item];
+  [menu addItem:menuItem];
+
+  return menu;
+}
+
+- (NSMenu *) menuForRecycler
+{
+  NSMenu *menu = AUTORELEASE([[NSMenu alloc] initWithTitle:@"Recycler"]);
+  NSMenuItem *menuItem;
+
+  menuItem = AUTORELEASE([[NSMenuItem alloc] initWithTitle:@"Empty Recycler"
+                                                    action:@selector(emptyRecycler:)
+                                             keyEquivalent:@""]);
+  [menuItem setTarget:self];
+  [menu addItem:menuItem];
+  return menu;
+}
+
+- (void) toggleOpenAtLogin: (id)sender
+{
+  DockItem *item = [sender representedObject];
+
+  if ([_delegate respondsToSelector:
+        @selector(dockView:didToggleOpenAtLoginForItem:)]) {
+    [_delegate dockView:self didToggleOpenAtLoginForItem:item];
+  }
+}
+
+- (void) showItemInFileViewer: (id)sender
+{
+  DockItem *item = [sender representedObject];
+
+  if ([_delegate respondsToSelector:
+        @selector(dockView:didShowItemInFileViewer:)]) {
+    [_delegate dockView:self didShowItemInFileViewer:item];
+  }
+}
+
+- (void) quitItem: (id)sender
+{
+  DockItem *item = [sender representedObject];
+
+  if ([_delegate respondsToSelector:@selector(dockView:didQuitItem:)]) {
+    [_delegate dockView:self didQuitItem:item];
+  }
+}
+
+- (void) emptyRecycler: (id)sender
+{
+  if ([_delegate respondsToSelector:@selector(dockViewDidEmptyRecycler:)]) {
+    [_delegate dockViewDidEmptyRecycler:self];
+  }
+}
+
 - (void) scheduleTooltipForHoverIndex: (NSInteger)index
 {
   [_tooltipTimer invalidate];
@@ -1000,6 +1096,27 @@ static NSInteger DockHoverRecycler = -3;
 {
   _hoveredItemIndex = DockHoverNone;
   [self hideTooltip];
+}
+
+- (void) rightMouseDown: (NSEvent *)event
+{
+  NSPoint location = [self convertPoint:[event locationInWindow] fromView:nil];
+  NSUInteger index = [self indexAtPoint:location];
+  NSMenu *contextMenu = nil;
+
+  [self hideTooltip];
+
+  if ([self topIconContainsPoint:location]) {
+    contextMenu = [self menu];
+  } else if ([self recyclerContainsPoint:location]) {
+    contextMenu = [self menuForRecycler];
+  } else if (index != NSNotFound && index < [_items count]) {
+    contextMenu = [self menuForDockItem:[_items objectAtIndex:index]];
+  }
+
+  if (contextMenu) {
+    [NSMenu popUpContextMenu:contextMenu withEvent:event forView:self];
+  }
 }
 
 - (NSImage *) dragImageForItemAtIndex: (NSUInteger)index

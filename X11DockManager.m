@@ -24,6 +24,7 @@
 #import <X11/Xatom.h>
 #import <X11/Xutil.h>
 #import <limits.h>
+#import <string.h>
 #import <unistd.h>
 
 static int X11DockManagerLastErrorCode = 0;
@@ -208,7 +209,54 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   return (unsigned char)((value * 255UL) / ((1UL << bits) - 1UL));
 }
 
-- (NSImage *) backgroundImageForDockPlacement: (DockPlacement)placement
+- (NSRect) x11FrameForAppKitFrame: (NSRect)dockFrame
+{
+  Display *display = (Display *)_display;
+  int screen;
+  int screenWidth;
+  int screenHeight;
+  int x;
+  int y;
+  int width;
+  int height;
+
+  if (!display) {
+    return NSZeroRect;
+  }
+
+  screen = DefaultScreen(display);
+  screenWidth = DisplayWidth(display, screen);
+  screenHeight = DisplayHeight(display, screen);
+  x = (int)floor(NSMinX(dockFrame));
+  width = (int)ceil(NSWidth(dockFrame));
+  height = (int)ceil(NSHeight(dockFrame));
+  y = screenHeight - (int)ceil(NSMaxY(dockFrame));
+
+  if (x < 0) {
+    width += x;
+    x = 0;
+  }
+  if (y < 0) {
+    height += y;
+    y = 0;
+  }
+  if (x + width > screenWidth) {
+    width = screenWidth - x;
+  }
+  if (y + height > screenHeight) {
+    height = screenHeight - y;
+  }
+  if (width < 0) {
+    width = 0;
+  }
+  if (height < 0) {
+    height = 0;
+  }
+
+  return NSMakeRect(x, y, width, height);
+}
+
+- (NSImage *) backgroundImageForDockFrame: (NSRect)dockFrame
 {
   Display *display = (Display *)_display;
   int screen;
@@ -229,7 +277,7 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
     return nil;
   }
 
-  frame = [self x11FrameForDockPlacement:placement];
+  frame = [self x11FrameForAppKitFrame:dockFrame];
   width = (NSInteger)NSWidth(frame);
   height = (NSInteger)NSHeight(frame);
   if (width <= 0 || height <= 0) {
@@ -378,18 +426,136 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   return NO;
 }
 
-- (NSImage *) imageFromWindowContents: (Window)window
+- (NSImage *) imageFromDrawable: (Drawable)drawable
+                           mask: (Pixmap)mask
+                          width: (unsigned int)width
+                         height: (unsigned int)height
 {
   Display *display = (Display *)_display;
-  XWindowAttributes attr;
   XImage *ximage;
+  XImage *maskImage = NULL;
   NSBitmapImageRep *rep;
   NSImage *image;
   unsigned char *bitmapData;
   NSInteger bytesPerRow;
   NSInteger x;
   NSInteger y;
-  BOOL sawNonBlackPixel = NO;
+  BOOL sawVisiblePixel = NO;
+
+  if (!display || !drawable || width == 0 || height == 0 ||
+      width > 128 || height > 128) {
+    return nil;
+  }
+
+  XSync(display, False);
+  [self clearX11Error];
+  ximage = XGetImage(display, drawable, 0, 0, width, height,
+                     AllPlanes, ZPixmap);
+  if (!ximage || [self x11ErrorOccurred]) {
+    if (ximage) {
+      XDestroyImage(ximage);
+    }
+    return nil;
+  }
+
+  if (mask) {
+    [self clearX11Error];
+    maskImage = XGetImage(display, mask, 0, 0, width, height,
+                          AllPlanes, ZPixmap);
+    if ([self x11ErrorOccurred]) {
+      if (maskImage) {
+        XDestroyImage(maskImage);
+      }
+      maskImage = NULL;
+    }
+  }
+
+  rep = [[NSBitmapImageRep alloc]
+    initWithBitmapDataPlanes:NULL
+                  pixelsWide: (NSInteger)width
+                  pixelsHigh: (NSInteger)height
+               bitsPerSample:8
+             samplesPerPixel:4
+                    hasAlpha:YES
+                    isPlanar:NO
+              colorSpaceName:NSDeviceRGBColorSpace
+                 bytesPerRow:0
+                bitsPerPixel:32];
+  rep = AUTORELEASE(rep);
+  if (!rep) {
+    XDestroyImage(ximage);
+    if (maskImage) {
+      XDestroyImage(maskImage);
+    }
+    return nil;
+  }
+
+  bitmapData = [rep bitmapData];
+  bytesPerRow = [rep bytesPerRow];
+  for (y = 0; y < (NSInteger)height; y++) {
+    for (x = 0; x < (NSInteger)width; x++) {
+      unsigned long pixel = XGetPixel(ximage, (int)x, (int)y);
+      unsigned char alpha = 255;
+      unsigned char *dst = bitmapData + y * bytesPerRow + x * 4;
+
+      if (maskImage && XGetPixel(maskImage, (int)x, (int)y) == 0) {
+        alpha = 0;
+      }
+
+      dst[0] = [self componentFromPixel:pixel mask:ximage->red_mask];
+      dst[1] = [self componentFromPixel:pixel mask:ximage->green_mask];
+      dst[2] = [self componentFromPixel:pixel mask:ximage->blue_mask];
+      dst[3] = alpha;
+      if (alpha && (dst[0] || dst[1] || dst[2])) {
+        sawVisiblePixel = YES;
+      }
+    }
+  }
+
+  XDestroyImage(ximage);
+  if (maskImage) {
+    XDestroyImage(maskImage);
+  }
+
+  if (!sawVisiblePixel) {
+    return nil;
+  }
+
+  image = AUTORELEASE([[NSImage alloc]
+    initWithSize:NSMakeSize(width, height)]);
+  [image addRepresentation:rep];
+  return image;
+}
+
+- (NSImage *) imageFromPixmap: (Pixmap)pixmap mask: (Pixmap)mask
+{
+  Display *display = (Display *)_display;
+  Window root;
+  int x;
+  int y;
+  unsigned int width;
+  unsigned int height;
+  unsigned int borderWidth;
+  unsigned int depth;
+
+  if (!display || !pixmap) {
+    return nil;
+  }
+
+  [self clearX11Error];
+  if (!XGetGeometry(display, pixmap, &root, &x, &y,
+                    &width, &height, &borderWidth, &depth) ||
+      [self x11ErrorOccurred]) {
+    return nil;
+  }
+
+  return [self imageFromDrawable:pixmap mask:mask width:width height:height];
+}
+
+- (NSImage *) imageFromWindowContents: (Window)window
+{
+  Display *display = (Display *)_display;
+  XWindowAttributes attr;
 
   [self clearX11Error];
   if (!XGetWindowAttributes(display, window, &attr)) {
@@ -403,64 +569,10 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
     return nil;
   }
 
-  XSync(display, False);
-  [self clearX11Error];
-  ximage = XGetImage(display, window, 0, 0,
-                     (unsigned int)attr.width,
-                     (unsigned int)attr.height,
-                     AllPlanes,
-                     ZPixmap);
-  if (!ximage || [self x11ErrorOccurred]) {
-    if (ximage) {
-      XDestroyImage(ximage);
-    }
-    return nil;
-  }
-
-  rep = [[NSBitmapImageRep alloc]
-    initWithBitmapDataPlanes:NULL
-                  pixelsWide:attr.width
-                  pixelsHigh:attr.height
-               bitsPerSample:8
-             samplesPerPixel:4
-                    hasAlpha:YES
-                    isPlanar:NO
-              colorSpaceName:NSDeviceRGBColorSpace
-                 bytesPerRow:0
-                bitsPerPixel:32];
-  rep = AUTORELEASE(rep);
-  if (!rep) {
-    XDestroyImage(ximage);
-    return nil;
-  }
-
-  bitmapData = [rep bitmapData];
-  bytesPerRow = [rep bytesPerRow];
-  for (y = 0; y < attr.height; y++) {
-    for (x = 0; x < attr.width; x++) {
-      unsigned long pixel = XGetPixel(ximage, (int)x, (int)y);
-      unsigned char *dst = bitmapData + y * bytesPerRow + x * 4;
-
-      dst[0] = [self componentFromPixel:pixel mask:ximage->red_mask];
-      dst[1] = [self componentFromPixel:pixel mask:ximage->green_mask];
-      dst[2] = [self componentFromPixel:pixel mask:ximage->blue_mask];
-      dst[3] = 255;
-      if (dst[0] || dst[1] || dst[2]) {
-        sawNonBlackPixel = YES;
-      }
-    }
-  }
-
-  XDestroyImage(ximage);
-
-  if (!sawNonBlackPixel) {
-    return nil;
-  }
-
-  image = AUTORELEASE([[NSImage alloc]
-    initWithSize:NSMakeSize(attr.width, attr.height)]);
-  [image addRepresentation:rep];
-  return image;
+  return [self imageFromDrawable:window
+                            mask:None
+                           width: (unsigned int)attr.width
+                          height: (unsigned int)attr.height];
 }
 
 - (NSImage *) iconForWindow: (Window)window
@@ -473,6 +585,35 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   unsigned char *data = NULL;
   NSImage *netWmIcon = nil;
   NSImage *icon = [[NSWorkspace sharedWorkspace] iconForFileType:@"app"];
+  XWMHints *hints;
+
+  [self clearX11Error];
+  hints = XGetWMHints(display, window);
+  if (![self x11ErrorOccurred] && hints) {
+    NSImage *hintIcon = nil;
+
+    if ((hints->flags & IconWindowHint) && hints->icon_window != None) {
+      hintIcon = [self imageFromWindowContents:hints->icon_window];
+    }
+
+    if (!hintIcon &&
+        (hints->flags & IconPixmapHint) &&
+        hints->icon_pixmap != None) {
+      Pixmap mask = None;
+
+      if ((hints->flags & IconMaskHint) && hints->icon_mask != None) {
+        mask = hints->icon_mask;
+      }
+      hintIcon = [self imageFromPixmap:hints->icon_pixmap mask:mask];
+    }
+
+    XFree(hints);
+    if (hintIcon) {
+      return hintIcon;
+    }
+  } else if (hints) {
+    XFree(hints);
+  }
 
   if ([self windowLooksLikeDockApp:window]) {
     NSImage *windowImage = [self imageFromWindowContents:window];
@@ -652,6 +793,29 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   return YES;
 }
 
+- (BOOL) knownWindowStillExists: (Window)window
+{
+  Display *display = (Display *)_display;
+  XWindowAttributes attr;
+
+  if (window == (Window)_hostWindow) {
+    return NO;
+  }
+
+  [self clearX11Error];
+  if (!XGetWindowAttributes(display, window, &attr)) {
+    return NO;
+  }
+  if ([self x11ErrorOccurred]) {
+    return NO;
+  }
+  if (attr.override_redirect) {
+    return NO;
+  }
+
+  return YES;
+}
+
 - (BOOL) windowShouldBeIgnoredWithTitle: (NSString *)title path: (NSString *)path
 {
   NSString *lowerTitle = [title lowercaseString];
@@ -675,6 +839,29 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   return NO;
 }
 
+- (void) scanKnownWindows
+{
+  NSArray *windows = [_knownWindows allObjects];
+  NSUInteger i;
+
+  for (i = 0; i < [windows count]; i++) {
+    NSNumber *key = [windows objectAtIndex:i];
+    Window window = (Window)[key unsignedLongValue];
+
+    if (![self knownWindowStillExists:window]) {
+      [_knownWindows removeObject:key];
+      continue;
+    }
+
+    if ([_delegate respondsToSelector:
+          @selector(x11DockManagerDidUpdateWindow:hidden:icon:)]) {
+      [_delegate x11DockManagerDidUpdateWindow: (unsigned long)window
+                                        hidden:[self windowIsHidden:window]
+                                          icon:[self iconForWindow:window]];
+    }
+  }
+}
+
 - (void) scanForDockApps
 {
   Display *display = (Display *)_display;
@@ -682,6 +869,8 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   unsigned int count = 0, i;
 
   if (!display) return;
+  [self scanKnownWindows];
+
   root = RootWindow(display, DefaultScreen(display));
   if (!XQueryTree(display, root, &root, &parent, &children, &count)) {
     return;
@@ -690,15 +879,6 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   for (i = 0; i < count; i++) {
     NSNumber *key = [NSNumber numberWithUnsignedLong: (unsigned long)children[i]];
     if ([_knownWindows containsObject:key]) {
-      if (![self windowLooksManageable:children[i]]) {
-        [_knownWindows removeObject:key];
-        continue;
-      }
-      if ([_delegate respondsToSelector:@selector(x11DockManagerDidUpdateWindow:hidden:icon:)]) {
-        [_delegate x11DockManagerDidUpdateWindow: (unsigned long)children[i]
-                                          hidden:[self windowIsHidden:children[i]]
-                                            icon:[self iconForWindow:children[i]]];
-      }
       continue;
     }
     if ([self windowLooksManageable:children[i]]) {
@@ -720,8 +900,20 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
               [lowerName isEqualToString:@"gworkspace"] ||
               [lowerTitle isEqualToString:@"dockwm"] ||
               [lowerTitle isEqualToString:@"gworkspace"]) {
-            XUnmapWindow(display, children[i]);
+            XMoveWindow(display, children[i], -10000, -10000);
+            XMapWindow(display, children[i]);
             XFlush(display);
+          }
+
+          [_knownWindows addObject:key];
+          if ([_delegate respondsToSelector:
+                @selector(x11DockManagerDidDiscoverWindowWithTitle:window:hidden:icon:path:dockApp:)]) {
+            [_delegate x11DockManagerDidDiscoverWindowWithTitle:title
+                                                         window: (unsigned long)children[i]
+                                                         hidden:YES
+                                                           icon:[self iconForWindow:children[i]]
+                                                           path:path
+                                                        dockApp:dockApp];
           }
         }
         continue;
@@ -779,12 +971,95 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   XFlush(display);
 }
 
+- (void) suppressWindow: (unsigned long)xWindow
+{
+  Display *display = (Display *)_display;
+
+  if (!display) return;
+  XMoveWindow(display, (Window)xWindow, -1000, -1000);
+  XMapWindow(display, (Window)xWindow);
+  XFlush(display);
+}
+
+- (void) suppressWindow: (unsigned long)xWindow atIndex: (NSUInteger)index
+{
+  Display *display = (Display *)_display;
+  NSPoint origin;
+
+  if (!display || !_hostWindow) {
+    [self suppressWindow:xWindow];
+    return;
+  }
+
+  origin = [_dockView cellOriginAtIndex:index];
+  XReparentWindow(display, (Window)xWindow, (Window)_hostWindow,
+                  (int)origin.x,
+                  (int)(NSHeight([_dockView bounds]) - origin.y - 64.0));
+  XResizeWindow(display, (Window)xWindow, 64, 64);
+  XMapWindow(display, (Window)xWindow);
+  XLowerWindow(display, (Window)_hostWindow);
+  XFlush(display);
+}
+
 - (void) activateWindow: (unsigned long)xWindow
 {
   Display *display = (Display *)_display;
   if (!display) return;
   XMapRaised(display, (Window)xWindow);
   XSetInputFocus(display, (Window)xWindow, RevertToParent, CurrentTime);
+  XFlush(display);
+}
+
+- (void) closeWindow: (unsigned long)xWindow
+{
+  Display *display = (Display *)_display;
+  Atom wmProtocols;
+  Atom wmDeleteWindow;
+  Atom actualType;
+  int actualFormat;
+  unsigned long itemCount;
+  unsigned long bytesAfter;
+  unsigned char *data = NULL;
+  BOOL supportsDelete = NO;
+
+  if (!display) return;
+
+  wmProtocols = XInternAtom(display, "WM_PROTOCOLS", False);
+  wmDeleteWindow = XInternAtom(display, "WM_DELETE_WINDOW", False);
+
+  if (XGetWindowProperty(display, (Window)xWindow, wmProtocols,
+                         0, 32, False, XA_ATOM,
+                         &actualType, &actualFormat, &itemCount,
+                         &bytesAfter, &data) == Success && data) {
+    unsigned long i;
+    Atom *protocols = (Atom *)data;
+
+    if (actualFormat == 32) {
+      for (i = 0; i < itemCount; i++) {
+        if (protocols[i] == wmDeleteWindow) {
+          supportsDelete = YES;
+          break;
+        }
+      }
+    }
+    XFree(data);
+  }
+
+  if (supportsDelete) {
+    XEvent event;
+
+    memset(&event, 0, sizeof(event));
+    event.xclient.type = ClientMessage;
+    event.xclient.window = (Window)xWindow;
+    event.xclient.message_type = wmProtocols;
+    event.xclient.format = 32;
+    event.xclient.data.l[0] = wmDeleteWindow;
+    event.xclient.data.l[1] = CurrentTime;
+    XSendEvent(display, (Window)xWindow, False, NoEventMask, &event);
+  } else {
+    XKillClient(display, (Window)xWindow);
+  }
+
   XFlush(display);
 }
 
