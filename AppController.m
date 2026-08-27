@@ -36,6 +36,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [_window setOpaque:NO];
   [_window setBackgroundColor:[NSColor clearColor]];
   [_window setTitle:@"AppsDockWM"];
+  [_window setAcceptsMouseMovedEvents:YES];
 
   _dockView = [[DockView alloc] initWithFrame:NSMakeRect(0, 0,
                                                          NSWidth(frame),

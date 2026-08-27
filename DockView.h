@@ -25,6 +25,10 @@ typedef enum {
   DockBackgroundMode _backgroundMode;
   BOOL _recyclerHasContents;
   BOOL _horizontal;
+  NSTimer *_tooltipTimer;
+  NSInteger _hoveredItemIndex;
+  NSInteger _tooltipItemIndex;
+  NSTrackingRectTag _trackingRectTag;
   NSUInteger _lastMouseDownIndex;
   NSTimeInterval _lastMouseDownTime;
 }

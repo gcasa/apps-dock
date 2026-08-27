@@ -10,6 +10,9 @@ static NSString *GWRemoteFilenamesPboardType = @"GWRemoteFilenamesPboardType";
 static NSString *GWLSFolderPboardType = @"GWLSFolderPboardType";
 static NSString *GWDockIconPboardType = @"DockIconPboardType";
 static NSUInteger DockTopIconClickIndex = NSUIntegerMax - 1;
+static NSInteger DockHoverNone = -1;
+static NSInteger DockHoverTopIcon = -2;
+static NSInteger DockHoverRecycler = -3;
 
 @implementation DockView
 
@@ -22,6 +25,9 @@ static NSUInteger DockTopIconClickIndex = NSUIntegerMax - 1;
     _performedDragOperation = NO;
     _lastMouseDownIndex = NSNotFound;
     _lastMouseDownTime = 0.0;
+    _hoveredItemIndex = DockHoverNone;
+    _tooltipItemIndex = DockHoverNone;
+    _trackingRectTag = 0;
     _backgroundMode = DockBackgroundBlack;
     _gnustepIcon = [[self loadGNUstepIcon] retain];
     _recyclerIcon = [[self loadRecyclerIcon] retain];
@@ -41,6 +47,11 @@ static NSUInteger DockTopIconClickIndex = NSUIntegerMax - 1;
 
 - (void)dealloc
 {
+  [_tooltipTimer invalidate];
+  [_tooltipTimer release];
+  if (_trackingRectTag) {
+    [self removeTrackingRect:_trackingRectTag];
+  }
   [_backgroundImage release];
   [_gnustepIcon release];
   [_recyclerIcon release];
@@ -88,6 +99,31 @@ static NSUInteger DockTopIconClickIndex = NSUIntegerMax - 1;
   return nil;
 }
 
+- (void)updateTrackingRect
+{
+  if (_trackingRectTag) {
+    [self removeTrackingRect:_trackingRectTag];
+    _trackingRectTag = 0;
+  }
+
+  _trackingRectTag = [self addTrackingRect:[self bounds]
+                                     owner:self
+                                  userData:NULL
+                              assumeInside:NO];
+}
+
+- (void)viewDidMoveToWindow
+{
+  [super viewDidMoveToWindow];
+  [self updateTrackingRect];
+}
+
+- (void)setFrame:(NSRect)frame
+{
+  [super setFrame:frame];
+  [self updateTrackingRect];
+}
+
 - (void)setDelegate:(id)delegate
 {
   _delegate = delegate;
@@ -101,6 +137,7 @@ static NSUInteger DockTopIconClickIndex = NSUIntegerMax - 1;
 - (void)setItems:(NSArray *)items
 {
   [_items setArray:items];
+  [self hideTooltip];
   [self setNeedsDisplay:YES];
 }
 
@@ -204,6 +241,161 @@ static NSUInteger DockTopIconClickIndex = NSUIntegerMax - 1;
 - (BOOL)topIconContainsPoint:(NSPoint)p
 {
   return NSPointInRect(p, [self topTileRect]);
+}
+
+- (NSInteger)hoverIndexAtPoint:(NSPoint)p
+{
+  NSUInteger index;
+
+  if ([self topIconContainsPoint:p]) {
+    return DockHoverTopIcon;
+  }
+
+  if ([self recyclerContainsPoint:p]) {
+    return DockHoverRecycler;
+  }
+
+  index = [self indexAtPoint:p];
+  return index == NSNotFound ? DockHoverNone : (NSInteger)index;
+}
+
+- (NSRect)cellRectForHoverIndex:(NSInteger)index
+{
+  if (index == DockHoverTopIcon) {
+    return [self topTileRect];
+  }
+
+  if (index == DockHoverRecycler) {
+    return [self recyclerTileRect];
+  }
+
+  if (index >= 0 && index < (NSInteger)[_items count]) {
+    NSPoint origin = [self cellOriginAtIndex:(NSUInteger)index];
+    return NSMakeRect(origin.x, origin.y, DockCell, DockCell);
+  }
+
+  return NSZeroRect;
+}
+
+- (NSString *)tooltipTitleForHoverIndex:(NSInteger)index
+{
+  if (index == DockHoverTopIcon) {
+    return @"GWorkspace";
+  }
+
+  if (index == DockHoverRecycler) {
+    return @"Recycler";
+  }
+
+  if (index >= 0 && index < (NSInteger)[_items count]) {
+    DockItem *item = [_items objectAtIndex:(NSUInteger)index];
+    return [[item title] length] ? [item title] : [[item path] lastPathComponent];
+  }
+
+  return nil;
+}
+
+- (void)hideTooltip
+{
+  [_tooltipTimer invalidate];
+  [_tooltipTimer release];
+  _tooltipTimer = nil;
+  if (_tooltipItemIndex != DockHoverNone) {
+    _tooltipItemIndex = DockHoverNone;
+    [self setNeedsDisplay:YES];
+  }
+}
+
+- (void)scheduleTooltipForHoverIndex:(NSInteger)index
+{
+  [_tooltipTimer invalidate];
+  [_tooltipTimer release];
+  _tooltipTimer = nil;
+  _tooltipItemIndex = DockHoverNone;
+
+  if (index == DockHoverNone) {
+    [self setNeedsDisplay:YES];
+    return;
+  }
+
+  _tooltipTimer = [[NSTimer scheduledTimerWithTimeInterval:0.5
+                                                    target:self
+                                                  selector:@selector(showTooltip:)
+                                                  userInfo:nil
+                                                   repeats:NO] retain];
+  [self setNeedsDisplay:YES];
+}
+
+- (void)drawTooltip
+{
+  NSString *title = [self tooltipTitleForHoverIndex:_tooltipItemIndex];
+  NSRect cell;
+  NSDictionary *attrs;
+  NSSize textSize;
+  CGFloat padX = 7.0;
+  CGFloat padY = 4.0;
+  NSRect tooltipRect;
+  NSPoint textPoint;
+  NSRect bounds = [self bounds];
+
+  if (![title length]) {
+    return;
+  }
+
+  cell = [self cellRectForHoverIndex:_tooltipItemIndex];
+  if (NSIsEmptyRect(cell)) {
+    return;
+  }
+
+  attrs = [NSDictionary dictionaryWithObjectsAndKeys:
+    [NSFont systemFontOfSize:11.0], NSFontAttributeName,
+    [NSColor whiteColor], NSForegroundColorAttributeName,
+    nil];
+  textSize = [title sizeWithAttributes:attrs];
+
+  tooltipRect = NSMakeRect(0.0, 0.0,
+                           textSize.width + padX * 2.0,
+                           textSize.height + padY * 2.0);
+  if (_horizontal) {
+    tooltipRect.origin.x = NSMidX(cell) - NSWidth(tooltipRect) / 2.0;
+    tooltipRect.origin.y = NSMaxY(cell) - NSHeight(tooltipRect) - 2.0;
+  } else {
+    tooltipRect.origin.x = NSMaxX(cell) - NSWidth(tooltipRect) - 2.0;
+    tooltipRect.origin.y = NSMidY(cell) - NSHeight(tooltipRect) / 2.0;
+  }
+
+  if (NSMinX(tooltipRect) < NSMinX(bounds) + 2.0) {
+    tooltipRect.origin.x = NSMinX(bounds) + 2.0;
+  }
+  if (NSMaxX(tooltipRect) > NSMaxX(bounds) - 2.0) {
+    tooltipRect.origin.x = NSMaxX(bounds) - NSWidth(tooltipRect) - 2.0;
+  }
+  if (NSMinY(tooltipRect) < NSMinY(bounds) + 2.0) {
+    tooltipRect.origin.y = NSMinY(bounds) + 2.0;
+  }
+  if (NSMaxY(tooltipRect) > NSMaxY(bounds) - 2.0) {
+    tooltipRect.origin.y = NSMaxY(bounds) - NSHeight(tooltipRect) - 2.0;
+  }
+
+  [[NSColor colorWithCalibratedWhite:0.0 alpha:0.82] set];
+  [[NSBezierPath bezierPathWithRoundedRect:tooltipRect
+                                   xRadius:4.0
+                                   yRadius:4.0] fill];
+
+  textPoint = NSMakePoint(NSMinX(tooltipRect) + padX,
+                          NSMinY(tooltipRect) + padY);
+  [title drawAtPoint:textPoint withAttributes:attrs];
+}
+
+- (void)showTooltip:(NSTimer *)timer
+{
+  [_tooltipTimer release];
+  _tooltipTimer = nil;
+
+  if (_hoveredItemIndex != DockHoverNone) {
+    _tooltipItemIndex = _hoveredItemIndex;
+    [self setNeedsDisplay:YES];
+  }
 }
 
 - (NSArray *)pathsFromPasteboard:(NSPasteboard *)pb
@@ -559,6 +751,24 @@ static NSUInteger DockTopIconClickIndex = NSUIntegerMax - 1;
   }
 
   [self drawRecyclerTile];
+  [self drawTooltip];
+}
+
+- (void)mouseMoved:(NSEvent *)event
+{
+  NSPoint location = [self convertPoint:[event locationInWindow] fromView:nil];
+  NSInteger hoverIndex = [self hoverIndexAtPoint:location];
+
+  if (hoverIndex != _hoveredItemIndex) {
+    _hoveredItemIndex = hoverIndex;
+    [self scheduleTooltipForHoverIndex:hoverIndex];
+  }
+}
+
+- (void)mouseExited:(NSEvent *)event
+{
+  _hoveredItemIndex = DockHoverNone;
+  [self hideTooltip];
 }
 
 - (NSDragOperation)draggingEntered:(id <NSDraggingInfo>)sender
