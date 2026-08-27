@@ -321,6 +321,7 @@
 
   item->_kind = DockItemApplication;
   item->_state = DockItemNotRunning;
+  item->_pinned = YES;
   ASSIGNCOPY(item->_path, path);
   ASSIGNCOPY(item->_iconPath, iconPath);
   ASSIGNCOPY(item->_title, [[path lastPathComponent] stringByDeletingPathExtension]);
@@ -346,6 +347,7 @@
   item->_kind = DockItemX11Window;
   item->_state = hidden ? DockItemHidden : DockItemRunning;
   item->_xWindow = xWindow;
+  item->_pinned = NO;
   ASSIGNCOPY(item->_title, displayTitle);
   ASSIGN(item->_icon, icon);
   item->_dockTile = [[NSDockTile alloc] init];
@@ -407,5 +409,7 @@
 - (NSDockTile *) dockTile { return _dockTile; }
 - (unsigned long) xWindow { return _xWindow; }
 - (void) setXWindow: (unsigned long)xWindow { _xWindow = xWindow; }
+- (BOOL) isPinned { return _pinned; }
+- (void) setPinned: (BOOL)pinned { _pinned = pinned; }
 
 @end

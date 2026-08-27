@@ -61,12 +61,14 @@ typedef enum
   NSUInteger _mouseDownItemIndex;
   NSUInteger _draggedItemIndex;
   NSUInteger _dropIndex;
+  NSUInteger _pinnedItemCount;
   NSUInteger _lastMouseDownIndex;
   NSTimeInterval _lastMouseDownTime;
 }
 
 - (void) setDelegate: (id)delegate;
 - (void) setItems: (NSArray *)items;
+- (void) setPinnedItemCount: (NSUInteger)count;
 - (void) setBackgroundImage: (NSImage *)image;
 - (void) setBackgroundMode: (DockBackgroundMode)mode;
 - (void) setRecyclerHasContents: (BOOL)hasContents;

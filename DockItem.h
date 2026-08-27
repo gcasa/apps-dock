@@ -42,6 +42,7 @@ typedef enum
   NSImage *_icon;
   NSDockTile *_dockTile;
   unsigned long _xWindow;
+  BOOL _pinned;
 }
 
 + (id) applicationItemWithPath: (NSString *)path;
@@ -49,6 +50,7 @@ typedef enum
                  window: (unsigned long)xWindow
                    icon: (NSImage *)icon
                  hidden: (BOOL)hidden;
++ (NSString *) applicationBundlePathForPath: (NSString *)path;
 
 - (DockItemKind) kind;
 - (DockItemState) state;
@@ -61,5 +63,7 @@ typedef enum
 - (NSDockTile *) dockTile;
 - (unsigned long) xWindow;
 - (void) setXWindow: (unsigned long)xWindow;
+- (BOOL) isPinned;
+- (void) setPinned: (BOOL)pinned;
 
 @end

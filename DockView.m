@@ -25,6 +25,7 @@
 static CGFloat DockCell = 64.0;
 static CGFloat DockGap = 2.0;
 static CGFloat DockPad = 10.0;
+static CGFloat DockSeparatorInset = 12.0;
 static NSTimeInterval DockWiggleDuration = 0.8;
 
 static NSString *GWRemoteFilenamesPboardType = @"GWRemoteFilenamesPboardType";
@@ -53,6 +54,7 @@ static NSInteger DockHoverRecycler = -3;
     _mouseDownItemIndex = NSNotFound;
     _draggedItemIndex = NSNotFound;
     _dropIndex = NSNotFound;
+    _pinnedItemCount = 0;
     _backgroundMode = DockBackgroundBlack;
     _gnustepIcon = RETAIN([self loadGNUstepIcon]);
     _recyclerIcon = RETAIN([self loadRecyclerIcon]);
@@ -164,8 +166,23 @@ static NSInteger DockHoverRecycler = -3;
 - (void) setItems: (NSArray *)items
 {
   [_items setArray:items];
+  if (_pinnedItemCount > [_items count]) {
+    _pinnedItemCount = [_items count];
+  }
   [self hideTooltip];
   [self setNeedsDisplay:YES];
+}
+
+- (void) setPinnedItemCount: (NSUInteger)count
+{
+  if (count > [_items count]) {
+    count = [_items count];
+  }
+
+  if (_pinnedItemCount != count) {
+    _pinnedItemCount = count;
+    [self setNeedsDisplay:YES];
+  }
 }
 
 - (void) stopWiggle
@@ -328,6 +345,25 @@ static NSInteger DockHoverRecycler = -3;
   }
 
   return [_items count];
+}
+
+- (NSUInteger) pinnedInsertionIndexAtPoint: (NSPoint)p
+{
+  NSUInteger index = [self insertionIndexAtPoint:p];
+
+  return MIN(index, _pinnedItemCount);
+}
+
+- (NSUInteger) reorderInsertionIndexAtPoint: (NSPoint)p
+                                  fromIndex: (NSUInteger)fromIndex
+{
+  NSUInteger index = [self insertionIndexAtPoint:p];
+
+  if (fromIndex < _pinnedItemCount) {
+    return MIN(index, _pinnedItemCount);
+  }
+
+  return index;
 }
 
 - (BOOL) topIconContainsPoint: (NSPoint)p
@@ -861,6 +897,60 @@ static NSInteger DockHoverRecycler = -3;
   }
 }
 
+- (void) drawSeparatorBeforeIndex: (NSUInteger)index
+{
+  NSPoint origin;
+  NSRect previousCell;
+  NSRect nextCell;
+  CGFloat x;
+  CGFloat y;
+  NSBezierPath *path;
+
+  if (index > [_items count]) {
+    return;
+  }
+
+  if (index > 0) {
+    origin = [self cellOriginAtIndex:index - 1];
+    previousCell = NSMakeRect(origin.x, origin.y, DockCell, DockCell);
+  } else {
+    previousCell = [self topTileRect];
+  }
+
+  if (index < [_items count]) {
+    origin = [self cellOriginAtIndex:index];
+    nextCell = NSMakeRect(origin.x, origin.y, DockCell, DockCell);
+  } else {
+    nextCell = [self recyclerTileRect];
+  }
+
+  path = [NSBezierPath bezierPath];
+  [path setLineWidth:1.0];
+  [[NSColor colorWithCalibratedWhite:1.0 alpha:0.55] set];
+
+  if (_horizontal) {
+    x = floor((NSMaxX(previousCell) + NSMinX(nextCell)) / 2.0) + 0.5;
+    [path moveToPoint:NSMakePoint(x, NSMinY(nextCell) + DockSeparatorInset)];
+    [path lineToPoint:NSMakePoint(x, NSMaxY(nextCell) - DockSeparatorInset)];
+  } else {
+    y = floor((NSMinY(previousCell) + NSMaxY(nextCell)) / 2.0) + 0.5;
+    [path moveToPoint:NSMakePoint(NSMinX(nextCell) + DockSeparatorInset, y)];
+    [path lineToPoint:NSMakePoint(NSMaxX(nextCell) - DockSeparatorInset, y)];
+  }
+
+  [path stroke];
+}
+
+- (void) drawDockSeparators
+{
+  if (_pinnedItemCount >= [_items count]) {
+    return;
+  }
+
+  [self drawSeparatorBeforeIndex:_pinnedItemCount];
+  [self drawSeparatorBeforeIndex:[_items count]];
+}
+
 - (void) drawRect: (NSRect)dirtyRect
 {
   NSUInteger i;
@@ -879,6 +969,7 @@ static NSInteger DockHoverRecycler = -3;
   }
 
   [self drawTopTile];
+  [self drawDockSeparators];
 
   for (i = 0; i < [_items count]; i++) {
     DockItem *item = [_items objectAtIndex:i];
@@ -1026,7 +1117,8 @@ static NSInteger DockHoverRecycler = -3;
   [self hideTooltip];
 
   if ([self pasteboardHasReorderType:pasteboard]) {
-    _dropIndex = [self insertionIndexAtPoint:location];
+    _dropIndex = [self reorderInsertionIndexAtPoint:location
+                                          fromIndex:_draggedItemIndex];
     [self setNeedsDisplay:YES];
     return NSDragOperationMove;
   }
@@ -1037,7 +1129,7 @@ static NSInteger DockHoverRecycler = -3;
 
   if ([self pasteboardHasSupportedType:pasteboard]) {
     _draggingPaths = YES;
-    _dropIndex = [self insertionIndexAtPoint:location];
+    _dropIndex = [self pinnedInsertionIndexAtPoint:location];
     [self setNeedsDisplay:YES];
     return [self dragOperationForSender:sender];
   }
@@ -1049,7 +1141,8 @@ static NSInteger DockHoverRecycler = -3;
   NSPoint location = [self convertPoint:[sender draggingLocation] fromView:nil];
 
   if ([self pasteboardHasReorderType:[sender draggingPasteboard]]) {
-    _dropIndex = [self insertionIndexAtPoint:location];
+    _dropIndex = [self reorderInsertionIndexAtPoint:location
+                                          fromIndex:_draggedItemIndex];
     [self setNeedsDisplay:YES];
     return NSDragOperationMove;
   }
@@ -1060,7 +1153,7 @@ static NSInteger DockHoverRecycler = -3;
       [self setNeedsDisplay:YES];
       return NSDragOperationNone;
     }
-    _dropIndex = [self insertionIndexAtPoint:location];
+    _dropIndex = [self pinnedInsertionIndexAtPoint:location];
     [self setNeedsDisplay:YES];
     return [self dragOperationForSender:sender];
   }
@@ -1099,7 +1192,8 @@ static NSInteger DockHoverRecycler = -3;
   if ([self pasteboardHasReorderType:pasteboard]) {
     NSString *indexString = [pasteboard stringForType:DockReorderPboardType];
     NSUInteger fromIndex = (NSUInteger)[indexString integerValue];
-    NSUInteger toIndex = [self insertionIndexAtPoint:location];
+    NSUInteger toIndex = [self reorderInsertionIndexAtPoint:location
+                                                  fromIndex:fromIndex];
 
     _dropIndex = NSNotFound;
     _draggedItemIndex = NSNotFound;
@@ -1119,7 +1213,7 @@ static NSInteger DockHoverRecycler = -3;
   }
 
   if ([paths count] && [_delegate respondsToSelector:@selector(dockViewDidReceivePaths:)]) {
-    NSUInteger toIndex = [self insertionIndexAtPoint:location];
+    NSUInteger toIndex = [self pinnedInsertionIndexAtPoint:location];
 
     if ([_delegate respondsToSelector:
           @selector(dockViewDidReceivePaths:atIndex:)]) {
@@ -1142,7 +1236,7 @@ static NSInteger DockHoverRecycler = -3;
     if (![self pasteboardHasReorderType:[sender draggingPasteboard]] &&
         ![self recyclerContainsPoint:location] &&
         [paths count]) {
-      NSUInteger toIndex = [self insertionIndexAtPoint:location];
+      NSUInteger toIndex = [self pinnedInsertionIndexAtPoint:location];
 
       if ([_delegate respondsToSelector:
             @selector(dockViewDidReceivePaths:atIndex:)]) {
