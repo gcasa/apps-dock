@@ -877,17 +877,55 @@ static NSInteger DockHoverRecycler = -3;
 
 - (NSDragOperation)draggingSourceOperationMaskForLocal:(BOOL)isLocal
 {
-  return NSDragOperationMove;
+  return NSDragOperationMove | NSDragOperationDelete;
+}
+
+- (BOOL)screenPointIsInsideDock:(NSPoint)screenPoint
+{
+  NSPoint windowPoint;
+  NSPoint viewPoint;
+
+  if (![self window]) {
+    return NO;
+  }
+
+  windowPoint = [[self window] convertScreenToBase:screenPoint];
+  viewPoint = [self convertPoint:windowPoint fromView:nil];
+  return NSPointInRect(viewPoint, [self bounds]);
+}
+
+- (void)finishDraggingItemWithRemove:(BOOL)remove
+{
+  NSUInteger draggedIndex = _draggedItemIndex;
+
+  if (remove &&
+      draggedIndex != NSNotFound &&
+      draggedIndex < [_items count] &&
+      [_delegate respondsToSelector:
+        @selector(dockViewDidRemoveItemAtIndex:)]) {
+    [_delegate dockViewDidRemoveItemAtIndex:draggedIndex];
+  }
+
+  _mouseDownItemIndex = NSNotFound;
+  _draggedItemIndex = NSNotFound;
+  _dropIndex = NSNotFound;
+  [self setNeedsDisplay:YES];
+}
+
+- (void)draggedImage:(NSImage *)image
+             endedAt:(NSPoint)screenPoint
+           operation:(NSDragOperation)operation
+{
+  [self finishDraggingItemWithRemove:
+    ![self screenPointIsInsideDock:screenPoint]];
 }
 
 - (void)draggedImage:(NSImage *)image
              endedAt:(NSPoint)screenPoint
            deposited:(BOOL)flag
 {
-  _mouseDownItemIndex = NSNotFound;
-  _draggedItemIndex = NSNotFound;
-  _dropIndex = NSNotFound;
-  [self setNeedsDisplay:YES];
+  [self finishDraggingItemWithRemove:
+    ![self screenPointIsInsideDock:screenPoint]];
 }
 
 - (NSDragOperation)draggingEntered:(id <NSDraggingInfo>)sender

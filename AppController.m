@@ -631,7 +631,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
     item = [[NSMenuItem alloc] initWithTitle:@"Quit"
                                       action:@selector(quitDock:)
-                               keyEquivalent:@""];
+                               keyEquivalent:@"q"];
     [item setTarget:self];
     [_dockMenu addItem:item];
     [item release];
@@ -860,6 +860,17 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [_items insertObject:item atIndex:toIndex];
   [item release];
 
+  [self savePersistedApplications];
+  [self refreshDock];
+}
+
+- (void)dockViewDidRemoveItemAtIndex:(NSUInteger)index
+{
+  if (index >= [_items count]) {
+    return;
+  }
+
+  [_items removeObjectAtIndex:index];
   [self savePersistedApplications];
   [self refreshDock];
 }

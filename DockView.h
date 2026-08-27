@@ -13,6 +13,7 @@ typedef enum {
 - (void)dockViewDidActivateTopIcon;
 - (void)dockViewDidMoveItemFromIndex:(NSUInteger)fromIndex
                               toIndex:(NSUInteger)toIndex;
+- (void)dockViewDidRemoveItemAtIndex:(NSUInteger)index;
 @end
 
 @interface DockView : NSView
