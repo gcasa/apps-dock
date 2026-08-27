@@ -1,5 +1,8 @@
 #import "AppController.h"
 #import "DockItem.h"
+#import <ctype.h>
+#import <limits.h>
+#import <unistd.h>
 
 static CGFloat DockWindowWidth = 84.0;
 static CGFloat DockCell = 64.0;
@@ -60,11 +63,19 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   } else {
     [_window makeKeyAndOrderFront:nil];
   }
+
+  _processScanTimer = [NSTimer scheduledTimerWithTimeInterval:1.0
+                                                       target:self
+                                                     selector:@selector(scanRunningApplications)
+                                                     userInfo:nil
+                                                      repeats:YES];
+  [self scanRunningApplications];
 }
 
 - (void)dealloc
 {
   [_scanTimer invalidate];
+  [_processScanTimer invalidate];
   [_transparentBackgroundMenuItem release];
   [_blackBackgroundMenuItem release];
   [_dockMenu release];
@@ -319,6 +330,136 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   }
 
   return nil;
+}
+
+- (BOOL)stringIsProcessIdentifier:(NSString *)string
+{
+  const char *chars = [string UTF8String];
+  NSUInteger i;
+
+  if (!chars || !chars[0]) {
+    return NO;
+  }
+
+  for (i = 0; chars[i]; i++) {
+    if (!isdigit((unsigned char)chars[i])) {
+      return NO;
+    }
+  }
+
+  return YES;
+}
+
+- (NSArray *)runningProcessExecutablePaths
+{
+  NSArray *entries = [[NSFileManager defaultManager]
+    directoryContentsAtPath:@"/proc"];
+  NSMutableArray *paths = [NSMutableArray array];
+  NSUInteger i;
+
+  for (i = 0; i < [entries count]; i++) {
+    NSString *entry = [entries objectAtIndex:i];
+    NSString *linkPath;
+    char target[PATH_MAX];
+    ssize_t length;
+
+    if (![self stringIsProcessIdentifier:entry]) {
+      continue;
+    }
+
+    linkPath = [[@"/proc" stringByAppendingPathComponent:entry]
+      stringByAppendingPathComponent:@"exe"];
+    length = readlink([linkPath fileSystemRepresentation],
+                      target,
+                      sizeof(target) - 1);
+    if (length <= 0) {
+      continue;
+    }
+
+    target[length] = '\0';
+    {
+      NSString *path = [self normalizedPath:
+        [NSString stringWithUTF8String:target]];
+      if ([path length] && ![paths containsObject:path]) {
+        [paths addObject:path];
+      }
+    }
+  }
+
+  return paths;
+}
+
+- (BOOL)applicationItem:(DockItem *)item matchesRunningProcessPath:(NSString *)processPath
+{
+  NSString *itemPath = [self normalizedPath:[item path]];
+  NSString *executablePath = [self executablePathForApplicationPath:[item path]];
+  NSString *processName = [[processPath lastPathComponent] lowercaseString];
+  NSString *itemName = [[[[item path] lastPathComponent]
+    stringByDeletingPathExtension] lowercaseString];
+  NSString *executableName = [[executablePath lastPathComponent] lowercaseString];
+
+  if (![processPath length]) {
+    return NO;
+  }
+
+  if (([itemPath length] && [processPath isEqualToString:itemPath]) ||
+      ([executablePath length] && [processPath isEqualToString:executablePath]) ||
+      ([processName length] && [processName isEqualToString:itemName]) ||
+      ([processName length] && [processName isEqualToString:executableName]) ||
+      ([itemPath length] &&
+       [[[itemPath pathExtension] lowercaseString] isEqualToString:@"app"] &&
+       [processPath hasPrefix:[itemPath stringByAppendingString:@"/"]])) {
+    return YES;
+  }
+
+  return NO;
+}
+
+- (BOOL)applicationItemHasRunningProcess:(DockItem *)item
+                                   paths:(NSArray *)processPaths
+{
+  NSUInteger i;
+
+  for (i = 0; i < [processPaths count]; i++) {
+    if ([self applicationItem:item
+      matchesRunningProcessPath:[processPaths objectAtIndex:i]]) {
+      return YES;
+    }
+  }
+
+  return NO;
+}
+
+- (void)scanRunningApplications
+{
+  NSArray *processPaths = [self runningProcessExecutablePaths];
+  BOOL changed = NO;
+  NSUInteger i;
+
+  for (i = 0; i < [_items count]; i++) {
+    DockItem *item = [_items objectAtIndex:i];
+    BOOL running;
+    DockItemState newState;
+
+    if ([item kind] != DockItemApplication) {
+      continue;
+    }
+
+    running = [self applicationItemHasRunningProcess:item paths:processPaths];
+    if (!running && [item xWindow]) {
+      continue;
+    }
+
+    newState = running ? DockItemRunning : DockItemNotRunning;
+    if ([item state] != newState) {
+      [item setState:newState];
+      changed = YES;
+    }
+  }
+
+  if (changed) {
+    [self refreshDock];
+  }
 }
 
 - (NSRect)dockWindowFrameForPlacement:(DockPlacement)placement

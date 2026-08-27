@@ -9,6 +9,7 @@
   NSMutableArray *_items;
   X11DockManager *_x11;
   NSTimer *_scanTimer;
+  NSTimer *_processScanTimer;
   NSMenu *_dockMenu;
   NSMutableArray *_placementMenuItems;
   NSMenuItem *_blackBackgroundMenuItem;
