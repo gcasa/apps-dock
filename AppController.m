@@ -1,5 +1,5 @@
 /*
- * Dock
+ * DockWM
  *
  * Copyright (C) 2026 Gregory Casamento <greg.casamento@gmail.com>
  *
@@ -59,7 +59,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [_window setLevel:NSDockWindowLevel];
   [_window setOpaque:NO];
   [_window setBackgroundColor:[NSColor clearColor]];
-  [_window setTitle:@"Dock"];
+  [_window setTitle:@"AppsDockWM"];
   [_window setAcceptsMouseMovedEvents:YES];
 
   _dockView = [[DockView alloc] initWithFrame:NSMakeRect(0, 0,
@@ -553,7 +553,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   return nil;
 }
 
-- (BOOL) applicationBundlePathIsDock: (NSString *)path
+- (BOOL) applicationBundlePathIsDockWM: (NSString *)path
 {
   NSString *candidateBundlePath = [DockItem applicationBundlePathForPath:path];
   NSString *bundlePath = [self normalizedPath:
@@ -569,7 +569,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     return YES;
   }
 
-  return [bundleName isEqualToString:@"dock.app"];
+  return [bundleName isEqualToString:@"dockwm.app"];
 }
 
 - (void) rememberLaunchedApplicationPath: (NSString *)path
@@ -761,7 +761,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     DockItem *item;
 
     if (![bundlePath length] ||
-        [self applicationBundlePathIsDock:bundlePath] ||
+        [self applicationBundlePathIsDockWM:bundlePath] ||
         [self dockHasApplicationPath:bundlePath] ||
         [self transientApplicationItemMatchingBundlePath:bundlePath]) {
       continue;
@@ -1472,7 +1472,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   matchedPinnedApplication = item && [item kind] == DockItemApplication && [item isPinned];
 
   if (dockApp &&
-      ([self applicationBundlePathIsDock:path] ||
+      ([self applicationBundlePathIsDockWM:path] ||
        [self windowPathMatchesLaunchedApplication:path])) {
     if (item) {
       itemIndex = [self indexForItem:item];
@@ -1500,7 +1500,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
       [item setIcon:icon];
     }
   } else {
-    if ([path length] && ![self applicationBundlePathIsDock:path]) {
+    if ([path length] && ![self applicationBundlePathIsDockWM:path]) {
       NSString *bundlePath = [DockItem applicationBundlePathForPath:path];
       NSString *applicationPath = [bundlePath length] ? bundlePath : path;
 

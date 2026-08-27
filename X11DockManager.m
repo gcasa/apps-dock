@@ -1,5 +1,5 @@
 /*
- * Dock
+ * DockWM
  *
  * Copyright (C) 2026 Gregory Casamento <greg.casamento@gmail.com>
  *
@@ -823,11 +823,11 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   NSString *lowerName = [[path lastPathComponent] lowercaseString];
 
   if ([lowerTitle isEqualToString:@"gworkspace"] ||
-      [lowerTitle isEqualToString:@"dock"] ||
+      [lowerTitle isEqualToString:@"dockwm"] ||
       [lowerName isEqualToString:@"gworkspace"] ||
-      [lowerName isEqualToString:@"dock"] ||
+      [lowerName isEqualToString:@"dockwm"] ||
       [lowerPath rangeOfString:@"/gworkspace.app/"].location != NSNotFound ||
-      [lowerPath rangeOfString:@"/dock.app/"].location != NSNotFound) {
+      [lowerPath rangeOfString:@"/dockwm.app/"].location != NSNotFound) {
     return YES;
   }
 
@@ -894,11 +894,11 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
           NSString *lowerTitle = [title lowercaseString];
 
           if (([lowerPath length] &&
-               ([lowerPath rangeOfString:@"/dock.app/"].location != NSNotFound ||
+               ([lowerPath rangeOfString:@"/dockwm.app/"].location != NSNotFound ||
                 [lowerPath rangeOfString:@"/gworkspace.app/"].location != NSNotFound)) ||
-              [lowerName isEqualToString:@"dock"] ||
+              [lowerName isEqualToString:@"dockwm"] ||
               [lowerName isEqualToString:@"gworkspace"] ||
-              [lowerTitle isEqualToString:@"dock"] ||
+              [lowerTitle isEqualToString:@"dockwm"] ||
               [lowerTitle isEqualToString:@"gworkspace"]) {
             XMoveWindow(display, children[i], -10000, -10000);
             XMapWindow(display, children[i]);

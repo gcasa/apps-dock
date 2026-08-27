@@ -1,6 +1,6 @@
-# Dock
+# AppsDockWM
 
-Dock is a small GNUstep/AppKit dock-style window manager shell inspired by
+AppsDockWM is a small GNUstep/AppKit dock-style window manager shell inspired by
 WindowMaker.
 
 It supports two inputs:
@@ -19,7 +19,7 @@ make
 ## Run
 
 ```sh
-./Dock.app/Dock
+./AppsDockWM.app/AppsDockWM
 ```
 
 The AppKit dock accepts filesystem drops. A companion X11 override-redirect host
