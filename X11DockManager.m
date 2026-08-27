@@ -3,6 +3,8 @@
 #import <X11/Xlib.h>
 #import <X11/Xatom.h>
 #import <X11/Xutil.h>
+#import <limits.h>
+#import <unistd.h>
 
 static int X11DockManagerLastErrorCode = 0;
 static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
@@ -442,6 +444,39 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   return icon;
 }
 
+- (NSString *)executablePathForWindow:(Window)window
+{
+  Display *display = (Display *)_display;
+  Atom property = XInternAtom(display, "_NET_WM_PID", False);
+  Atom actualType;
+  int actualFormat;
+  unsigned long itemCount, bytesAfter;
+  unsigned char *data = NULL;
+  NSString *path = nil;
+
+  [self clearX11Error];
+  if (XGetWindowProperty(display, window, property, 0, 1, False, XA_CARDINAL,
+                         &actualType, &actualFormat, &itemCount, &bytesAfter,
+                         &data) == Success && data) {
+    if (![self x11ErrorOccurred] && actualFormat == 32 && itemCount >= 1) {
+      unsigned long pid = ((unsigned long *)data)[0];
+      char procPath[64];
+      char target[PATH_MAX];
+      ssize_t length;
+
+      snprintf(procPath, sizeof(procPath), "/proc/%lu/exe", pid);
+      length = readlink(procPath, target, sizeof(target) - 1);
+      if (length > 0) {
+        target[length] = '\0';
+        path = [NSString stringWithUTF8String:target];
+      }
+    }
+    XFree(data);
+  }
+
+  return [path length] ? path : nil;
+}
+
 - (BOOL)windowLooksLikeDockApp:(Window)window
 {
   Display *display = (Display *)_display;
@@ -531,11 +566,12 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
       BOOL dockApp = [self windowLooksLikeDockApp:children[i]];
       BOOL hidden = [self windowIsHidden:children[i]];
       [_knownWindows addObject:key];
-      if ([_delegate respondsToSelector:@selector(x11DockManagerDidDiscoverWindowWithTitle:window:hidden:icon:dockApp:)]) {
+      if ([_delegate respondsToSelector:@selector(x11DockManagerDidDiscoverWindowWithTitle:window:hidden:icon:path:dockApp:)]) {
         [_delegate x11DockManagerDidDiscoverWindowWithTitle:[self titleForWindow:children[i]]
                                                      window:(unsigned long)children[i]
                                                      hidden:hidden
                                                        icon:[self iconForWindow:children[i]]
+                                                       path:[self executablePathForWindow:children[i]]
                                                     dockApp:dockApp];
       }
     }

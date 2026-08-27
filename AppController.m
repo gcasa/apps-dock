@@ -141,7 +141,8 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     }
 
     if ([[NSFileManager defaultManager] fileExistsAtPath:path
-                                             isDirectory:&isDir]) {
+                                             isDirectory:&isDir] &&
+        ![self dockHasApplicationPath:path]) {
       [_items addObject:[DockItem applicationItemWithPath:path]];
     }
   }
@@ -170,21 +171,154 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
 - (BOOL)dockHasApplicationPath:(NSString *)path
 {
+  NSString *normalizedPath = [self normalizedPath:path];
   NSUInteger i;
 
-  if (![path length]) {
+  if (![normalizedPath length]) {
     return NO;
   }
 
   for (i = 0; i < [_items count]; i++) {
     DockItem *item = [_items objectAtIndex:i];
     if ([item kind] == DockItemApplication &&
-        [[item path] isEqualToString:path]) {
+        [[self normalizedPath:[item path]] isEqualToString:normalizedPath]) {
       return YES;
     }
   }
 
   return NO;
+}
+
+- (NSString *)normalizedPath:(NSString *)path
+{
+  if (![path length]) {
+    return nil;
+  }
+
+  return [path stringByResolvingSymlinksInPath];
+}
+
+- (NSString *)executablePathForApplicationPath:(NSString *)path
+{
+  NSString *extension = [[path pathExtension] lowercaseString];
+  BOOL isDir = NO;
+
+  if (![path length]) {
+    return nil;
+  }
+
+  [[NSFileManager defaultManager] fileExistsAtPath:path isDirectory:&isDir];
+  if ([extension isEqualToString:@"app"] && isDir) {
+    NSBundle *bundle = [NSBundle bundleWithPath:path];
+    NSString *executablePath = [bundle executablePath];
+    NSString *fallbackPath;
+
+    if ([executablePath length]) {
+      return [self normalizedPath:executablePath];
+    }
+
+    fallbackPath = [path stringByAppendingPathComponent:
+      [[path lastPathComponent] stringByDeletingPathExtension]];
+    if ([[NSFileManager defaultManager] fileExistsAtPath:fallbackPath]) {
+      return [self normalizedPath:fallbackPath];
+    }
+  }
+
+  if ([extension isEqualToString:@"desktop"]) {
+    NSString *desktopExecutable = [self executablePathForDesktopFile:path];
+    if ([desktopExecutable length]) {
+      return desktopExecutable;
+    }
+  }
+
+  if (!isDir && [[NSFileManager defaultManager] isExecutableFileAtPath:path]) {
+    return [self normalizedPath:path];
+  }
+
+  return [self normalizedPath:path];
+}
+
+- (NSString *)firstCommandTokenFromString:(NSString *)string
+{
+  NSMutableString *token = [NSMutableString string];
+  NSUInteger i;
+  BOOL quoted = NO;
+  unichar quote = 0;
+
+  for (i = 0; i < [string length]; i++) {
+    unichar ch = [string characterAtIndex:i];
+
+    if (quoted) {
+      if (ch == quote) {
+        quoted = NO;
+      } else {
+        [token appendFormat:@"%C", ch];
+      }
+    } else if (ch == '"' || ch == '\'') {
+      quoted = YES;
+      quote = ch;
+    } else if ([[NSCharacterSet whitespaceAndNewlineCharacterSet]
+                  characterIsMember:ch]) {
+      if ([token length]) {
+        break;
+      }
+    } else {
+      [token appendFormat:@"%C", ch];
+    }
+  }
+
+  return [token length] ? token : nil;
+}
+
+- (NSString *)pathForExecutableCommand:(NSString *)command
+{
+  NSArray *pathComponents;
+  NSUInteger i;
+
+  if (![command length]) {
+    return nil;
+  }
+
+  if ([command isAbsolutePath] &&
+      [[NSFileManager defaultManager] fileExistsAtPath:command]) {
+    return [self normalizedPath:command];
+  }
+
+  pathComponents = [[[NSProcessInfo processInfo] environment]
+    objectForKey:@"PATH"] ?
+    [[[[NSProcessInfo processInfo] environment] objectForKey:@"PATH"]
+      componentsSeparatedByString:@":"] :
+    [NSArray arrayWithObjects:@"/usr/local/bin", @"/usr/bin", @"/bin", nil];
+
+  for (i = 0; i < [pathComponents count]; i++) {
+    NSString *candidate = [[pathComponents objectAtIndex:i]
+      stringByAppendingPathComponent:command];
+    if ([[NSFileManager defaultManager] isExecutableFileAtPath:candidate]) {
+      return [self normalizedPath:candidate];
+    }
+  }
+
+  return command;
+}
+
+- (NSString *)executablePathForDesktopFile:(NSString *)path
+{
+  NSString *contents = [NSString stringWithContentsOfFile:path];
+  NSArray *lines = [contents componentsSeparatedByCharactersInSet:
+    [NSCharacterSet newlineCharacterSet]];
+  NSUInteger i;
+
+  for (i = 0; i < [lines count]; i++) {
+    NSString *line = [lines objectAtIndex:i];
+    if ([line hasPrefix:@"Exec="]) {
+      NSString *command = [line substringFromIndex:5];
+      command = [[command componentsSeparatedByString:@"%"] objectAtIndex:0];
+      return [self pathForExecutableCommand:
+        [self firstCommandTokenFromString:command]];
+    }
+  }
+
+  return nil;
 }
 
 - (NSRect)dockWindowFrameForPlacement:(DockPlacement)placement
@@ -406,6 +540,19 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   return nil;
 }
 
+- (NSUInteger)indexForItem:(DockItem *)targetItem
+{
+  NSUInteger i;
+
+  for (i = 0; i < [_items count]; i++) {
+    if ([_items objectAtIndex:i] == targetItem) {
+      return i;
+    }
+  }
+
+  return NSNotFound;
+}
+
 - (DockItem *)applicationItemMatchingTitle:(NSString *)title
 {
   NSString *windowTitle = [title lowercaseString];
@@ -427,6 +574,48 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     if ([appTitle length] &&
         ([windowTitle rangeOfString:appTitle].location != NSNotFound ||
          [appTitle rangeOfString:windowTitle].location != NSNotFound)) {
+      return item;
+    }
+  }
+
+  return nil;
+}
+
+- (DockItem *)applicationItemMatchingExecutablePath:(NSString *)path
+{
+  NSString *windowPath = [self normalizedPath:path];
+  NSString *windowName = [[windowPath lastPathComponent] lowercaseString];
+  NSUInteger i;
+
+  if (![windowPath length]) {
+    return nil;
+  }
+
+  for (i = 0; i < [_items count]; i++) {
+    DockItem *item = [_items objectAtIndex:i];
+    NSString *itemPath;
+    NSString *executablePath;
+    NSString *itemName;
+    NSString *executableName;
+
+    if ([item kind] != DockItemApplication) {
+      continue;
+    }
+
+    itemPath = [self normalizedPath:[item path]];
+    executablePath = [self executablePathForApplicationPath:[item path]];
+    itemName = [[[[item path] lastPathComponent]
+      stringByDeletingPathExtension] lowercaseString];
+    executableName = [[executablePath lastPathComponent] lowercaseString];
+
+    if (([itemPath length] && [windowPath isEqualToString:itemPath]) ||
+        ([executablePath length] && [windowPath isEqualToString:executablePath]) ||
+        ([windowName length] && [windowName isEqualToString:itemName]) ||
+        ([windowName length] && [windowName isEqualToString:executableName]) ||
+        ([itemPath length] &&
+         [[[itemPath pathExtension] lowercaseString] isEqualToString:@"app"] &&
+         [windowPath hasPrefix:
+           [itemPath stringByAppendingString:@"/"]])) {
       return item;
     }
   }
@@ -529,13 +718,22 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
                                           window:(unsigned long)xWindow
                                           hidden:(BOOL)hidden
                                             icon:(NSImage *)icon
+                                            path:(NSString *)path
                                          dockApp:(BOOL)dockApp
 {
-  DockItem *item = dockApp ? nil : [self applicationItemMatchingTitle:title];
+  DockItem *item = [self applicationItemMatchingExecutablePath:path];
+  NSUInteger itemIndex;
+
+  if (!item) {
+    item = [self applicationItemMatchingTitle:title];
+  }
 
   if (item) {
     [item setState:(hidden ? DockItemHidden : DockItemRunning)];
     [item setXWindow:xWindow];
+    if (![item icon] && icon) {
+      [item setIcon:icon];
+    }
   } else {
     item = [DockItem x11ItemWithTitle:title window:xWindow icon:icon hidden:hidden];
     [_items addObject:item];
@@ -543,7 +741,10 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
   [self refreshDock];
   if (dockApp) {
-    [_x11 dockWindow:xWindow atIndex:([_items count] - 1)];
+    itemIndex = [self indexForItem:item];
+    if (itemIndex != NSNotFound) {
+      [_x11 dockWindow:xWindow atIndex:itemIndex];
+    }
   }
 }
 

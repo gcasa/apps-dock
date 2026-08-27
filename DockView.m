@@ -392,30 +392,24 @@ static NSUInteger DockTopIconClickIndex = NSUIntegerMax - 1;
 
 - (void)drawStateForItem:(DockItem *)item inCell:(NSRect)cell
 {
-  NSUInteger count = 0;
-  NSUInteger i;
-  CGFloat dotSize = 4.0;
-  CGFloat gap = 3.0;
+  CGFloat dotSize = 5.0;
   CGFloat x;
-  CGFloat y = NSMinY(cell) + 6.0;
+  CGFloat y = NSMinY(cell) + 2.0;
 
-  if ([item state] == DockItemNotRunning) {
-    count = 3;
-  } else if ([item state] == DockItemHidden) {
-    count = 1;
-  }
-
-  if (!count) {
+  if ([item kind] != DockItemApplication ||
+      [item state] == DockItemNotRunning) {
     return;
   }
 
-  x = NSMinX(cell) + 8.0;
+  x = NSMidX(cell) - dotSize / 2.0;
 
-  [[NSColor colorWithCalibratedWhite:0.08 alpha:1.0] set];
-  for (i = 0; i < count; i++) {
-    NSRect dot = NSMakeRect(x + i * (dotSize + gap), y, dotSize, dotSize);
-    [[NSBezierPath bezierPathWithOvalInRect:dot] fill];
-  }
+  [[NSColor colorWithCalibratedWhite:0.0 alpha:0.65] set];
+  [[NSBezierPath bezierPathWithOvalInRect:
+    NSMakeRect(x - 1.0, y - 1.0, dotSize + 2.0, dotSize + 2.0)] fill];
+
+  [[NSColor colorWithCalibratedWhite:0.92 alpha:0.95] set];
+  [[NSBezierPath bezierPathWithOvalInRect:
+    NSMakeRect(x, y, dotSize, dotSize)] fill];
 }
 
 - (void)drawTopTile

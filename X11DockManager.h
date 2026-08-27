@@ -17,6 +17,7 @@ typedef enum {
                                           window:(unsigned long)xWindow
                                          hidden:(BOOL)hidden
                                            icon:(NSImage *)icon
+                                           path:(NSString *)path
                                         dockApp:(BOOL)dockApp;
 - (void)x11DockManagerDidUpdateWindow:(unsigned long)xWindow hidden:(BOOL)hidden;
 @end
