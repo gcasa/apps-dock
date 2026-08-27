@@ -553,6 +553,47 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   return nil;
 }
 
+- (DockItem *) applicationItemMatchingProcessIdentifier: (NSNumber *)processIdentifier
+{
+  NSUInteger i;
+
+  if (![processIdentifier isKindOfClass:[NSNumber class]]) {
+    return nil;
+  }
+
+  for (i = 0; i < [_items count]; i++) {
+    DockItem *item = [_items objectAtIndex:i];
+
+    if ([item kind] == DockItemApplication &&
+        [[self runningProcessIdentifiersForApplicationItem:item]
+          containsObject:processIdentifier]) {
+      return item;
+    }
+  }
+
+  return nil;
+}
+
+- (void) x11DockManagerDidUpdateApplicationIcon: (NSImage *)icon
+                              processIdentifier: (int)processIdentifier
+                                          title: (NSString *)title
+{
+  DockItem *item = nil;
+
+  if (processIdentifier > 0) {
+    item = [self applicationItemMatchingProcessIdentifier:
+      [NSNumber numberWithInt:processIdentifier]];
+  }
+  if (!item && [title length]) {
+    item = [self applicationItemMatchingTitle:title];
+  }
+
+  if (item && icon) {
+    [item setIcon:icon];
+    [self refreshDock];
+  }
+}
+
 - (BOOL) applicationBundlePathIsDockWM: (NSString *)path
 {
   NSString *candidateBundlePath = [DockItem applicationBundlePathForPath:path];

@@ -42,6 +42,9 @@ typedef enum
 - (void) x11DockManagerDidUpdateWindow: (unsigned long)xWindow
                                 hidden: (BOOL)hidden
                                   icon: (NSImage *)icon;
+- (void) x11DockManagerDidUpdateApplicationIcon: (NSImage *)icon
+                              processIdentifier: (int)processIdentifier
+                                          title: (NSString *)title;
 @end
 
 @interface X11DockManager : NSObject
@@ -51,6 +54,9 @@ typedef enum
   void *_display;
   unsigned long _hostWindow;
   NSMutableSet *_knownWindows;
+  NSConnection *_iconConnection;
+  NSMutableDictionary *_iconWindowsByProcessID;
+  NSMutableDictionary *_iconImageDataByProcessID;
 }
 
 - (id) initWithDockView: (DockView *)view;
