@@ -1,6 +1,6 @@
-# AppsDockWM
+# DockWM
 
-AppsDockWM is a small GNUstep/AppKit dock-style window manager shell inspired by
+DockWM is a small GNUstep/AppKit dock-style window manager shell inspired by
 WindowMaker.
 
 It supports two inputs:
