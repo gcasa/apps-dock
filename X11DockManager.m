@@ -357,6 +357,89 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   return NO;
 }
 
+- (NSImage *)imageFromWindowContents:(Window)window
+{
+  Display *display = (Display *)_display;
+  XWindowAttributes attr;
+  XImage *ximage;
+  NSBitmapImageRep *rep;
+  NSImage *image;
+  unsigned char *bitmapData;
+  NSInteger bytesPerRow;
+  NSInteger x;
+  NSInteger y;
+  BOOL sawNonBlackPixel = NO;
+
+  [self clearX11Error];
+  if (!XGetWindowAttributes(display, window, &attr)) {
+    return nil;
+  }
+  if ([self x11ErrorOccurred]) {
+    return nil;
+  }
+  if (attr.width <= 0 || attr.height <= 0 ||
+      attr.width > 128 || attr.height > 128) {
+    return nil;
+  }
+
+  XSync(display, False);
+  [self clearX11Error];
+  ximage = XGetImage(display, window, 0, 0,
+                     (unsigned int)attr.width,
+                     (unsigned int)attr.height,
+                     AllPlanes,
+                     ZPixmap);
+  if (!ximage || [self x11ErrorOccurred]) {
+    if (ximage) {
+      XDestroyImage(ximage);
+    }
+    return nil;
+  }
+
+  rep = [[[NSBitmapImageRep alloc]
+    initWithBitmapDataPlanes:NULL
+                  pixelsWide:attr.width
+                  pixelsHigh:attr.height
+               bitsPerSample:8
+             samplesPerPixel:4
+                    hasAlpha:YES
+                    isPlanar:NO
+              colorSpaceName:NSDeviceRGBColorSpace
+                 bytesPerRow:0
+                bitsPerPixel:32] autorelease];
+  if (!rep) {
+    XDestroyImage(ximage);
+    return nil;
+  }
+
+  bitmapData = [rep bitmapData];
+  bytesPerRow = [rep bytesPerRow];
+  for (y = 0; y < attr.height; y++) {
+    for (x = 0; x < attr.width; x++) {
+      unsigned long pixel = XGetPixel(ximage, (int)x, (int)y);
+      unsigned char *dst = bitmapData + y * bytesPerRow + x * 4;
+
+      dst[0] = [self componentFromPixel:pixel mask:ximage->red_mask];
+      dst[1] = [self componentFromPixel:pixel mask:ximage->green_mask];
+      dst[2] = [self componentFromPixel:pixel mask:ximage->blue_mask];
+      dst[3] = 255;
+      if (dst[0] || dst[1] || dst[2]) {
+        sawNonBlackPixel = YES;
+      }
+    }
+  }
+
+  XDestroyImage(ximage);
+
+  if (!sawNonBlackPixel) {
+    return nil;
+  }
+
+  image = [[[NSImage alloc] initWithSize:NSMakeSize(attr.width, attr.height)] autorelease];
+  [image addRepresentation:rep];
+  return image;
+}
+
 - (NSImage *)iconForWindow:(Window)window
 {
   Display *display = (Display *)_display;
@@ -367,6 +450,13 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   unsigned char *data = NULL;
   NSImage *netWmIcon = nil;
   NSImage *icon = [[NSWorkspace sharedWorkspace] iconForFileType:@"app"];
+
+  if ([self windowLooksLikeDockApp:window]) {
+    NSImage *windowImage = [self imageFromWindowContents:window];
+    if (windowImage) {
+      return windowImage;
+    }
+  }
 
   [self clearX11Error];
   if (XGetWindowProperty(display, window, property, 0, 65536, False, XA_CARDINAL,
@@ -556,9 +646,10 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
         [_knownWindows removeObject:key];
         continue;
       }
-      if ([_delegate respondsToSelector:@selector(x11DockManagerDidUpdateWindow:hidden:)]) {
+      if ([_delegate respondsToSelector:@selector(x11DockManagerDidUpdateWindow:hidden:icon:)]) {
         [_delegate x11DockManagerDidUpdateWindow:(unsigned long)children[i]
-                                          hidden:[self windowIsHidden:children[i]]];
+                                          hidden:[self windowIsHidden:children[i]]
+                                            icon:[self iconForWindow:children[i]]];
       }
       continue;
     }
@@ -592,6 +683,28 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
                   (int)(NSHeight([_dockView bounds]) - origin.y - 64.0));
   XResizeWindow(display, (Window)xWindow, 64, 64);
   XMapRaised(display, (Window)xWindow);
+  XFlush(display);
+}
+
+- (void)moveDockedWindow:(unsigned long)xWindow toIndex:(NSUInteger)index
+{
+  Display *display = (Display *)_display;
+  NSPoint origin;
+
+  if (!display || !_hostWindow) return;
+  origin = [_dockView cellOriginAtIndex:index];
+  XMoveWindow(display, (Window)xWindow,
+              (int)origin.x,
+              (int)(NSHeight([_dockView bounds]) - origin.y - 64.0));
+  XFlush(display);
+}
+
+- (void)hideWindow:(unsigned long)xWindow
+{
+  Display *display = (Display *)_display;
+
+  if (!display) return;
+  XUnmapWindow(display, (Window)xWindow);
   XFlush(display);
 }
 

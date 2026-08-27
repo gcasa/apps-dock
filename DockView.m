@@ -542,25 +542,7 @@ static NSInteger DockHoverRecycler = -3;
 
 - (NSDragOperation)dragOperationForSender:(id <NSDraggingInfo>)sender
 {
-  NSDragOperation mask = [sender draggingSourceOperationMask];
-
-  if (mask & NSDragOperationCopy) {
-    return NSDragOperationCopy;
-  }
-  if (mask & NSDragOperationLink) {
-    return NSDragOperationLink;
-  }
-  if (mask & NSDragOperationGeneric) {
-    return NSDragOperationGeneric;
-  }
-  if (mask & NSDragOperationPrivate) {
-    return NSDragOperationPrivate;
-  }
-  if (mask & NSDragOperationMove) {
-    return NSDragOperationMove;
-  }
-
-  return NSDragOperationCopy;
+  return NSDragOperationEvery;
 }
 
 - (BOOL)drawImage:(NSImage *)image inCell:(NSRect)cell size:(CGFloat)size

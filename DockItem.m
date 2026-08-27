@@ -356,9 +356,26 @@
 - (NSString *)path { return _path; }
 - (NSString *)iconPath { return _iconPath; }
 - (NSImage *)icon { return _icon; }
+- (BOOL)iconMatchesImage:(NSImage *)image
+{
+  NSData *currentData;
+  NSData *newData;
+
+  if (_icon == image) {
+    return YES;
+  }
+  if (!_icon || !image) {
+    return NO;
+  }
+
+  currentData = [_icon TIFFRepresentation];
+  newData = [image TIFFRepresentation];
+  return currentData && newData && [currentData isEqualToData:newData];
+}
+
 - (void)setIcon:(NSImage *)icon
 {
-  if (_icon != icon) {
+  if (![self iconMatchesImage:icon]) {
     [_icon release];
     _icon = [icon retain];
     if ([[_dockTile contentView] respondsToSelector:@selector(setIcon:)]) {

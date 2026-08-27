@@ -933,15 +933,19 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 {
   DockItem *item = [self applicationItemMatchingExecutablePath:path];
   NSUInteger itemIndex;
+  BOOL matchedPinnedApplication;
 
   if (!item) {
     item = [self applicationItemMatchingTitle:title];
   }
+  matchedPinnedApplication = item && [item kind] == DockItemApplication;
 
   if (item) {
     [item setState:(hidden ? DockItemHidden : DockItemRunning)];
-    [item setXWindow:xWindow];
-    if (![item icon] && icon) {
+    if (!(dockApp && matchedPinnedApplication)) {
+      [item setXWindow:xWindow];
+    }
+    if (icon) {
       [item setIcon:icon];
     }
   } else {
@@ -951,18 +955,32 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
   [self refreshDock];
   if (dockApp) {
-    itemIndex = [self indexForItem:item];
-    if (itemIndex != NSNotFound) {
-      [_x11 dockWindow:xWindow atIndex:itemIndex];
+    if (matchedPinnedApplication) {
+      [_x11 hideWindow:xWindow];
+    } else {
+      itemIndex = [self indexForItem:item];
+      if (itemIndex != NSNotFound) {
+        [_x11 dockWindow:xWindow atIndex:itemIndex];
+      }
     }
   }
 }
 
-- (void)x11DockManagerDidUpdateWindow:(unsigned long)xWindow hidden:(BOOL)hidden
+- (void)x11DockManagerDidUpdateWindow:(unsigned long)xWindow
+                                hidden:(BOOL)hidden
+                                  icon:(NSImage *)icon
 {
   DockItem *item = [self itemForXWindow:xWindow];
   if (item) {
+    NSUInteger itemIndex = [self indexForItem:item];
+
     [item setState:(hidden ? DockItemHidden : DockItemRunning)];
+    if (icon) {
+      [item setIcon:icon];
+    }
+    if (itemIndex != NSNotFound) {
+      [_x11 moveDockedWindow:xWindow toIndex:itemIndex];
+    }
     [self refreshDock];
   }
 }
