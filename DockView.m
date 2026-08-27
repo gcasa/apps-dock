@@ -1234,19 +1234,21 @@ static NSInteger DockHoverRecycler = -3;
   [self hideTooltip];
 
   if ([self pasteboardHasReorderType:pasteboard]) {
+    if ([self recyclerContainsPoint:location]) {
+      _dropIndex = NSNotFound;
+      [self setNeedsDisplay:YES];
+      return NSDragOperationDelete;
+    }
     _dropIndex = [self reorderInsertionIndexAtPoint:location
                                           fromIndex:_draggedItemIndex];
     [self setNeedsDisplay:YES];
     return NSDragOperationMove;
   }
 
-  if ([self recyclerContainsPoint:location]) {
-    return NSDragOperationNone;
-  }
-
   if ([self pasteboardHasSupportedType:pasteboard]) {
     _draggingPaths = YES;
-    _dropIndex = [self pinnedInsertionIndexAtPoint:location];
+    _dropIndex = [self recyclerContainsPoint:location]
+      ? NSNotFound : [self pinnedInsertionIndexAtPoint:location];
     [self setNeedsDisplay:YES];
     return [self dragOperationForSender:sender];
   }
@@ -1258,6 +1260,11 @@ static NSInteger DockHoverRecycler = -3;
   NSPoint location = [self convertPoint:[sender draggingLocation] fromView:nil];
 
   if ([self pasteboardHasReorderType:[sender draggingPasteboard]]) {
+    if ([self recyclerContainsPoint:location]) {
+      _dropIndex = NSNotFound;
+      [self setNeedsDisplay:YES];
+      return NSDragOperationDelete;
+    }
     _dropIndex = [self reorderInsertionIndexAtPoint:location
                                           fromIndex:_draggedItemIndex];
     [self setNeedsDisplay:YES];
@@ -1268,7 +1275,7 @@ static NSInteger DockHoverRecycler = -3;
     if ([self recyclerContainsPoint:location]) {
       _dropIndex = NSNotFound;
       [self setNeedsDisplay:YES];
-      return NSDragOperationNone;
+      return [self dragOperationForSender:sender];
     }
     _dropIndex = [self pinnedInsertionIndexAtPoint:location];
     [self setNeedsDisplay:YES];
@@ -1288,14 +1295,11 @@ static NSInteger DockHoverRecycler = -3;
 
 - (BOOL) prepareForDragOperation: (id <NSDraggingInfo>)sender
 {
-  NSPoint location = [self convertPoint:[sender draggingLocation] fromView:nil];
-
   if ([self pasteboardHasReorderType:[sender draggingPasteboard]]) {
     return YES;
   }
 
-  return ![self recyclerContainsPoint:location] &&
-    [self pasteboardHasSupportedType:[sender draggingPasteboard]];
+  return [self pasteboardHasSupportedType:[sender draggingPasteboard]];
 }
 
 - (BOOL) performDragOperation: (id <NSDraggingInfo>)sender
@@ -1309,23 +1313,47 @@ static NSInteger DockHoverRecycler = -3;
   if ([self pasteboardHasReorderType:pasteboard]) {
     NSString *indexString = [pasteboard stringForType:DockReorderPboardType];
     NSUInteger fromIndex = (NSUInteger)[indexString integerValue];
-    NSUInteger toIndex = [self reorderInsertionIndexAtPoint:location
-                                                  fromIndex:fromIndex];
 
-    _dropIndex = NSNotFound;
-    _draggedItemIndex = NSNotFound;
-    _performedDragOperation = YES;
-    if (fromIndex < [_items count] &&
-        toIndex <= [_items count] &&
-        [_delegate respondsToSelector:
-          @selector(dockViewDidMoveItemFromIndex:toIndex:)]) {
-      [_delegate dockViewDidMoveItemFromIndex:fromIndex toIndex:toIndex];
-      return YES;
+    if ([self recyclerContainsPoint:location]) {
+      _dropIndex = NSNotFound;
+      _draggedItemIndex = NSNotFound;
+      _performedDragOperation = YES;
+      if (fromIndex < [_items count] &&
+          [_delegate respondsToSelector:
+            @selector(dockViewDidRemoveItemAtIndex:)]) {
+        [_delegate dockViewDidRemoveItemAtIndex:fromIndex];
+        return YES;
+      }
+      return NO;
+    }
+
+    {
+      NSUInteger toIndex = [self reorderInsertionIndexAtPoint:location
+                                                    fromIndex:fromIndex];
+
+      _dropIndex = NSNotFound;
+      _draggedItemIndex = NSNotFound;
+      _performedDragOperation = YES;
+      if (fromIndex < [_items count] &&
+          toIndex <= [_items count] &&
+          [_delegate respondsToSelector:
+            @selector(dockViewDidMoveItemFromIndex:toIndex:)]) {
+        [_delegate dockViewDidMoveItemFromIndex:fromIndex toIndex:toIndex];
+        return YES;
+      }
     }
     return NO;
   }
 
   if ([self recyclerContainsPoint:location]) {
+    if ([paths count] &&
+        [_delegate respondsToSelector:
+          @selector(dockViewDidReceivePathsInRecycler:)]) {
+      [_delegate dockViewDidReceivePathsInRecycler:paths];
+      _performedDragOperation = YES;
+      _dropIndex = NSNotFound;
+      return YES;
+    }
     return NO;
   }
 
@@ -1351,14 +1379,19 @@ static NSInteger DockHoverRecycler = -3;
     NSArray *paths = [self pathsFromPasteboard:[sender draggingPasteboard]];
     NSPoint location = [self convertPoint:[sender draggingLocation] fromView:nil];
     if (![self pasteboardHasReorderType:[sender draggingPasteboard]] &&
-        ![self recyclerContainsPoint:location] &&
         [paths count]) {
       NSUInteger toIndex = [self pinnedInsertionIndexAtPoint:location];
 
-      if ([_delegate respondsToSelector:
+      if ([self recyclerContainsPoint:location] &&
+          [_delegate respondsToSelector:
+            @selector(dockViewDidReceivePathsInRecycler:)]) {
+        [_delegate dockViewDidReceivePathsInRecycler:paths];
+      } else if (![self recyclerContainsPoint:location] &&
+                 [_delegate respondsToSelector:
             @selector(dockViewDidReceivePaths:atIndex:)]) {
         [_delegate dockViewDidReceivePaths:paths atIndex:toIndex];
-      } else if ([_delegate respondsToSelector:
+      } else if (![self recyclerContainsPoint:location] &&
+                 [_delegate respondsToSelector:
                    @selector(dockViewDidReceivePaths:)]) {
         [_delegate dockViewDidReceivePaths:paths];
       }

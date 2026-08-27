@@ -836,6 +836,111 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   return NO;
 }
 
+- (NSString *) recyclerPathForDropping
+{
+  NSArray *paths = [self recyclerPaths];
+  NSFileManager *fileManager = [NSFileManager defaultManager];
+  NSUInteger i;
+
+  for (i = 0; i < [paths count]; i++) {
+    NSString *path = [paths objectAtIndex:i];
+    BOOL isDir = NO;
+
+    if ([fileManager fileExistsAtPath:path isDirectory:&isDir] && isDir) {
+      return path;
+    }
+  }
+
+  if ([paths count]) {
+    NSString *path = [paths objectAtIndex:0];
+    if ([fileManager createDirectoryAtPath:path attributes:nil]) {
+      return path;
+    }
+  }
+
+  return nil;
+}
+
+- (NSString *) recyclerDestinationPathForPath: (NSString *)path
+                               recyclerPath: (NSString *)recyclerPath
+{
+  NSFileManager *fileManager = [NSFileManager defaultManager];
+  NSString *name = [path lastPathComponent];
+  NSString *base;
+  NSString *extension;
+  NSString *candidate;
+  NSUInteger i = 2;
+
+  if (![name length]) {
+    return nil;
+  }
+
+  candidate = [recyclerPath stringByAppendingPathComponent:name];
+  if (![fileManager fileExistsAtPath:candidate]) {
+    return candidate;
+  }
+
+  extension = [name pathExtension];
+  base = [extension length] ? [name stringByDeletingPathExtension] : name;
+
+  while (1) {
+    NSString *numberedName = [NSString stringWithFormat:@"%@ %lu",
+      base, (unsigned long)i];
+    if ([extension length]) {
+      numberedName = [numberedName stringByAppendingPathExtension:extension];
+    }
+
+    candidate = [recyclerPath stringByAppendingPathComponent:numberedName];
+    if (![fileManager fileExistsAtPath:candidate]) {
+      return candidate;
+    }
+    i++;
+  }
+}
+
+- (void) dockViewDidReceivePathsInRecycler: (NSArray *)paths
+{
+  NSFileManager *fileManager = [NSFileManager defaultManager];
+  NSString *recyclerPath = [self recyclerPathForDropping];
+  NSString *normalizedRecyclerPath = [self normalizedPath:recyclerPath];
+  BOOL moved = NO;
+  NSUInteger i;
+
+  if (![recyclerPath length]) {
+    NSBeep();
+    return;
+  }
+
+  for (i = 0; i < [paths count]; i++) {
+    NSString *path = [paths objectAtIndex:i];
+    NSString *normalizedPath = [self normalizedPath:path];
+    NSString *destination;
+
+    if (![normalizedPath length] ||
+        [normalizedPath isEqualToString:normalizedRecyclerPath] ||
+        [normalizedPath hasPrefix:
+          [normalizedRecyclerPath stringByAppendingString:@"/"]] ||
+        ![fileManager fileExistsAtPath:path]) {
+      continue;
+    }
+
+    destination = [self recyclerDestinationPathForPath:path
+                                         recyclerPath:recyclerPath];
+    if ([destination length] &&
+        [fileManager movePath:path toPath:destination handler:nil]) {
+      moved = YES;
+    }
+  }
+
+  if (moved) {
+    [self updateRecyclerState];
+    [self refreshDock];
+    [[NSSound soundNamed:@"Pop"] play];
+  } else {
+    NSBeep();
+  }
+}
+
 - (void) updateRecyclerState
 {
   [_dockView setRecyclerHasContents:[self recyclerHasContents]];
