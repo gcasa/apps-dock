@@ -818,8 +818,15 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
 - (void)dockViewDidReceivePaths:(NSArray *)paths
 {
+  [self dockViewDidReceivePaths:paths atIndex:[_items count]];
+}
+
+- (void)dockViewDidReceivePaths:(NSArray *)paths
+                        atIndex:(NSUInteger)index
+{
   NSUInteger i;
   BOOL added = NO;
+  NSUInteger insertionIndex = MIN(index, [_items count]);
 
   for (i = 0; i < [paths count]; i++) {
     NSString *path = [paths objectAtIndex:i];
@@ -827,7 +834,9 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
     if ([[NSFileManager defaultManager] fileExistsAtPath:path isDirectory:&isDir] &&
         ![self dockHasApplicationPath:path]) {
-      [_items addObject:[DockItem applicationItemWithPath:path]];
+      [_items insertObject:[DockItem applicationItemWithPath:path]
+                   atIndex:insertionIndex];
+      insertionIndex++;
       added = YES;
     }
   }

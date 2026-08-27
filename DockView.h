@@ -9,6 +9,8 @@ typedef enum {
 
 @protocol DockViewDelegate
 - (void)dockViewDidReceivePaths:(NSArray *)paths;
+- (void)dockViewDidReceivePaths:(NSArray *)paths
+                        atIndex:(NSUInteger)index;
 - (void)dockViewDidActivateItem:(DockItem *)item;
 - (void)dockViewDidActivateTopIcon;
 - (void)dockViewDidMoveItemFromIndex:(NSUInteger)fromIndex

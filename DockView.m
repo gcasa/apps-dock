@@ -66,19 +66,18 @@ static NSInteger DockHoverRecycler = -3;
 
 - (NSImage *)loadGNUstepIcon
 {
-  NSArray *paths = [NSArray arrayWithObjects:
-    @"/home/heron/Development/gs-wmaker/WindowMaker/Icons/GNUstep.tiff",
-    @"/usr/GNUstep/Local/Library/WindowMaker/Icons/GNUstep.tiff",
-    @"/usr/GNUstep/System/Library/WindowMaker/Icons/GNUstep.tiff",
-    nil];
-  NSUInteger i;
+  NSString *path = [[NSBundle mainBundle] pathForResource:@"GNUstep"
+                                                   ofType:@"tiff"];
+  NSImage *image;
 
-  for (i = 0; i < [paths count]; i++) {
-    NSImage *image = [[[NSImage alloc] initWithContentsOfFile:
-      [paths objectAtIndex:i]] autorelease];
-    if (image) {
-      return image;
-    }
+  if (![path length]) {
+    path = [[@"Resources" stringByAppendingPathComponent:@"GNUstep"]
+      stringByAppendingPathExtension:@"tiff"];
+  }
+
+  image = [[[NSImage alloc] initWithContentsOfFile:path] autorelease];
+  if (image) {
+    return image;
   }
 
   return [NSImage imageNamed:@"GNUstep"];
@@ -86,19 +85,18 @@ static NSInteger DockHoverRecycler = -3;
 
 - (NSImage *)loadRecyclerIcon
 {
-  NSArray *paths = [NSArray arrayWithObjects:
-    @"/home/heron/GNUstep/Library/WindowMaker/CachedPixmaps/Recycler.GNUstep.xpm",
-    @"/usr/GNUstep/Local/Library/WindowMaker/Icons/Recycler.xpm",
-    @"/usr/GNUstep/System/Library/WindowMaker/Icons/Recycler.xpm",
-    nil];
-  NSUInteger i;
+  NSString *path = [[NSBundle mainBundle] pathForResource:@"Recycler.GNUstep"
+                                                   ofType:@"xpm"];
+  NSImage *image;
 
-  for (i = 0; i < [paths count]; i++) {
-    NSImage *image = [[[NSImage alloc] initWithContentsOfFile:
-      [paths objectAtIndex:i]] autorelease];
-    if (image) {
-      return image;
-    }
+  if (![path length]) {
+    path = [[@"Resources" stringByAppendingPathComponent:@"Recycler.GNUstep"]
+      stringByAppendingPathExtension:@"xpm"];
+  }
+
+  image = [[[NSImage alloc] initWithContentsOfFile:path] autorelease];
+  if (image) {
+    return image;
   }
 
   return nil;
@@ -948,6 +946,7 @@ static NSInteger DockHoverRecycler = -3;
   if ([self pasteboardHasSupportedType:pasteboard]) {
     _draggingPaths = YES;
     _performedDragOperation = NO;
+    _dropIndex = [self insertionIndexAtPoint:location];
     [self setNeedsDisplay:YES];
     return [self dragOperationForSender:sender];
   }
@@ -962,6 +961,17 @@ static NSInteger DockHoverRecycler = -3;
     _dropIndex = [self insertionIndexAtPoint:location];
     [self setNeedsDisplay:YES];
     return NSDragOperationMove;
+  }
+
+  if ([self pasteboardHasSupportedType:[sender draggingPasteboard]]) {
+    if ([self recyclerContainsPoint:location]) {
+      _dropIndex = NSNotFound;
+      [self setNeedsDisplay:YES];
+      return NSDragOperationNone;
+    }
+    _dropIndex = [self insertionIndexAtPoint:location];
+    [self setNeedsDisplay:YES];
+    return [self dragOperationForSender:sender];
   }
 
   return [self draggingEntered:sender];
@@ -1018,8 +1028,16 @@ static NSInteger DockHoverRecycler = -3;
   }
 
   if ([paths count] && [_delegate respondsToSelector:@selector(dockViewDidReceivePaths:)]) {
-    [_delegate dockViewDidReceivePaths:paths];
+    NSUInteger toIndex = [self insertionIndexAtPoint:location];
+
+    if ([_delegate respondsToSelector:
+          @selector(dockViewDidReceivePaths:atIndex:)]) {
+      [_delegate dockViewDidReceivePaths:paths atIndex:toIndex];
+    } else {
+      [_delegate dockViewDidReceivePaths:paths];
+    }
     _performedDragOperation = YES;
+    _dropIndex = NSNotFound;
     return YES;
   }
   return NO;
@@ -1032,9 +1050,16 @@ static NSInteger DockHoverRecycler = -3;
     NSPoint location = [self convertPoint:[sender draggingLocation] fromView:nil];
     if (![self pasteboardHasReorderType:[sender draggingPasteboard]] &&
         ![self recyclerContainsPoint:location] &&
-        [paths count] &&
-        [_delegate respondsToSelector:@selector(dockViewDidReceivePaths:)]) {
-      [_delegate dockViewDidReceivePaths:paths];
+        [paths count]) {
+      NSUInteger toIndex = [self insertionIndexAtPoint:location];
+
+      if ([_delegate respondsToSelector:
+            @selector(dockViewDidReceivePaths:atIndex:)]) {
+        [_delegate dockViewDidReceivePaths:paths atIndex:toIndex];
+      } else if ([_delegate respondsToSelector:
+                   @selector(dockViewDidReceivePaths:)]) {
+        [_delegate dockViewDidReceivePaths:paths];
+      }
     }
   }
 
