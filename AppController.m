@@ -1,5 +1,25 @@
+/*
+ * DockWM
+ *
+ * Copyright (C) 2026 Gregory Casamento <greg.casamento@gmail.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #import "AppController.h"
 #import "DockItem.h"
+#import <GNUstepBase/GNUstep.h>
 #import <ctype.h>
 #import <limits.h>
 #import <unistd.h>
@@ -18,7 +38,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
 @implementation AppController
 
-- (void)applicationDidFinishLaunching:(NSNotification *)notification
+- (void) applicationDidFinishLaunching: (NSNotification *)notification
 {
   NSRect frame;
 
@@ -73,33 +93,33 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [self scanRunningApplications];
 }
 
-- (void)dealloc
+- (void) dealloc
 {
   [_scanTimer invalidate];
   [_processScanTimer invalidate];
-  [_transparentBackgroundMenuItem release];
-  [_blackBackgroundMenuItem release];
-  [_dockMenu release];
-  [_placementMenuItems release];
-  [_x11 release];
-  [_dockView release];
-  [_window release];
-  [_items release];
-  [super dealloc];
+  DESTROY(_transparentBackgroundMenuItem);
+  DESTROY(_blackBackgroundMenuItem);
+  DESTROY(_dockMenu);
+  DESTROY(_placementMenuItems);
+  DESTROY(_x11);
+  DESTROY(_dockView);
+  DESTROY(_window);
+  DESTROY(_items);
+  DEALLOC;
 }
 
-- (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender
+- (BOOL) applicationShouldTerminateAfterLastWindowClosed: (NSApplication *)sender
 {
   return YES;
 }
 
-- (void)applicationWillTerminate:(NSNotification *)notification
+- (void) applicationWillTerminate: (NSNotification *)notification
 {
   [self savePersistedApplications];
   [[NSUserDefaults standardUserDefaults] synchronize];
 }
 
-- (DockPlacement)savedDockPlacement
+- (DockPlacement) savedDockPlacement
 {
   NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
   id savedPlacement = [defaults objectForKey:@"DockPlacement"];
@@ -118,7 +138,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   return [defaults boolForKey:@"DockCentered"] ? DockPlacementLeftCenter : DockPlacementLeftTop;
 }
 
-- (DockBackgroundMode)savedBackgroundMode
+- (DockBackgroundMode) savedBackgroundMode
 {
   NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
   id savedMode = [defaults objectForKey:DockBackgroundModeDefaultsKey];
@@ -134,7 +154,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   return DockBackgroundBlack;
 }
 
-- (void)loadPersistedApplications
+- (void) loadPersistedApplications
 {
   NSArray *paths = [[NSUserDefaults standardUserDefaults]
     objectForKey:DockApplicationsDefaultsKey];
@@ -160,7 +180,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   }
 }
 
-- (void)savePersistedApplications
+- (void) savePersistedApplications
 {
   NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
   NSMutableArray *paths = [NSMutableArray array];
@@ -181,7 +201,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [defaults synchronize];
 }
 
-- (BOOL)dockHasApplicationPath:(NSString *)path
+- (BOOL) dockHasApplicationPath: (NSString *)path
 {
   NSString *normalizedPath = [self normalizedPath:path];
   NSUInteger i;
@@ -201,7 +221,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   return NO;
 }
 
-- (NSString *)normalizedPath:(NSString *)path
+- (NSString *) normalizedPath: (NSString *)path
 {
   if (![path length]) {
     return nil;
@@ -210,7 +230,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   return [path stringByResolvingSymlinksInPath];
 }
 
-- (NSString *)executablePathForApplicationPath:(NSString *)path
+- (NSString *) executablePathForApplicationPath: (NSString *)path
 {
   NSString *extension = [[path pathExtension] lowercaseString];
   BOOL isDir = NO;
@@ -250,7 +270,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   return [self normalizedPath:path];
 }
 
-- (NSString *)firstCommandTokenFromString:(NSString *)string
+- (NSString *) firstCommandTokenFromString: (NSString *)string
 {
   NSMutableString *token = [NSMutableString string];
   NSUInteger i;
@@ -282,7 +302,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   return [token length] ? token : nil;
 }
 
-- (NSString *)pathForExecutableCommand:(NSString *)command
+- (NSString *) pathForExecutableCommand: (NSString *)command
 {
   NSArray *pathComponents;
   NSUInteger i;
@@ -313,7 +333,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   return command;
 }
 
-- (NSString *)executablePathForDesktopFile:(NSString *)path
+- (NSString *) executablePathForDesktopFile: (NSString *)path
 {
   NSString *contents = [NSString stringWithContentsOfFile:path];
   NSArray *lines = [contents componentsSeparatedByCharactersInSet:
@@ -333,7 +353,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   return nil;
 }
 
-- (BOOL)stringIsProcessIdentifier:(NSString *)string
+- (BOOL) stringIsProcessIdentifier: (NSString *)string
 {
   const char *chars = [string UTF8String];
   NSUInteger i;
@@ -351,7 +371,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   return YES;
 }
 
-- (NSArray *)runningProcessExecutablePaths
+- (NSArray *) runningProcessExecutablePaths
 {
   NSArray *entries = [[NSFileManager defaultManager]
     directoryContentsAtPath:@"/proc"];
@@ -390,7 +410,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   return paths;
 }
 
-- (BOOL)applicationItem:(DockItem *)item matchesRunningProcessPath:(NSString *)processPath
+- (BOOL) applicationItem: (DockItem *)item matchesRunningProcessPath: (NSString *)processPath
 {
   NSString *itemPath = [self normalizedPath:[item path]];
   NSString *executablePath = [self executablePathForApplicationPath:[item path]];
@@ -416,8 +436,8 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   return NO;
 }
 
-- (BOOL)applicationItemHasRunningProcess:(DockItem *)item
-                                   paths:(NSArray *)processPaths
+- (BOOL) applicationItemHasRunningProcess: (DockItem *)item
+                                   paths: (NSArray *)processPaths
 {
   NSUInteger i;
 
@@ -431,7 +451,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   return NO;
 }
 
-- (void)scanRunningApplications
+- (void) scanRunningApplications
 {
   NSArray *processPaths = [self runningProcessExecutablePaths];
   BOOL changed = NO;
@@ -465,7 +485,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [self updateRecyclerState];
 }
 
-- (NSArray *)recyclerPaths
+- (NSArray *) recyclerPaths
 {
   NSString *home = NSHomeDirectory();
   return [NSArray arrayWithObjects:
@@ -475,7 +495,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     nil];
 }
 
-- (BOOL)directoryHasVisibleContentsAtPath:(NSString *)path
+- (BOOL) directoryHasVisibleContentsAtPath: (NSString *)path
 {
   NSArray *entries = [[NSFileManager defaultManager] directoryContentsAtPath:path];
   NSUInteger i;
@@ -495,7 +515,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   return NO;
 }
 
-- (BOOL)recyclerHasContents
+- (BOOL) recyclerHasContents
 {
   NSArray *paths = [self recyclerPaths];
   NSUInteger i;
@@ -509,12 +529,12 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   return NO;
 }
 
-- (void)updateRecyclerState
+- (void) updateRecyclerState
 {
   [_dockView setRecyclerHasContents:[self recyclerHasContents]];
 }
 
-- (NSRect)dockWindowFrameForPlacement:(DockPlacement)placement
+- (NSRect) dockWindowFrameForPlacement: (DockPlacement)placement
 {
   NSRect screenFrame = [[NSScreen mainScreen] frame];
   NSUInteger cellCount = [_items count] + 2;
@@ -566,13 +586,13 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   return NSMakeRect(x, y, width, height);
 }
 
-- (void)updateDockMenu
+- (void) updateDockMenu
 {
   NSUInteger i;
 
   for (i = 0; i < [_placementMenuItems count]; i++) {
     NSMenuItem *item = [_placementMenuItems objectAtIndex:i];
-    [item setState:([item tag] == _dockPlacement ? NSOnState : NSOffState)];
+    [item setState: ([item tag] == _dockPlacement ? NSOnState : NSOffState)];
   }
 
   [_blackBackgroundMenuItem setState:
@@ -581,7 +601,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     (_backgroundMode == DockBackgroundSimulatedTransparency ? NSOnState : NSOffState)];
 }
 
-- (NSMenu *)dockMenu
+- (NSMenu *) dockMenu
 {
   if (!_dockMenu) {
     NSArray *titles = [NSArray arrayWithObjects:
@@ -603,10 +623,10 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
                                         action:@selector(selectDockPlacement:)
                                  keyEquivalent:@""];
       [item setTarget:self];
-      [item setTag:(NSInteger)i];
+      [item setTag: (NSInteger)i];
       [_dockMenu addItem:item];
       [_placementMenuItems addObject:item];
-      [item release];
+      DESTROY(item);
     }
 
     [_dockMenu addItem:[NSMenuItem separatorItem]];
@@ -634,14 +654,14 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
                                keyEquivalent:@"q"];
     [item setTarget:self];
     [_dockMenu addItem:item];
-    [item release];
+    DESTROY(item);
   }
 
   [self updateDockMenu];
   return _dockMenu;
 }
 
-- (void)applyDockPlacement
+- (void) applyDockPlacement
 {
   [[NSUserDefaults standardUserDefaults] setInteger:_dockPlacement forKey:@"DockPlacement"];
   [_dockView setHorizontal:DockPlacementIsHorizontal(_dockPlacement)];
@@ -655,7 +675,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [self updateDockMenu];
 }
 
-- (void)updateDockBackgroundHidingWindow:(BOOL)hideWindow
+- (void) updateDockBackgroundHidingWindow: (BOOL)hideWindow
 {
   NSImage *image;
   BOOL wasVisible;
@@ -690,7 +710,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   }
 }
 
-- (void)selectBackgroundMode:(id)sender
+- (void) selectBackgroundMode: (id)sender
 {
   NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
 
@@ -701,26 +721,26 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [self updateDockMenu];
 }
 
-- (void)selectDockPlacement:(id)sender
+- (void) selectDockPlacement: (id)sender
 {
   _dockPlacement = (DockPlacement)[sender tag];
   [self applyDockPlacement];
 }
 
-- (void)quitDock:(id)sender
+- (void) quitDock: (id)sender
 {
   [self savePersistedApplications];
   [[NSUserDefaults standardUserDefaults] synchronize];
   [NSApp terminate:sender];
 }
 
-- (void)refreshDock
+- (void) refreshDock
 {
   [_dockView setItems:_items];
   [self applyDockPlacement];
 }
 
-- (DockItem *)itemForXWindow:(unsigned long)xWindow
+- (DockItem *) itemForXWindow: (unsigned long)xWindow
 {
   NSUInteger i;
 
@@ -733,7 +753,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   return nil;
 }
 
-- (NSUInteger)indexForItem:(DockItem *)targetItem
+- (NSUInteger) indexForItem: (DockItem *)targetItem
 {
   NSUInteger i;
 
@@ -746,7 +766,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   return NSNotFound;
 }
 
-- (DockItem *)applicationItemMatchingTitle:(NSString *)title
+- (DockItem *) applicationItemMatchingTitle: (NSString *)title
 {
   NSString *windowTitle = [title lowercaseString];
   NSUInteger i;
@@ -774,7 +794,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   return nil;
 }
 
-- (DockItem *)applicationItemMatchingExecutablePath:(NSString *)path
+- (DockItem *) applicationItemMatchingExecutablePath: (NSString *)path
 {
   NSString *windowPath = [self normalizedPath:path];
   NSString *windowName = [[windowPath lastPathComponent] lowercaseString];
@@ -816,13 +836,13 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   return nil;
 }
 
-- (void)dockViewDidReceivePaths:(NSArray *)paths
+- (void) dockViewDidReceivePaths: (NSArray *)paths
 {
   [self dockViewDidReceivePaths:paths atIndex:[_items count]];
 }
 
-- (void)dockViewDidReceivePaths:(NSArray *)paths
-                        atIndex:(NSUInteger)index
+- (void) dockViewDidReceivePaths: (NSArray *)paths
+                        atIndex: (NSUInteger)index
 {
   NSUInteger i;
   BOOL added = NO;
@@ -847,8 +867,8 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   }
 }
 
-- (void)dockViewDidMoveItemFromIndex:(NSUInteger)fromIndex
-                              toIndex:(NSUInteger)toIndex
+- (void) dockViewDidMoveItemFromIndex: (NSUInteger)fromIndex
+                              toIndex: (NSUInteger)toIndex
 {
   DockItem *item;
 
@@ -864,16 +884,16 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     return;
   }
 
-  item = [[_items objectAtIndex:fromIndex] retain];
+  item = RETAIN([_items objectAtIndex:fromIndex]);
   [_items removeObjectAtIndex:fromIndex];
   [_items insertObject:item atIndex:toIndex];
-  [item release];
+  DESTROY(item);
 
   [self savePersistedApplications];
   [self refreshDock];
 }
 
-- (void)dockViewDidRemoveItemAtIndex:(NSUInteger)index
+- (void) dockViewDidRemoveItemAtIndex: (NSUInteger)index
 {
   if (index >= [_items count]) {
     return;
@@ -884,7 +904,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [self refreshDock];
 }
 
-- (void)dockViewDidActivateItem:(DockItem *)item
+- (void) dockViewDidActivateItem: (DockItem *)item
 {
   if ([item kind] == DockItemApplication) {
     NSString *path = [item path];
@@ -924,7 +944,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   }
 }
 
-- (void)dockViewDidActivateTopIcon
+- (void) dockViewDidActivateTopIcon
 {
   NSArray *paths = [NSArray arrayWithObjects:
     @"/usr/GNUstep/System/Applications/GWorkspace.app",
@@ -943,7 +963,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   }
 }
 
-- (BOOL)launchDesktopFile:(NSString *)path
+- (BOOL) launchDesktopFile: (NSString *)path
 {
   NSString *contents = [NSString stringWithContentsOfFile:path];
   NSArray *lines = [contents componentsSeparatedByCharactersInSet:
@@ -971,12 +991,12 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   return NO;
 }
 
-- (void)x11DockManagerDidDiscoverWindowWithTitle:(NSString *)title
-                                          window:(unsigned long)xWindow
-                                          hidden:(BOOL)hidden
-                                            icon:(NSImage *)icon
-                                            path:(NSString *)path
-                                         dockApp:(BOOL)dockApp
+- (void) x11DockManagerDidDiscoverWindowWithTitle: (NSString *)title
+                                          window: (unsigned long)xWindow
+                                          hidden: (BOOL)hidden
+                                            icon: (NSImage *)icon
+                                            path: (NSString *)path
+                                         dockApp: (BOOL)dockApp
 {
   DockItem *item = [self applicationItemMatchingExecutablePath:path];
   NSUInteger itemIndex;
@@ -988,7 +1008,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   matchedPinnedApplication = item && [item kind] == DockItemApplication;
 
   if (item) {
-    [item setState:(hidden ? DockItemHidden : DockItemRunning)];
+    [item setState: (hidden ? DockItemHidden : DockItemRunning)];
     if (!(dockApp && matchedPinnedApplication)) {
       [item setXWindow:xWindow];
     }
@@ -1013,15 +1033,15 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   }
 }
 
-- (void)x11DockManagerDidUpdateWindow:(unsigned long)xWindow
-                                hidden:(BOOL)hidden
-                                  icon:(NSImage *)icon
+- (void) x11DockManagerDidUpdateWindow: (unsigned long)xWindow
+                                hidden: (BOOL)hidden
+                                  icon: (NSImage *)icon
 {
   DockItem *item = [self itemForXWindow:xWindow];
   if (item) {
     NSUInteger itemIndex = [self indexForItem:item];
 
-    [item setState:(hidden ? DockItemHidden : DockItemRunning)];
+    [item setState: (hidden ? DockItemHidden : DockItemRunning)];
     if (icon) {
       [item setIcon:icon];
     }

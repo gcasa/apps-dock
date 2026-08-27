@@ -1,42 +1,60 @@
+/*
+ * DockWM
+ *
+ * Copyright (C) 2026 Gregory Casamento <greg.casamento@gmail.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #import "DockItem.h"
+#import <GNUstepBase/GNUstep.h>
 
 @interface DockTileIconView : NSView
 {
   NSImage *_icon;
   NSString *_title;
 }
-- (void)setIcon:(NSImage *)icon;
-- (void)setTitle:(NSString *)title;
+- (void) setIcon: (NSImage *)icon;
+- (void) setTitle: (NSString *)title;
 @end
 
 @implementation DockTileIconView
 
-- (void)dealloc
+- (void) dealloc
 {
-  [_icon release];
-  [_title release];
-  [super dealloc];
+  DESTROY(_icon);
+  DESTROY(_title);
+  DEALLOC;
 }
 
-- (void)setIcon:(NSImage *)icon
+- (void) setIcon: (NSImage *)icon
 {
   if (_icon != icon) {
-    [_icon release];
-    _icon = [icon retain];
+    ASSIGN(_icon, icon);
     [self setNeedsDisplay:YES];
   }
 }
 
-- (void)setTitle:(NSString *)title
+- (void) setTitle: (NSString *)title
 {
   if (_title != title) {
-    [_title release];
-    _title = [title copy];
+    ASSIGNCOPY(_title, title);
     [self setNeedsDisplay:YES];
   }
 }
 
-- (BOOL)drawImage:(NSImage *)image inRect:(NSRect)rect
+- (BOOL) drawImage: (NSImage *)image inRect: (NSRect)rect
 {
   NSSize imageSize;
   NSImageRep *rep;
@@ -67,7 +85,7 @@
   return YES;
 }
 
-- (void)drawFallbackInRect:(NSRect)rect
+- (void) drawFallbackInRect: (NSRect)rect
 {
   NSString *title = [_title length] ? _title : @"?";
   NSString *label = [[title substringToIndex:MIN((NSUInteger)2, [title length])] uppercaseString];
@@ -82,7 +100,7 @@
       withAttributes:attrs];
 }
 
-- (void)drawRect:(NSRect)rect
+- (void) drawRect: (NSRect)rect
 {
   NSRect bounds = [self bounds];
   CGFloat size = MIN(NSWidth(bounds), NSHeight(bounds));
@@ -100,13 +118,13 @@
 
 @implementation DockItem
 
-+ (BOOL)imageIsDrawable:(NSImage *)image
++ (BOOL) imageIsDrawable: (NSImage *)image
 {
   return image && ([[image representations] count] > 0 ||
                    [image isValid]);
 }
 
-+ (NSImage *)imageAtPath:(NSString *)path
++ (NSImage *) imageAtPath: (NSString *)path
 {
   NSImage *image;
 
@@ -114,11 +132,11 @@
     return nil;
   }
 
-  image = [[[NSImage alloc] initWithContentsOfFile:path] autorelease];
+  image = AUTORELEASE([[NSImage alloc] initWithContentsOfFile:path]);
   return [self imageIsDrawable:image] ? image : nil;
 }
 
-+ (NSImage *)imageNamed:(NSString *)name inApplicationPath:(NSString *)path
++ (NSImage *) imageNamed: (NSString *)name inApplicationPath: (NSString *)path
 {
   NSString *resources = [path stringByAppendingPathComponent:@"Resources"];
   NSArray *basePaths;
@@ -151,7 +169,7 @@
   return nil;
 }
 
-+ (NSString *)applicationBundlePathForPath:(NSString *)path
++ (NSString *) applicationBundlePathForPath: (NSString *)path
 {
   NSString *candidate = path;
   BOOL isDir = NO;
@@ -168,7 +186,7 @@
   return nil;
 }
 
-+ (NSImage *)iconForApplicationPath:(NSString *)path
++ (NSImage *) iconForApplicationPath: (NSString *)path
 {
   NSArray *infoPaths = [NSArray arrayWithObjects:
     [[path stringByAppendingPathComponent:@"Resources"] stringByAppendingPathComponent:@"Info-gnustep.plist"],
@@ -204,7 +222,7 @@
         inApplicationPath:path];
 }
 
-+ (NSImage *)iconForDesktopFile:(NSString *)path
++ (NSImage *) iconForDesktopFile: (NSString *)path
 {
   NSString *contents = [NSString stringWithContentsOfFile:path];
   NSArray *lines = [contents componentsSeparatedByCharactersInSet:
@@ -246,7 +264,7 @@
   return nil;
 }
 
-+ (NSImage *)fallbackApplicationIcon
++ (NSImage *) fallbackApplicationIcon
 {
   NSArray *paths = [NSArray arrayWithObjects:
     @"/home/heron/Development/gs-wmaker/WindowMaker/Icons/GNUstep.tiff",
@@ -266,9 +284,9 @@
     ? [NSImage imageNamed:@"NSApplicationIcon"] : nil;
 }
 
-+ (id)applicationItemWithPath:(NSString *)path
++ (id) applicationItemWithPath: (NSString *)path
 {
-  DockItem *item = [[[self alloc] init] autorelease];
+  DockItem *item = AUTORELEASE([[self alloc] init]);
   NSImage *icon = nil;
   NSString *bundlePath = [self applicationBundlePathForPath:path];
   NSString *iconPath = bundlePath ? bundlePath : path;
@@ -303,15 +321,15 @@
 
   item->_kind = DockItemApplication;
   item->_state = DockItemNotRunning;
-  item->_path = [path copy];
-  item->_iconPath = [iconPath copy];
-  item->_title = [[[path lastPathComponent] stringByDeletingPathExtension] copy];
-  item->_icon = [icon retain];
+  ASSIGNCOPY(item->_path, path);
+  ASSIGNCOPY(item->_iconPath, iconPath);
+  ASSIGNCOPY(item->_title, [[path lastPathComponent] stringByDeletingPathExtension]);
+  ASSIGN(item->_icon, icon);
   item->_dockTile = [[NSDockTile alloc] init];
   [item->_dockTile setOwner:item];
   {
-    DockTileIconView *iconView = [[[DockTileIconView alloc]
-      initWithFrame:NSMakeRect(0, 0, 46, 46)] autorelease];
+    DockTileIconView *iconView = AUTORELEASE([[DockTileIconView alloc]
+      initWithFrame:NSMakeRect(0, 0, 46, 46)]);
     [iconView setIcon:icon];
     [iconView setTitle:item->_title];
     [item->_dockTile setContentView:iconView];
@@ -319,19 +337,22 @@
   return item;
 }
 
-+ (id)x11ItemWithTitle:(NSString *)title window:(unsigned long)xWindow icon:(NSImage *)icon hidden:(BOOL)hidden
++ (id) x11ItemWithTitle: (NSString *)title window: (unsigned long)xWindow icon: (NSImage *)icon hidden: (BOOL)hidden
 {
-  DockItem *item = [[[self alloc] init] autorelease];
+  DockItem *item = AUTORELEASE([[self alloc] init]);
+  NSString *displayTitle;
+
+  displayTitle = [title length] ? title : [NSString stringWithFormat:@"0x%lx", xWindow];
   item->_kind = DockItemX11Window;
   item->_state = hidden ? DockItemHidden : DockItemRunning;
   item->_xWindow = xWindow;
-  item->_title = [[title length] ? title : [NSString stringWithFormat:@"0x%lx", xWindow] copy];
-  item->_icon = [icon retain];
+  ASSIGNCOPY(item->_title, displayTitle);
+  ASSIGN(item->_icon, icon);
   item->_dockTile = [[NSDockTile alloc] init];
   [item->_dockTile setOwner:item];
   {
-    DockTileIconView *iconView = [[[DockTileIconView alloc]
-      initWithFrame:NSMakeRect(0, 0, 46, 46)] autorelease];
+    DockTileIconView *iconView = AUTORELEASE([[DockTileIconView alloc]
+      initWithFrame:NSMakeRect(0, 0, 46, 46)]);
     [iconView setIcon:icon];
     [iconView setTitle:item->_title];
     [item->_dockTile setContentView:iconView];
@@ -339,24 +360,24 @@
   return item;
 }
 
-- (void)dealloc
+- (void) dealloc
 {
-  [_title release];
-  [_path release];
-  [_iconPath release];
-  [_icon release];
-  [_dockTile release];
-  [super dealloc];
+  DESTROY(_title);
+  DESTROY(_path);
+  DESTROY(_iconPath);
+  DESTROY(_icon);
+  DESTROY(_dockTile);
+  DEALLOC;
 }
 
-- (DockItemKind)kind { return _kind; }
-- (DockItemState)state { return _state; }
-- (void)setState:(DockItemState)state { _state = state; }
-- (NSString *)title { return _title; }
-- (NSString *)path { return _path; }
-- (NSString *)iconPath { return _iconPath; }
-- (NSImage *)icon { return _icon; }
-- (BOOL)iconMatchesImage:(NSImage *)image
+- (DockItemKind) kind { return _kind; }
+- (DockItemState) state { return _state; }
+- (void) setState: (DockItemState)state { _state = state; }
+- (NSString *) title { return _title; }
+- (NSString *) path { return _path; }
+- (NSString *) iconPath { return _iconPath; }
+- (NSImage *) icon { return _icon; }
+- (BOOL) iconMatchesImage: (NSImage *)image
 {
   NSData *currentData;
   NSData *newData;
@@ -373,19 +394,18 @@
   return currentData && newData && [currentData isEqualToData:newData];
 }
 
-- (void)setIcon:(NSImage *)icon
+- (void) setIcon: (NSImage *)icon
 {
   if (![self iconMatchesImage:icon]) {
-    [_icon release];
-    _icon = [icon retain];
+    ASSIGN(_icon, icon);
     if ([[_dockTile contentView] respondsToSelector:@selector(setIcon:)]) {
       [(DockTileIconView *)[_dockTile contentView] setIcon:icon];
     }
     [_dockTile display];
   }
 }
-- (NSDockTile *)dockTile { return _dockTile; }
-- (unsigned long)xWindow { return _xWindow; }
-- (void)setXWindow:(unsigned long)xWindow { _xWindow = xWindow; }
+- (NSDockTile *) dockTile { return _dockTile; }
+- (unsigned long) xWindow { return _xWindow; }
+- (void) setXWindow: (unsigned long)xWindow { _xWindow = xWindow; }
 
 @end

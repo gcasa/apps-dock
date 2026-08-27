@@ -1,21 +1,41 @@
+/*
+ * DockWM
+ *
+ * Copyright (C) 2026 Gregory Casamento <greg.casamento@gmail.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #import <AppKit/AppKit.h>
 
 @class DockItem;
 
-typedef enum {
+typedef enum
+{
   DockBackgroundBlack = 0,
   DockBackgroundSimulatedTransparency
 } DockBackgroundMode;
 
 @protocol DockViewDelegate
-- (void)dockViewDidReceivePaths:(NSArray *)paths;
-- (void)dockViewDidReceivePaths:(NSArray *)paths
-                        atIndex:(NSUInteger)index;
-- (void)dockViewDidActivateItem:(DockItem *)item;
-- (void)dockViewDidActivateTopIcon;
-- (void)dockViewDidMoveItemFromIndex:(NSUInteger)fromIndex
-                              toIndex:(NSUInteger)toIndex;
-- (void)dockViewDidRemoveItemAtIndex:(NSUInteger)index;
+- (void) dockViewDidReceivePaths: (NSArray *)paths;
+- (void) dockViewDidReceivePaths: (NSArray *)paths
+                          atIndex: (NSUInteger)index;
+- (void) dockViewDidActivateItem: (DockItem *)item;
+- (void) dockViewDidActivateTopIcon;
+- (void) dockViewDidMoveItemFromIndex: (NSUInteger)fromIndex
+                              toIndex: (NSUInteger)toIndex;
+- (void) dockViewDidRemoveItemAtIndex: (NSUInteger)index;
 @end
 
 @interface DockView : NSView
@@ -45,17 +65,17 @@ typedef enum {
   NSTimeInterval _lastMouseDownTime;
 }
 
-- (void)setDelegate:(id)delegate;
-- (void)setItems:(NSArray *)items;
-- (void)setBackgroundImage:(NSImage *)image;
-- (void)setBackgroundMode:(DockBackgroundMode)mode;
-- (void)setRecyclerHasContents:(BOOL)hasContents;
-- (void)startWiggleForItem:(DockItem *)item;
-- (void)setHorizontal:(BOOL)horizontal;
-- (BOOL)isHorizontal;
-- (NSRect)topTileRect;
-- (NSRect)recyclerTileRect;
-- (NSPoint)cellOriginAtIndex:(NSUInteger)index;
-- (NSSize)cellSize;
+- (void) setDelegate: (id)delegate;
+- (void) setItems: (NSArray *)items;
+- (void) setBackgroundImage: (NSImage *)image;
+- (void) setBackgroundMode: (DockBackgroundMode)mode;
+- (void) setRecyclerHasContents: (BOOL)hasContents;
+- (void) startWiggleForItem: (DockItem *)item;
+- (void) setHorizontal: (BOOL)horizontal;
+- (BOOL) isHorizontal;
+- (NSRect) topTileRect;
+- (NSRect) recyclerTileRect;
+- (NSPoint) cellOriginAtIndex: (NSUInteger)index;
+- (NSSize) cellSize;
 
 @end

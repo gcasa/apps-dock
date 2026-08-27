@@ -1,5 +1,25 @@
+/*
+ * DockWM
+ *
+ * Copyright (C) 2026 Gregory Casamento <greg.casamento@gmail.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #import "DockView.h"
 #import "DockItem.h"
+#import <GNUstepBase/GNUstep.h>
 #import <math.h>
 
 static CGFloat DockCell = 64.0;
@@ -18,7 +38,7 @@ static NSInteger DockHoverRecycler = -3;
 
 @implementation DockView
 
-- (id)initWithFrame:(NSRect)frame
+- (id) initWithFrame: (NSRect)frame
 {
   self = [super initWithFrame:frame];
   if (self) {
@@ -34,8 +54,8 @@ static NSInteger DockHoverRecycler = -3;
     _draggedItemIndex = NSNotFound;
     _dropIndex = NSNotFound;
     _backgroundMode = DockBackgroundBlack;
-    _gnustepIcon = [[self loadGNUstepIcon] retain];
-    _recyclerIcon = [[self loadRecyclerIcon] retain];
+    _gnustepIcon = RETAIN([self loadGNUstepIcon]);
+    _recyclerIcon = RETAIN([self loadRecyclerIcon]);
     [self registerForDraggedTypes:
       [NSArray arrayWithObjects:NSFilenamesPboardType,
                                 NSURLPboardType,
@@ -51,24 +71,24 @@ static NSInteger DockHoverRecycler = -3;
   return self;
 }
 
-- (void)dealloc
+- (void) dealloc
 {
   [_tooltipTimer invalidate];
-  [_tooltipTimer release];
+  DESTROY(_tooltipTimer);
   [_wiggleTimer invalidate];
-  [_wiggleTimer release];
-  [_wiggleItem release];
+  DESTROY(_wiggleTimer);
+  DESTROY(_wiggleItem);
   if (_trackingRectTag) {
     [self removeTrackingRect:_trackingRectTag];
   }
-  [_backgroundImage release];
-  [_gnustepIcon release];
-  [_recyclerIcon release];
-  [_items release];
-  [super dealloc];
+  DESTROY(_backgroundImage);
+  DESTROY(_gnustepIcon);
+  DESTROY(_recyclerIcon);
+  DESTROY(_items);
+  DEALLOC;
 }
 
-- (NSImage *)loadGNUstepIcon
+- (NSImage *) loadGNUstepIcon
 {
   NSString *path = [[NSBundle mainBundle] pathForResource:@"GNUstep"
                                                    ofType:@"tiff"];
@@ -79,7 +99,7 @@ static NSInteger DockHoverRecycler = -3;
       stringByAppendingPathExtension:@"tiff"];
   }
 
-  image = [[[NSImage alloc] initWithContentsOfFile:path] autorelease];
+  image = AUTORELEASE([[NSImage alloc] initWithContentsOfFile:path]);
   if (image) {
     return image;
   }
@@ -87,7 +107,7 @@ static NSInteger DockHoverRecycler = -3;
   return [NSImage imageNamed:@"GNUstep"];
 }
 
-- (NSImage *)loadRecyclerIcon
+- (NSImage *) loadRecyclerIcon
 {
   NSString *path = [[NSBundle mainBundle] pathForResource:@"Recycler.GNUstep"
                                                    ofType:@"xpm"];
@@ -98,7 +118,7 @@ static NSInteger DockHoverRecycler = -3;
       stringByAppendingPathExtension:@"xpm"];
   }
 
-  image = [[[NSImage alloc] initWithContentsOfFile:path] autorelease];
+  image = AUTORELEASE([[NSImage alloc] initWithContentsOfFile:path]);
   if (image) {
     return image;
   }
@@ -106,7 +126,7 @@ static NSInteger DockHoverRecycler = -3;
   return nil;
 }
 
-- (void)updateTrackingRect
+- (void) updateTrackingRect
 {
   if (_trackingRectTag) {
     [self removeTrackingRect:_trackingRectTag];
@@ -119,47 +139,45 @@ static NSInteger DockHoverRecycler = -3;
                               assumeInside:NO];
 }
 
-- (void)viewDidMoveToWindow
+- (void) viewDidMoveToWindow
 {
   [super viewDidMoveToWindow];
   [self updateTrackingRect];
 }
 
-- (void)setFrame:(NSRect)frame
+- (void) setFrame: (NSRect)frame
 {
   [super setFrame:frame];
   [self updateTrackingRect];
 }
 
-- (void)setDelegate:(id)delegate
+- (void) setDelegate: (id)delegate
 {
   _delegate = delegate;
 }
 
-- (BOOL)acceptsFirstMouse:(NSEvent *)event
+- (BOOL) acceptsFirstMouse: (NSEvent *)event
 {
   return YES;
 }
 
-- (void)setItems:(NSArray *)items
+- (void) setItems: (NSArray *)items
 {
   [_items setArray:items];
   [self hideTooltip];
   [self setNeedsDisplay:YES];
 }
 
-- (void)stopWiggle
+- (void) stopWiggle
 {
   [_wiggleTimer invalidate];
-  [_wiggleTimer release];
-  _wiggleTimer = nil;
-  [_wiggleItem release];
-  _wiggleItem = nil;
+  DESTROY(_wiggleTimer);
+  DESTROY(_wiggleItem);
   _wiggleStartTime = 0.0;
   [self setNeedsDisplay:YES];
 }
 
-- (void)stepWiggle:(NSTimer *)timer
+- (void) stepWiggle: (NSTimer *)timer
 {
   NSTimeInterval now = [NSDate timeIntervalSinceReferenceDate];
 
@@ -171,36 +189,34 @@ static NSInteger DockHoverRecycler = -3;
   [self setNeedsDisplay:YES];
 }
 
-- (void)startWiggleForItem:(DockItem *)item
+- (void) startWiggleForItem: (DockItem *)item
 {
   if (!item) {
     return;
   }
 
   [_wiggleTimer invalidate];
-  [_wiggleTimer release];
-  _wiggleTimer = nil;
-  [_wiggleItem release];
-  _wiggleItem = [item retain];
+  DESTROY(_wiggleTimer);
+  ASSIGN(_wiggleItem, item);
   _wiggleStartTime = [NSDate timeIntervalSinceReferenceDate];
-  _wiggleTimer = [[NSTimer scheduledTimerWithTimeInterval:1.0 / 30.0
-                                                   target:self
-                                                 selector:@selector(stepWiggle:)
-                                                 userInfo:nil
-                                                  repeats:YES] retain];
+  _wiggleTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 / 30.0
+                                                  target:self
+                                                selector:@selector(stepWiggle:)
+                                                userInfo:nil
+                                                repeats:YES];
+  _wiggleTimer = RETAIN(_wiggleTimer);
   [self setNeedsDisplay:YES];
 }
 
-- (void)setBackgroundImage:(NSImage *)image
+- (void) setBackgroundImage: (NSImage *)image
 {
   if (_backgroundImage != image) {
-    [_backgroundImage release];
-    _backgroundImage = [image retain];
+    ASSIGN(_backgroundImage, image);
     [self setNeedsDisplay:YES];
   }
 }
 
-- (void)setBackgroundMode:(DockBackgroundMode)mode
+- (void) setBackgroundMode: (DockBackgroundMode)mode
 {
   if (_backgroundMode != mode) {
     _backgroundMode = mode;
@@ -208,7 +224,7 @@ static NSInteger DockHoverRecycler = -3;
   }
 }
 
-- (void)setRecyclerHasContents:(BOOL)hasContents
+- (void) setRecyclerHasContents: (BOOL)hasContents
 {
   if (_recyclerHasContents != hasContents) {
     _recyclerHasContents = hasContents;
@@ -216,7 +232,7 @@ static NSInteger DockHoverRecycler = -3;
   }
 }
 
-- (void)setHorizontal:(BOOL)horizontal
+- (void) setHorizontal: (BOOL)horizontal
 {
   if (_horizontal != horizontal) {
     _horizontal = horizontal;
@@ -224,17 +240,17 @@ static NSInteger DockHoverRecycler = -3;
   }
 }
 
-- (BOOL)isHorizontal
+- (BOOL) isHorizontal
 {
   return _horizontal;
 }
 
-- (NSSize)cellSize
+- (NSSize) cellSize
 {
   return NSMakeSize(DockCell, DockCell);
 }
 
-- (NSRect)topTileRect
+- (NSRect) topTileRect
 {
   NSRect bounds = [self bounds];
   if (_horizontal) {
@@ -250,7 +266,7 @@ static NSInteger DockHoverRecycler = -3;
   }
 }
 
-- (NSPoint)cellOriginAtIndex:(NSUInteger)index
+- (NSPoint) cellOriginAtIndex: (NSUInteger)index
 {
   NSRect topTile = [self topTileRect];
   if (_horizontal) {
@@ -263,13 +279,13 @@ static NSInteger DockHoverRecycler = -3;
   }
 }
 
-- (NSRect)recyclerTileRect
+- (NSRect) recyclerTileRect
 {
   NSPoint origin = [self cellOriginAtIndex:[_items count]];
   return NSMakeRect(origin.x, origin.y, DockCell, DockCell);
 }
 
-- (NSUInteger)indexAtPoint:(NSPoint)p
+- (NSUInteger) indexAtPoint: (NSPoint)p
 {
   NSUInteger i;
   for (i = 0; i < [_items count]; i++) {
@@ -283,12 +299,12 @@ static NSInteger DockHoverRecycler = -3;
   return NSNotFound;
 }
 
-- (BOOL)recyclerContainsPoint:(NSPoint)p
+- (BOOL) recyclerContainsPoint: (NSPoint)p
 {
   return NSPointInRect(p, [self recyclerTileRect]);
 }
 
-- (NSUInteger)insertionIndexAtPoint:(NSPoint)p
+- (NSUInteger) insertionIndexAtPoint: (NSPoint)p
 {
   NSUInteger i;
 
@@ -314,12 +330,12 @@ static NSInteger DockHoverRecycler = -3;
   return [_items count];
 }
 
-- (BOOL)topIconContainsPoint:(NSPoint)p
+- (BOOL) topIconContainsPoint: (NSPoint)p
 {
   return NSPointInRect(p, [self topTileRect]);
 }
 
-- (NSInteger)hoverIndexAtPoint:(NSPoint)p
+- (NSInteger) hoverIndexAtPoint: (NSPoint)p
 {
   NSUInteger index;
 
@@ -335,7 +351,7 @@ static NSInteger DockHoverRecycler = -3;
   return index == NSNotFound ? DockHoverNone : (NSInteger)index;
 }
 
-- (NSRect)cellRectForHoverIndex:(NSInteger)index
+- (NSRect) cellRectForHoverIndex: (NSInteger)index
 {
   if (index == DockHoverTopIcon) {
     return [self topTileRect];
@@ -346,14 +362,14 @@ static NSInteger DockHoverRecycler = -3;
   }
 
   if (index >= 0 && index < (NSInteger)[_items count]) {
-    NSPoint origin = [self cellOriginAtIndex:(NSUInteger)index];
+    NSPoint origin = [self cellOriginAtIndex: (NSUInteger)index];
     return NSMakeRect(origin.x, origin.y, DockCell, DockCell);
   }
 
   return NSZeroRect;
 }
 
-- (NSString *)tooltipTitleForHoverIndex:(NSInteger)index
+- (NSString *) tooltipTitleForHoverIndex: (NSInteger)index
 {
   if (index == DockHoverTopIcon) {
     return @"GWorkspace";
@@ -364,29 +380,27 @@ static NSInteger DockHoverRecycler = -3;
   }
 
   if (index >= 0 && index < (NSInteger)[_items count]) {
-    DockItem *item = [_items objectAtIndex:(NSUInteger)index];
+    DockItem *item = [_items objectAtIndex: (NSUInteger)index];
     return [[item title] length] ? [item title] : [[item path] lastPathComponent];
   }
 
   return nil;
 }
 
-- (void)hideTooltip
+- (void) hideTooltip
 {
   [_tooltipTimer invalidate];
-  [_tooltipTimer release];
-  _tooltipTimer = nil;
+  DESTROY(_tooltipTimer);
   if (_tooltipItemIndex != DockHoverNone) {
     _tooltipItemIndex = DockHoverNone;
     [self setNeedsDisplay:YES];
   }
 }
 
-- (void)scheduleTooltipForHoverIndex:(NSInteger)index
+- (void) scheduleTooltipForHoverIndex: (NSInteger)index
 {
   [_tooltipTimer invalidate];
-  [_tooltipTimer release];
-  _tooltipTimer = nil;
+  DESTROY(_tooltipTimer);
   _tooltipItemIndex = DockHoverNone;
 
   if (index == DockHoverNone) {
@@ -394,15 +408,16 @@ static NSInteger DockHoverRecycler = -3;
     return;
   }
 
-  _tooltipTimer = [[NSTimer scheduledTimerWithTimeInterval:0.5
-                                                    target:self
-                                                  selector:@selector(showTooltip:)
-                                                  userInfo:nil
-                                                   repeats:NO] retain];
+  _tooltipTimer = [NSTimer scheduledTimerWithTimeInterval:0.5
+                                                   target:self
+                                                 selector:@selector(showTooltip:)
+                                                 userInfo:nil
+                                                 repeats:NO];
+  _tooltipTimer = RETAIN(_tooltipTimer);
   [self setNeedsDisplay:YES];
 }
 
-- (void)drawTooltip
+- (void) drawTooltip
 {
   NSString *title = [self tooltipTitleForHoverIndex:_tooltipItemIndex];
   NSRect cell;
@@ -463,10 +478,9 @@ static NSInteger DockHoverRecycler = -3;
   [title drawAtPoint:textPoint withAttributes:attrs];
 }
 
-- (void)showTooltip:(NSTimer *)timer
+- (void) showTooltip: (NSTimer *)timer
 {
-  [_tooltipTimer release];
-  _tooltipTimer = nil;
+  DESTROY(_tooltipTimer);
 
   if (_hoveredItemIndex != DockHoverNone) {
     _tooltipItemIndex = _hoveredItemIndex;
@@ -474,7 +488,7 @@ static NSInteger DockHoverRecycler = -3;
   }
 }
 
-- (NSArray *)pathsFromPasteboard:(NSPasteboard *)pb
+- (NSArray *) pathsFromPasteboard: (NSPasteboard *)pb
 {
   NSArray *types = [pb types];
   NSArray *paths;
@@ -543,7 +557,7 @@ static NSInteger DockHoverRecycler = -3;
   return nil;
 }
 
-- (BOOL)pasteboardHasSupportedType:(NSPasteboard *)pb
+- (BOOL) pasteboardHasSupportedType: (NSPasteboard *)pb
 {
   NSArray *supportedTypes = [NSArray arrayWithObjects:NSFilenamesPboardType,
                                                        NSURLPboardType,
@@ -557,7 +571,7 @@ static NSInteger DockHoverRecycler = -3;
   return [pb availableTypeFromArray:supportedTypes] != nil;
 }
 
-- (void)addPathsFromPasteboardObject:(id)object toArray:(NSMutableArray *)paths
+- (void) addPathsFromPasteboardObject: (id)object toArray: (NSMutableArray *)paths
 {
   if ([object isKindOfClass:[NSString class]]) {
     [self addPathsFromPasteboardString:object toArray:paths];
@@ -576,7 +590,7 @@ static NSInteger DockHoverRecycler = -3;
   }
 }
 
-- (void)addPathsFromPasteboardString:(NSString *)string toArray:(NSMutableArray *)paths
+- (void) addPathsFromPasteboardString: (NSString *)string toArray: (NSMutableArray *)paths
 {
   NSArray *lines;
   NSUInteger i;
@@ -616,20 +630,20 @@ static NSInteger DockHoverRecycler = -3;
   }
 }
 
-- (NSDragOperation)dragOperationForSender:(id <NSDraggingInfo>)sender
+- (NSDragOperation) dragOperationForSender: (id <NSDraggingInfo>)sender
 {
   return NSDragOperationEvery;
 }
 
-- (BOOL)pasteboardHasReorderType:(NSPasteboard *)pb
+- (BOOL) pasteboardHasReorderType: (NSPasteboard *)pb
 {
   return [[pb types] containsObject:DockReorderPboardType];
 }
 
-- (BOOL)drawImage:(NSImage *)image
-           inCell:(NSRect)cell
-             size:(CGFloat)size
-            angle:(CGFloat)angle
+- (BOOL) drawImage: (NSImage *)image
+           inCell: (NSRect)cell
+             size: (CGFloat)size
+            angle: (CGFloat)angle
 {
   NSSize imageSize;
   NSRect sourceRect;
@@ -679,12 +693,12 @@ static NSInteger DockHoverRecycler = -3;
   return YES;
 }
 
-- (BOOL)drawImage:(NSImage *)image inCell:(NSRect)cell size:(CGFloat)size
+- (BOOL) drawImage: (NSImage *)image inCell: (NSRect)cell size: (CGFloat)size
 {
   return [self drawImage:image inCell:cell size:size angle:0.0];
 }
 
-- (void)drawFallbackIconForItem:(DockItem *)item inCell:(NSRect)cell
+- (void) drawFallbackIconForItem: (DockItem *)item inCell: (NSRect)cell
 {
   NSDictionary *attrs = [NSDictionary dictionaryWithObjectsAndKeys:
     [NSFont boldSystemFontOfSize:18], NSFontAttributeName,
@@ -699,7 +713,7 @@ static NSInteger DockHoverRecycler = -3;
       withAttributes:attrs];
 }
 
-- (void)drawDockTileForItem:(DockItem *)item inCell:(NSRect)cell size:(CGFloat)size
+- (void) drawDockTileForItem: (DockItem *)item inCell: (NSRect)cell size: (CGFloat)size
 {
   NSImage *icon = [item icon];
   CGFloat angle = 0.0;
@@ -717,7 +731,7 @@ static NSInteger DockHoverRecycler = -3;
   }
 }
 
-- (void)drawStateForItem:(DockItem *)item inCell:(NSRect)cell
+- (void) drawStateForItem: (DockItem *)item inCell: (NSRect)cell
 {
   CGFloat dotSize = 5.0;
   CGFloat x;
@@ -739,14 +753,14 @@ static NSInteger DockHoverRecycler = -3;
     NSMakeRect(x, y, dotSize, dotSize)] fill];
 }
 
-- (void)drawTopTile
+- (void) drawTopTile
 {
   NSRect cell = [self topTileRect];
 
   [self drawImage:_gnustepIcon inCell:cell size:50.0];
 }
 
-- (void)drawRecyclerFallbackInCell:(NSRect)cell
+- (void) drawRecyclerFallbackInCell: (NSRect)cell
 {
   NSPoint center = NSMakePoint(NSMidX(cell), NSMidY(cell));
   CGFloat radius = 18.0;
@@ -783,7 +797,7 @@ static NSInteger DockHoverRecycler = -3;
   }
 }
 
-- (void)drawRecyclerContentsIndicatorInCell:(NSRect)cell
+- (void) drawRecyclerContentsIndicatorInCell: (NSRect)cell
 {
   CGFloat dotSize = 8.0;
   CGFloat x = NSMidX(cell) - dotSize / 2.0;
@@ -805,7 +819,7 @@ static NSInteger DockHoverRecycler = -3;
     NSMakeRect(x, y, dotSize, dotSize)] fill];
 }
 
-- (void)drawRecyclerTile
+- (void) drawRecyclerTile
 {
   NSRect cell = [self recyclerTileRect];
 
@@ -815,7 +829,7 @@ static NSInteger DockHoverRecycler = -3;
   [self drawRecyclerContentsIndicatorInCell:cell];
 }
 
-- (void)drawDropIndicator
+- (void) drawDropIndicator
 {
   NSRect cell;
   CGFloat thickness = 3.0;
@@ -847,7 +861,7 @@ static NSInteger DockHoverRecycler = -3;
   }
 }
 
-- (void)drawRect:(NSRect)dirtyRect
+- (void) drawRect: (NSRect)dirtyRect
 {
   NSUInteger i;
 
@@ -880,7 +894,7 @@ static NSInteger DockHoverRecycler = -3;
   [self drawTooltip];
 }
 
-- (void)mouseMoved:(NSEvent *)event
+- (void) mouseMoved: (NSEvent *)event
 {
   NSPoint location = [self convertPoint:[event locationInWindow] fromView:nil];
   NSInteger hoverIndex = [self hoverIndexAtPoint:location];
@@ -891,15 +905,16 @@ static NSInteger DockHoverRecycler = -3;
   }
 }
 
-- (void)mouseExited:(NSEvent *)event
+- (void) mouseExited: (NSEvent *)event
 {
   _hoveredItemIndex = DockHoverNone;
   [self hideTooltip];
 }
 
-- (NSImage *)dragImageForItemAtIndex:(NSUInteger)index
+- (NSImage *) dragImageForItemAtIndex: (NSUInteger)index
 {
-  NSImage *image = [[[NSImage alloc] initWithSize:NSMakeSize(DockCell, DockCell)] autorelease];
+  NSImage *image = AUTORELEASE([[NSImage alloc]
+    initWithSize:NSMakeSize(DockCell, DockCell)]);
   NSRect cell = NSMakeRect(0.0, 0.0, DockCell, DockCell);
 
   if (index >= [_items count]) {
@@ -913,7 +928,7 @@ static NSInteger DockHoverRecycler = -3;
   return image;
 }
 
-- (void)mouseDragged:(NSEvent *)event
+- (void) mouseDragged: (NSEvent *)event
 {
   NSPoint location = [self convertPoint:[event locationInWindow] fromView:nil];
   CGFloat dx = location.x - _mouseDownPoint.x;
@@ -950,12 +965,12 @@ static NSInteger DockHoverRecycler = -3;
   }
 }
 
-- (NSDragOperation)draggingSourceOperationMaskForLocal:(BOOL)isLocal
+- (NSDragOperation) draggingSourceOperationMaskForLocal: (BOOL)isLocal
 {
   return NSDragOperationMove | NSDragOperationDelete;
 }
 
-- (BOOL)screenPointIsInsideDock:(NSPoint)screenPoint
+- (BOOL) screenPointIsInsideDock: (NSPoint)screenPoint
 {
   NSPoint windowPoint;
   NSPoint viewPoint;
@@ -969,7 +984,7 @@ static NSInteger DockHoverRecycler = -3;
   return NSPointInRect(viewPoint, [self bounds]);
 }
 
-- (void)finishDraggingItemWithRemove:(BOOL)remove
+- (void) finishDraggingItemWithRemove: (BOOL)remove
 {
   NSUInteger draggedIndex = _draggedItemIndex;
 
@@ -987,23 +1002,23 @@ static NSInteger DockHoverRecycler = -3;
   [self setNeedsDisplay:YES];
 }
 
-- (void)draggedImage:(NSImage *)image
-             endedAt:(NSPoint)screenPoint
-           operation:(NSDragOperation)operation
+- (void) draggedImage: (NSImage *)image
+             endedAt: (NSPoint)screenPoint
+           operation: (NSDragOperation)operation
 {
   [self finishDraggingItemWithRemove:
     ![self screenPointIsInsideDock:screenPoint]];
 }
 
-- (void)draggedImage:(NSImage *)image
-             endedAt:(NSPoint)screenPoint
-           deposited:(BOOL)flag
+- (void) draggedImage: (NSImage *)image
+             endedAt: (NSPoint)screenPoint
+           deposited: (BOOL)flag
 {
   [self finishDraggingItemWithRemove:
     ![self screenPointIsInsideDock:screenPoint]];
 }
 
-- (NSDragOperation)draggingEntered:(id <NSDraggingInfo>)sender
+- (NSDragOperation) draggingEntered: (id <NSDraggingInfo>)sender
 {
   NSPoint location = [self convertPoint:[sender draggingLocation] fromView:nil];
   NSPasteboard *pasteboard = [sender draggingPasteboard];
@@ -1029,7 +1044,7 @@ static NSInteger DockHoverRecycler = -3;
   return NSDragOperationNone;
 }
 
-- (NSDragOperation)draggingUpdated:(id <NSDraggingInfo>)sender
+- (NSDragOperation) draggingUpdated: (id <NSDraggingInfo>)sender
 {
   NSPoint location = [self convertPoint:[sender draggingLocation] fromView:nil];
 
@@ -1053,7 +1068,7 @@ static NSInteger DockHoverRecycler = -3;
   return [self draggingEntered:sender];
 }
 
-- (void)draggingExited:(id <NSDraggingInfo>)sender
+- (void) draggingExited: (id <NSDraggingInfo>)sender
 {
   _draggingPaths = NO;
   _performedDragOperation = NO;
@@ -1061,7 +1076,7 @@ static NSInteger DockHoverRecycler = -3;
   [self setNeedsDisplay:YES];
 }
 
-- (BOOL)prepareForDragOperation:(id <NSDraggingInfo>)sender
+- (BOOL) prepareForDragOperation: (id <NSDraggingInfo>)sender
 {
   NSPoint location = [self convertPoint:[sender draggingLocation] fromView:nil];
 
@@ -1073,7 +1088,7 @@ static NSInteger DockHoverRecycler = -3;
     [self pasteboardHasSupportedType:[sender draggingPasteboard]];
 }
 
-- (BOOL)performDragOperation:(id <NSDraggingInfo>)sender
+- (BOOL) performDragOperation: (id <NSDraggingInfo>)sender
 {
   NSArray *paths = [self pathsFromPasteboard:[sender draggingPasteboard]];
   NSPoint location = [self convertPoint:[sender draggingLocation] fromView:nil];
@@ -1119,7 +1134,7 @@ static NSInteger DockHoverRecycler = -3;
   return NO;
 }
 
-- (void)concludeDragOperation:(id <NSDraggingInfo>)sender
+- (void) concludeDragOperation: (id <NSDraggingInfo>)sender
 {
   if (!_performedDragOperation) {
     NSArray *paths = [self pathsFromPasteboard:[sender draggingPasteboard]];
@@ -1146,7 +1161,7 @@ static NSInteger DockHoverRecycler = -3;
   [self setNeedsDisplay:YES];
 }
 
-- (void)mouseDown:(NSEvent *)event
+- (void) mouseDown: (NSEvent *)event
 {
   NSPoint location = [self convertPoint:[event locationInWindow] fromView:nil];
   NSUInteger index = [self indexAtPoint:location];

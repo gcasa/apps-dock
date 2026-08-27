@@ -1,11 +1,32 @@
+/*
+ * DockWM
+ *
+ * Copyright (C) 2026 Gregory Casamento <greg.casamento@gmail.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #import <AppKit/AppKit.h>
 
-typedef enum {
+typedef enum
+{
   DockItemApplication,
   DockItemX11Window
 } DockItemKind;
 
-typedef enum {
+typedef enum
+{
   DockItemNotRunning,
   DockItemRunning,
   DockItemHidden
@@ -23,19 +44,22 @@ typedef enum {
   unsigned long _xWindow;
 }
 
-+ (id)applicationItemWithPath:(NSString *)path;
-+ (id)x11ItemWithTitle:(NSString *)title window:(unsigned long)xWindow icon:(NSImage *)icon hidden:(BOOL)hidden;
++ (id) applicationItemWithPath: (NSString *)path;
++ (id) x11ItemWithTitle: (NSString *)title
+                 window: (unsigned long)xWindow
+                   icon: (NSImage *)icon
+                 hidden: (BOOL)hidden;
 
-- (DockItemKind)kind;
-- (DockItemState)state;
-- (void)setState:(DockItemState)state;
-- (NSString *)title;
-- (NSString *)path;
-- (NSString *)iconPath;
-- (NSImage *)icon;
-- (void)setIcon:(NSImage *)icon;
-- (NSDockTile *)dockTile;
-- (unsigned long)xWindow;
-- (void)setXWindow:(unsigned long)xWindow;
+- (DockItemKind) kind;
+- (DockItemState) state;
+- (void) setState: (DockItemState)state;
+- (NSString *) title;
+- (NSString *) path;
+- (NSString *) iconPath;
+- (NSImage *) icon;
+- (void) setIcon: (NSImage *)icon;
+- (NSDockTile *) dockTile;
+- (unsigned long) xWindow;
+- (void) setXWindow: (unsigned long)xWindow;
 
 @end
