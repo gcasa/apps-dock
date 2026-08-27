@@ -966,7 +966,7 @@ static NSInteger DockHoverRecycler = -3;
   NSRect cell;
   CGFloat thickness = 3.0;
 
-  if (_draggedItemIndex == NSNotFound ||
+  if ((!_draggingPaths && _draggedItemIndex == NSNotFound) ||
       _dropIndex == NSNotFound ||
       _dropIndex > [_items count]) {
     return;
