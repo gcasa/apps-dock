@@ -851,9 +851,12 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     }
   }
 
-  if ([paths count]) {
-    NSString *path = [paths objectAtIndex:0];
-    if ([fileManager createDirectoryAtPath:path attributes:nil]) {
+  for (i = 0; i < [paths count]; i++) {
+    NSString *path = [paths objectAtIndex:i];
+    if ([fileManager createDirectoryAtPath:path
+                    withIntermediateDirectories:YES
+                                     attributes:nil
+                                          error:NULL]) {
       return path;
     }
   }
@@ -898,41 +901,112 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   }
 }
 
+- (BOOL) movePathToRecyclerFallback: (NSString *)path
+                       recyclerPath: (NSString *)recyclerPath
+{
+  NSFileManager *fileManager = [NSFileManager defaultManager];
+  NSString *destination = [self recyclerDestinationPathForPath:path
+                                                 recyclerPath:recyclerPath];
+
+  if (![destination length]) {
+    return NO;
+  }
+
+  if ([fileManager movePath:path toPath:destination handler:nil]) {
+    return YES;
+  }
+
+  if ([fileManager copyPath:path toPath:destination handler:nil]) {
+    if ([fileManager removeFileAtPath:path handler:nil]) {
+      return YES;
+    }
+    [fileManager removeFileAtPath:destination handler:nil];
+  }
+
+  return NO;
+}
+
 - (void) dockViewDidReceivePathsInRecycler: (NSArray *)paths
 {
   NSFileManager *fileManager = [NSFileManager defaultManager];
-  NSString *recyclerPath = [self recyclerPathForDropping];
-  NSString *normalizedRecyclerPath = [self normalizedPath:recyclerPath];
-  BOOL moved = NO;
+  NSMutableDictionary *filesBySource = [NSMutableDictionary dictionary];
+  NSMutableArray *fallbackPaths = [NSMutableArray array];
+  BOOL recycled = NO;
   NSUInteger i;
-
-  if (![recyclerPath length]) {
-    NSBeep();
-    return;
-  }
 
   for (i = 0; i < [paths count]; i++) {
     NSString *path = [paths objectAtIndex:i];
     NSString *normalizedPath = [self normalizedPath:path];
-    NSString *destination;
+    NSString *source;
+    NSString *filename;
+    NSMutableArray *files;
 
     if (![normalizedPath length] ||
-        [normalizedPath isEqualToString:normalizedRecyclerPath] ||
-        [normalizedPath hasPrefix:
-          [normalizedRecyclerPath stringByAppendingString:@"/"]] ||
-        ![fileManager fileExistsAtPath:path]) {
+        ![fileManager fileExistsAtPath:normalizedPath]) {
       continue;
     }
 
-    destination = [self recyclerDestinationPathForPath:path
-                                         recyclerPath:recyclerPath];
-    if ([destination length] &&
-        [fileManager movePath:path toPath:destination handler:nil]) {
-      moved = YES;
+    if (![fallbackPaths containsObject:normalizedPath]) {
+      [fallbackPaths addObject:normalizedPath];
+    }
+
+    source = [normalizedPath stringByDeletingLastPathComponent];
+    filename = [normalizedPath lastPathComponent];
+    if (![source length] || ![filename length]) {
+      continue;
+    }
+
+    files = [filesBySource objectForKey:source];
+    if (!files) {
+      files = [NSMutableArray array];
+      [filesBySource setObject:files forKey:source];
+    }
+    if (![files containsObject:filename]) {
+      [files addObject:filename];
     }
   }
 
-  if (moved) {
+  {
+    NSEnumerator *enumerator = [filesBySource keyEnumerator];
+    NSString *source;
+
+    while ((source = [enumerator nextObject])) {
+      NSInteger tag = 0;
+      NSArray *files = [filesBySource objectForKey:source];
+
+      if ([[NSWorkspace sharedWorkspace]
+            performFileOperation:NSWorkspaceRecycleOperation
+                          source:source
+                     destination:@""
+                           files:files
+                             tag:&tag]) {
+        recycled = YES;
+      }
+    }
+  }
+
+  if ([fallbackPaths count]) {
+    NSString *recyclerPath = [self recyclerPathForDropping];
+
+    if ([recyclerPath length]) {
+      for (i = 0; i < [fallbackPaths count]; i++) {
+        NSString *path = [fallbackPaths objectAtIndex:i];
+        NSString *normalizedRecyclerPath = [self normalizedPath:recyclerPath];
+
+        if ([path isEqualToString:normalizedRecyclerPath] ||
+            [path hasPrefix:
+              [normalizedRecyclerPath stringByAppendingString:@"/"]]) {
+          continue;
+        }
+
+        if ([self movePathToRecyclerFallback:path recyclerPath:recyclerPath]) {
+          recycled = YES;
+        }
+      }
+    }
+  }
+
+  if (recycled) {
     [self updateRecyclerState];
     [self refreshDock];
     [[NSSound soundNamed:@"Pop"] play];

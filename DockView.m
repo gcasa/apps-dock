@@ -408,7 +408,7 @@ static NSInteger DockHoverRecycler = -3;
 - (NSString *) tooltipTitleForHoverIndex: (NSInteger)index
 {
   if (index == DockHoverTopIcon) {
-    return @"GWorkspace";
+    return @"DockWM";
   }
 
   if (index == DockHoverRecycler) {
