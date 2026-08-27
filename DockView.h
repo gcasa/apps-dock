@@ -11,6 +11,8 @@ typedef enum {
 - (void)dockViewDidReceivePaths:(NSArray *)paths;
 - (void)dockViewDidActivateItem:(DockItem *)item;
 - (void)dockViewDidActivateTopIcon;
+- (void)dockViewDidMoveItemFromIndex:(NSUInteger)fromIndex
+                              toIndex:(NSUInteger)toIndex;
 @end
 
 @interface DockView : NSView
@@ -29,6 +31,10 @@ typedef enum {
   NSInteger _hoveredItemIndex;
   NSInteger _tooltipItemIndex;
   NSTrackingRectTag _trackingRectTag;
+  NSPoint _mouseDownPoint;
+  NSUInteger _mouseDownItemIndex;
+  NSUInteger _draggedItemIndex;
+  NSUInteger _dropIndex;
   NSUInteger _lastMouseDownIndex;
   NSTimeInterval _lastMouseDownTime;
 }

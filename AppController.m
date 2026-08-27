@@ -838,6 +838,32 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   }
 }
 
+- (void)dockViewDidMoveItemFromIndex:(NSUInteger)fromIndex
+                              toIndex:(NSUInteger)toIndex
+{
+  DockItem *item;
+
+  if (fromIndex >= [_items count] || toIndex > [_items count]) {
+    return;
+  }
+
+  if (toIndex > fromIndex) {
+    toIndex--;
+  }
+
+  if (fromIndex == toIndex) {
+    return;
+  }
+
+  item = [[_items objectAtIndex:fromIndex] retain];
+  [_items removeObjectAtIndex:fromIndex];
+  [_items insertObject:item atIndex:toIndex];
+  [item release];
+
+  [self savePersistedApplications];
+  [self refreshDock];
+}
+
 - (void)dockViewDidActivateItem:(DockItem *)item
 {
   if ([item kind] == DockItemApplication) {
