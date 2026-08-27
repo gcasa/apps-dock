@@ -1,5 +1,5 @@
 /*
- * DockWM
+ * Dock
  *
  * Copyright (C) 2026 Gregory Casamento <greg.casamento@gmail.com>
  *
@@ -31,7 +31,7 @@ static NSTimeInterval DockWiggleDuration = 0.8;
 static NSString *GWRemoteFilenamesPboardType = @"GWRemoteFilenamesPboardType";
 static NSString *GWLSFolderPboardType = @"GWLSFolderPboardType";
 static NSString *GWDockIconPboardType = @"DockIconPboardType";
-static NSString *DockReorderPboardType = @"DockWMReorderPboardType";
+static NSString *DockReorderPboardType = @"DockReorderPboardType";
 static NSUInteger DockTopIconClickIndex = NSUIntegerMax - 1;
 static NSInteger DockHoverNone = -1;
 static NSInteger DockHoverTopIcon = -2;
