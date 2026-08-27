@@ -33,6 +33,7 @@
   NSMutableArray *_placementMenuItems;
   NSMenuItem *_blackBackgroundMenuItem;
   NSMenuItem *_transparentBackgroundMenuItem;
+  NSMenuItem *_emptyRecyclerMenuItem;
   DockPlacement _dockPlacement;
   DockBackgroundMode _backgroundMode;
 }

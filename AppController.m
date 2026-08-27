@@ -100,6 +100,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [_processScanTimer invalidate];
   DESTROY(_transparentBackgroundMenuItem);
   DESTROY(_blackBackgroundMenuItem);
+  DESTROY(_emptyRecyclerMenuItem);
   DESTROY(_dockMenu);
   DESTROY(_placementMenuItems);
   DESTROY(_x11);
@@ -631,6 +632,52 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 - (void) updateRecyclerState
 {
   [_dockView setRecyclerHasContents:[self recyclerHasContents]];
+  [_emptyRecyclerMenuItem setEnabled:[self recyclerHasContents]];
+}
+
+- (void) emptyRecyclerPath: (NSString *)path
+{
+  NSFileManager *fileManager = [NSFileManager defaultManager];
+  NSArray *entries = [fileManager directoryContentsAtPath:path];
+  NSUInteger i;
+
+  for (i = 0; i < [entries count]; i++) {
+    NSString *entry = [entries objectAtIndex:i];
+    NSString *entryPath;
+
+    if ([entry isEqualToString:@"."] ||
+        [entry isEqualToString:@".."] ||
+        [entry isEqualToString:@".gwdir"]) {
+      continue;
+    }
+
+    entryPath = [path stringByAppendingPathComponent:entry];
+    [fileManager removeFileAtPath:entryPath handler:nil];
+  }
+}
+
+- (void) emptyRecycler: (id)sender
+{
+  NSArray *paths = [self recyclerPaths];
+  NSUInteger i;
+  int result;
+
+  result = NSRunAlertPanel(@"Empty Recycler",
+                           @"Are you sure you want to permanently remove the items in the Recycler?",
+                           @"Empty Recycler",
+                           @"Cancel",
+                           nil);
+  if (result != NSAlertDefaultReturn) {
+    return;
+  }
+
+  for (i = 0; i < [paths count]; i++) {
+    [self emptyRecyclerPath:[paths objectAtIndex:i]];
+  }
+
+  [self updateRecyclerState];
+  [self refreshDock];
+  [[NSSound soundNamed:@"Glass"] play];
 }
 
 - (NSRect) dockWindowFrameForPlacement: (DockPlacement)placement
@@ -698,6 +745,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     (_backgroundMode == DockBackgroundBlack ? NSOnState : NSOffState)];
   [_transparentBackgroundMenuItem setState:
     (_backgroundMode == DockBackgroundSimulatedTransparency ? NSOnState : NSOffState)];
+  [_emptyRecyclerMenuItem setEnabled:[self recyclerHasContents]];
 }
 
 - (NSMenu *) dockMenu
@@ -745,6 +793,15 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     [_transparentBackgroundMenuItem setTarget:self];
     [_transparentBackgroundMenuItem setTag:DockBackgroundSimulatedTransparency];
     [_dockMenu addItem:_transparentBackgroundMenuItem];
+
+    [_dockMenu addItem:[NSMenuItem separatorItem]];
+
+    _emptyRecyclerMenuItem =
+      [[NSMenuItem alloc] initWithTitle:@"Empty Recycler"
+                                 action:@selector(emptyRecycler:)
+                          keyEquivalent:@""];
+    [_emptyRecyclerMenuItem setTarget:self];
+    [_dockMenu addItem:_emptyRecyclerMenuItem];
 
     [_dockMenu addItem:[NSMenuItem separatorItem]];
 
