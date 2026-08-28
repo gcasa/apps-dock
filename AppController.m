@@ -34,7 +34,8 @@ static NSString *DockOpenAtLoginApplicationsDefaultsKey = @"DockOpenAtLoginAppli
 static NSString *DockBackgroundModeDefaultsKey = @"DockBackgroundMode";
 static NSString *DockBackgroundColorDefaultsKey = @"DockBackgroundColor";
 
-static NSColor *DockCalibratedBackgroundColor(NSColor *color)
+static NSColor *
+DockCalibratedBackgroundColor (NSColor *color)
 {
   NSColor *rgbColor = nil;
   CGFloat red = 0.0;
@@ -42,25 +43,29 @@ static NSColor *DockCalibratedBackgroundColor(NSColor *color)
   CGFloat blue = 0.0;
   CGFloat alpha = 1.0;
 
-  if (!color) {
-    return [NSColor blackColor];
-  }
+  if (!color)
+    {
+      return [NSColor blackColor];
+    }
 
   NS_DURING
     rgbColor = [color colorUsingColorSpaceName:NSCalibratedRGBColorSpace];
-    if (!rgbColor) {
-      rgbColor = [color colorUsingColorSpaceName:NSDeviceRGBColorSpace];
-    }
-    if (rgbColor) {
-      [rgbColor getRed:&red green:&green blue:&blue alpha:&alpha];
-    }
+    if (!rgbColor)
+      {
+        rgbColor = [color colorUsingColorSpaceName:NSDeviceRGBColorSpace];
+      }
+    if (rgbColor)
+      {
+        [rgbColor getRed:&red green:&green blue:&blue alpha:&alpha];
+      }
   NS_HANDLER
     rgbColor = nil;
   NS_ENDHANDLER
 
-  if (!rgbColor) {
-    return [NSColor blackColor];
-  }
+  if (!rgbColor)
+    {
+      return [NSColor blackColor];
+    }
 
   return [NSColor colorWithCalibratedRed:red
                                    green:green
@@ -228,25 +233,29 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     objectForKey:DockBackgroundColorDefaultsKey];
   NSColor *color = nil;
 
-  if ([savedColor isKindOfClass:[NSDictionary class]]) {
-    NSNumber *red = [savedColor objectForKey:@"Red"];
-    NSNumber *green = [savedColor objectForKey:@"Green"];
-    NSNumber *blue = [savedColor objectForKey:@"Blue"];
-    NSNumber *alpha = [savedColor objectForKey:@"Alpha"];
+  if ([savedColor isKindOfClass:[NSDictionary class]])
+    {
+      NSNumber *red = [savedColor objectForKey:@"Red"];
+      NSNumber *green = [savedColor objectForKey:@"Green"];
+      NSNumber *blue = [savedColor objectForKey:@"Blue"];
+      NSNumber *alpha = [savedColor objectForKey:@"Alpha"];
 
-    if (red && green && blue) {
-      color = [NSColor colorWithCalibratedRed:[red doubleValue]
-                                        green:[green doubleValue]
-                                         blue:[blue doubleValue]
-                                        alpha:alpha ? [alpha doubleValue] : 1.0];
+      if (red && green && blue)
+        {
+          color = [NSColor colorWithCalibratedRed:[red doubleValue]
+                                            green:[green doubleValue]
+                                             blue:[blue doubleValue]
+                                            alpha:alpha ? [alpha doubleValue] : 1.0];
+        }
     }
-  } else if ([savedColor isKindOfClass:[NSData class]]) {
-    NS_DURING
-      color = [NSUnarchiver unarchiveObjectWithData:savedColor];
-    NS_HANDLER
-      color = nil;
-    NS_ENDHANDLER
-  }
+  else if ([savedColor isKindOfClass:[NSData class]])
+    {
+      NS_DURING
+        color = [NSUnarchiver unarchiveObjectWithData:savedColor];
+      NS_HANDLER
+        color = nil;
+      NS_ENDHANDLER
+    }
 
   return DockCalibratedBackgroundColor(color);
 }
@@ -1351,9 +1360,10 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   NSArray *placements;
   NSUInteger i;
 
-  if (_settingsPanel) {
-    return;
-  }
+  if (_settingsPanel)
+    {
+      return;
+    }
 
   _settingsPanel = [[NSPanel alloc]
     initWithContentRect:NSMakeRect(0, 0, 320, 320)
@@ -1381,10 +1391,11 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     @"Top Center",
     @"Bottom Center",
     nil];
-  for (i = 0; i < [placements count]; i++) {
-    [_settingsPlacementPopup addItemWithTitle:[placements objectAtIndex:i]];
-    [[_settingsPlacementPopup itemAtIndex:i] setTag:(NSInteger)i];
-  }
+  for (i = 0; i < [placements count]; i++)
+    {
+      [_settingsPlacementPopup addItemWithTitle:[placements objectAtIndex:i]];
+      [[_settingsPlacementPopup itemAtIndex:i] setTag:(NSInteger)i];
+    }
   [_settingsPlacementPopup setTarget:self];
   [_settingsPlacementPopup setAction:@selector(settingsPlacementChanged:)];
   [contentView addSubview:_settingsPlacementPopup];
@@ -1466,19 +1477,21 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   CGFloat blue = 0.0;
   CGFloat alpha = 1.0;
 
-  if (!_settingsPanel) {
-    return;
-  }
+  if (!_settingsPanel)
+    {
+      return;
+    }
 
   [_settingsPlacementPopup selectItemWithTag:(NSInteger)_dockPlacement];
-  if (![_settingsPanel isVisible]) {
-    color = DockCalibratedBackgroundColor(_backgroundColor);
-    [color getRed:&red green:&green blue:&blue alpha:&alpha];
-    [_settingsBackgroundColorWell setColor:color];
-    [_settingsRedSlider setDoubleValue:red * 255.0];
-    [_settingsGreenSlider setDoubleValue:green * 255.0];
-    [_settingsBlueSlider setDoubleValue:blue * 255.0];
-  }
+  if (![_settingsPanel isVisible])
+    {
+      color = DockCalibratedBackgroundColor(_backgroundColor);
+      [color getRed:&red green:&green blue:&blue alpha:&alpha];
+      [_settingsBackgroundColorWell setColor:color];
+      [_settingsRedSlider setDoubleValue:red * 255.0];
+      [_settingsGreenSlider setDoubleValue:green * 255.0];
+      [_settingsBlueSlider setDoubleValue:blue * 255.0];
+    }
   [_settingsBlackBackgroundButton setState:
     (_backgroundMode == DockBackgroundBlack ? NSOnState : NSOffState)];
   [_settingsTransparentBackgroundButton setState:
@@ -1503,10 +1516,11 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
 - (void) windowWillClose: (NSNotification *)notification
 {
-  if ([notification object] == _settingsPanel) {
-    [self settingsColorSliderChanged:self];
-    [[NSUserDefaults standardUserDefaults] synchronize];
-  }
+  if ([notification object] == _settingsPanel)
+    {
+      [self settingsColorSliderChanged:self];
+      [[NSUserDefaults standardUserDefaults] synchronize];
+    }
 }
 
 - (void) settingsPlacementChanged: (id)sender

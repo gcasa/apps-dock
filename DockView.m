@@ -37,7 +37,8 @@ static NSInteger DockHoverNone = -1;
 static NSInteger DockHoverTopIcon = -2;
 static NSInteger DockHoverRecycler = -3;
 
-static NSColor *DockViewCalibratedBackgroundColor(NSColor *color)
+static NSColor *
+DockViewCalibratedBackgroundColor (NSColor *color)
 {
   NSColor *rgbColor = nil;
   CGFloat red = 0.0;
@@ -45,25 +46,29 @@ static NSColor *DockViewCalibratedBackgroundColor(NSColor *color)
   CGFloat blue = 0.0;
   CGFloat alpha = 1.0;
 
-  if (!color) {
-    return [NSColor blackColor];
-  }
+  if (!color)
+    {
+      return [NSColor blackColor];
+    }
 
   NS_DURING
     rgbColor = [color colorUsingColorSpaceName:NSCalibratedRGBColorSpace];
-    if (!rgbColor) {
-      rgbColor = [color colorUsingColorSpaceName:NSDeviceRGBColorSpace];
-    }
-    if (rgbColor) {
-      [rgbColor getRed:&red green:&green blue:&blue alpha:&alpha];
-    }
+    if (!rgbColor)
+      {
+        rgbColor = [color colorUsingColorSpaceName:NSDeviceRGBColorSpace];
+      }
+    if (rgbColor)
+      {
+        [rgbColor getRed:&red green:&green blue:&blue alpha:&alpha];
+      }
   NS_HANDLER
     rgbColor = nil;
   NS_ENDHANDLER
 
-  if (!rgbColor) {
-    return [NSColor blackColor];
-  }
+  if (!rgbColor)
+    {
+      return [NSColor blackColor];
+    }
 
   return [NSColor colorWithCalibratedRed:red
                                    green:green
