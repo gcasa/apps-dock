@@ -27,6 +27,9 @@
   NSPanel *_settingsPanel;
   NSPopUpButton *_settingsPlacementPopup;
   NSColorWell *_settingsBackgroundColorWell;
+  NSSlider *_settingsRedSlider;
+  NSSlider *_settingsGreenSlider;
+  NSSlider *_settingsBlueSlider;
   NSButton *_settingsBlackBackgroundButton;
   NSButton *_settingsTransparentBackgroundButton;
   NSButton *_settingsEmptyRecyclerButton;
@@ -40,10 +43,6 @@
   NSTimer *_processScanTimer;
   NSTimer *_backgroundRefreshTimer;
   NSMenu *_dockMenu;
-  NSMutableArray *_placementMenuItems;
-  NSMenuItem *_blackBackgroundMenuItem;
-  NSMenuItem *_transparentBackgroundMenuItem;
-  NSMenuItem *_emptyRecyclerMenuItem;
   DockPlacement _dockPlacement;
   DockBackgroundMode _backgroundMode;
   NSColor *_backgroundColor;

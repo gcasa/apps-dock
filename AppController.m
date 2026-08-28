@@ -34,6 +34,40 @@ static NSString *DockOpenAtLoginApplicationsDefaultsKey = @"DockOpenAtLoginAppli
 static NSString *DockBackgroundModeDefaultsKey = @"DockBackgroundMode";
 static NSString *DockBackgroundColorDefaultsKey = @"DockBackgroundColor";
 
+static NSColor *DockCalibratedBackgroundColor(NSColor *color)
+{
+  NSColor *rgbColor = nil;
+  CGFloat red = 0.0;
+  CGFloat green = 0.0;
+  CGFloat blue = 0.0;
+  CGFloat alpha = 1.0;
+
+  if (!color) {
+    return [NSColor blackColor];
+  }
+
+  NS_DURING
+    rgbColor = [color colorUsingColorSpaceName:NSCalibratedRGBColorSpace];
+    if (!rgbColor) {
+      rgbColor = [color colorUsingColorSpaceName:NSDeviceRGBColorSpace];
+    }
+    if (rgbColor) {
+      [rgbColor getRed:&red green:&green blue:&blue alpha:&alpha];
+    }
+  NS_HANDLER
+    rgbColor = nil;
+  NS_ENDHANDLER
+
+  if (!rgbColor) {
+    return [NSColor blackColor];
+  }
+
+  return [NSColor colorWithCalibratedRed:red
+                                   green:green
+                                    blue:blue
+                                   alpha:alpha];
+}
+
 static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 {
   return placement == DockPlacementTopCenter || placement == DockPlacementBottomCenter;
@@ -125,14 +159,13 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   DESTROY(_settingsEmptyRecyclerButton);
   DESTROY(_settingsTransparentBackgroundButton);
   DESTROY(_settingsBlackBackgroundButton);
+  DESTROY(_settingsBlueSlider);
+  DESTROY(_settingsGreenSlider);
+  DESTROY(_settingsRedSlider);
   DESTROY(_settingsBackgroundColorWell);
   DESTROY(_settingsPlacementPopup);
   DESTROY(_settingsPanel);
-  DESTROY(_transparentBackgroundMenuItem);
-  DESTROY(_blackBackgroundMenuItem);
-  DESTROY(_emptyRecyclerMenuItem);
   DESTROY(_dockMenu);
-  DESTROY(_placementMenuItems);
   DESTROY(_x11);
   DESTROY(_dockView);
   DESTROY(_window);
@@ -191,26 +224,49 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
 - (NSColor *) savedBackgroundColor
 {
-  NSData *data = [[NSUserDefaults standardUserDefaults]
+  id savedColor = [[NSUserDefaults standardUserDefaults]
     objectForKey:DockBackgroundColorDefaultsKey];
   NSColor *color = nil;
 
-  if ([data isKindOfClass:[NSData class]]) {
-    color = [NSUnarchiver unarchiveObjectWithData:data];
+  if ([savedColor isKindOfClass:[NSDictionary class]]) {
+    NSNumber *red = [savedColor objectForKey:@"Red"];
+    NSNumber *green = [savedColor objectForKey:@"Green"];
+    NSNumber *blue = [savedColor objectForKey:@"Blue"];
+    NSNumber *alpha = [savedColor objectForKey:@"Alpha"];
+
+    if (red && green && blue) {
+      color = [NSColor colorWithCalibratedRed:[red doubleValue]
+                                        green:[green doubleValue]
+                                         blue:[blue doubleValue]
+                                        alpha:alpha ? [alpha doubleValue] : 1.0];
+    }
+  } else if ([savedColor isKindOfClass:[NSData class]]) {
+    NS_DURING
+      color = [NSUnarchiver unarchiveObjectWithData:savedColor];
+    NS_HANDLER
+      color = nil;
+    NS_ENDHANDLER
   }
 
-  return color ? color : [NSColor blackColor];
+  return DockCalibratedBackgroundColor(color);
 }
 
 - (void) saveBackgroundColor
 {
-  NSData *data = [NSArchiver archivedDataWithRootObject:_backgroundColor];
   NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+  NSColor *color = DockCalibratedBackgroundColor(_backgroundColor);
+  NSMutableDictionary *components = [NSMutableDictionary dictionary];
+  CGFloat red = 0.0;
+  CGFloat green = 0.0;
+  CGFloat blue = 0.0;
+  CGFloat alpha = 1.0;
 
-  if (data) {
-    [defaults setObject:data forKey:DockBackgroundColorDefaultsKey];
-    [defaults synchronize];
-  }
+  [color getRed:&red green:&green blue:&blue alpha:&alpha];
+  [components setObject:[NSNumber numberWithDouble:red] forKey:@"Red"];
+  [components setObject:[NSNumber numberWithDouble:green] forKey:@"Green"];
+  [components setObject:[NSNumber numberWithDouble:blue] forKey:@"Blue"];
+  [components setObject:[NSNumber numberWithDouble:alpha] forKey:@"Alpha"];
+  [defaults setObject:components forKey:DockBackgroundColorDefaultsKey];
 }
 
 - (void) loadPersistedApplications
@@ -1113,7 +1169,6 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 - (void) updateRecyclerState
 {
   [_dockView setRecyclerHasContents:[self recyclerHasContents]];
-  [_emptyRecyclerMenuItem setEnabled:[self recyclerHasContents]];
   [self updateSettingsPanelControls];
 }
 
@@ -1217,37 +1272,15 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
 - (void) updateDockMenu
 {
-  NSUInteger i;
-
-  for (i = 0; i < [_placementMenuItems count]; i++) {
-    NSMenuItem *item = [_placementMenuItems objectAtIndex:i];
-    [item setState: ([item tag] == _dockPlacement ? NSOnState : NSOffState)];
-  }
-
-  [_blackBackgroundMenuItem setState:
-    (_backgroundMode == DockBackgroundBlack ? NSOnState : NSOffState)];
-  [_transparentBackgroundMenuItem setState:
-    (_backgroundMode == DockBackgroundSimulatedTransparency ? NSOnState : NSOffState)];
-  [_emptyRecyclerMenuItem setEnabled:[self recyclerHasContents]];
   [self updateSettingsPanelControls];
 }
 
 - (NSMenu *) dockMenu
 {
   if (!_dockMenu) {
-    NSArray *titles = [NSArray arrayWithObjects:
-      @"Left Top",
-      @"Left Center",
-      @"Right Top",
-      @"Right Center",
-      @"Top Center",
-      @"Bottom Center",
-      nil];
-    NSUInteger i;
     NSMenuItem *item;
 
     _dockMenu = [[NSMenu alloc] initWithTitle:@"Dock"];
-    _placementMenuItems = [NSMutableArray new];
 
     item = [[NSMenuItem alloc] initWithTitle:@"Settings..."
                                       action:@selector(showSettingsPanel:)
@@ -1255,46 +1288,6 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     [item setTarget:self];
     [_dockMenu addItem:item];
     DESTROY(item);
-
-    [_dockMenu addItem:[NSMenuItem separatorItem]];
-
-    for (i = 0; i < [titles count]; i++) {
-      item = [[NSMenuItem alloc] initWithTitle:[titles objectAtIndex:i]
-                                        action:@selector(selectDockPlacement:)
-                                 keyEquivalent:@""];
-      [item setTarget:self];
-      [item setTag: (NSInteger)i];
-      [_dockMenu addItem:item];
-      [_placementMenuItems addObject:item];
-      DESTROY(item);
-    }
-
-    [_dockMenu addItem:[NSMenuItem separatorItem]];
-
-    _blackBackgroundMenuItem =
-      [[NSMenuItem alloc] initWithTitle:@"Solid Background"
-                                 action:@selector(selectBackgroundMode:)
-                          keyEquivalent:@""];
-    [_blackBackgroundMenuItem setTarget:self];
-    [_blackBackgroundMenuItem setTag:DockBackgroundBlack];
-    [_dockMenu addItem:_blackBackgroundMenuItem];
-
-    _transparentBackgroundMenuItem =
-      [[NSMenuItem alloc] initWithTitle:@"Simulated Transparency"
-                                 action:@selector(selectBackgroundMode:)
-                          keyEquivalent:@""];
-    [_transparentBackgroundMenuItem setTarget:self];
-    [_transparentBackgroundMenuItem setTag:DockBackgroundSimulatedTransparency];
-    [_dockMenu addItem:_transparentBackgroundMenuItem];
-
-    [_dockMenu addItem:[NSMenuItem separatorItem]];
-
-    _emptyRecyclerMenuItem =
-      [[NSMenuItem alloc] initWithTitle:@"Empty Recycler"
-                                 action:@selector(emptyRecycler:)
-                          keyEquivalent:@""];
-    [_emptyRecyclerMenuItem setTarget:self];
-    [_dockMenu addItem:_emptyRecyclerMenuItem];
 
     [_dockMenu addItem:[NSMenuItem separatorItem]];
 
@@ -1338,6 +1331,18 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   return button;
 }
 
+- (NSSlider *) settingsColorSliderWithFrame: (NSRect)frame
+{
+  NSSlider *slider = [[NSSlider alloc] initWithFrame:frame];
+
+  [slider setMinValue:0.0];
+  [slider setMaxValue:255.0];
+  [slider setContinuous:YES];
+  [slider setTarget:self];
+  [slider setAction:@selector(settingsColorSliderChanged:)];
+  return slider;
+}
+
 - (void) createSettingsPanel
 {
   NSView *contentView;
@@ -1351,7 +1356,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   }
 
   _settingsPanel = [[NSPanel alloc]
-    initWithContentRect:NSMakeRect(0, 0, 320, 230)
+    initWithContentRect:NSMakeRect(0, 0, 320, 320)
               styleMask:NSTitledWindowMask | NSClosableWindowMask
                 backing:NSBackingStoreBuffered
                   defer:NO];
@@ -1362,11 +1367,11 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   contentView = [_settingsPanel contentView];
 
   label = [self settingsLabelWithTitle:@"Placement"
-                                 frame:NSMakeRect(18, 186, 110, 20)];
+                                 frame:NSMakeRect(18, 276, 110, 20)];
   [contentView addSubview:label];
 
   _settingsPlacementPopup =
-    [[NSPopUpButton alloc] initWithFrame:NSMakeRect(132, 182, 170, 26)
+    [[NSPopUpButton alloc] initWithFrame:NSMakeRect(132, 272, 170, 26)
                                pullsDown:NO];
   placements = [NSArray arrayWithObjects:
     @"Left Top",
@@ -1385,22 +1390,42 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [contentView addSubview:_settingsPlacementPopup];
 
   label = [self settingsLabelWithTitle:@"Color"
-                                 frame:NSMakeRect(18, 142, 110, 20)];
+                                 frame:NSMakeRect(18, 232, 110, 20)];
   [contentView addSubview:label];
 
   _settingsBackgroundColorWell =
-    [[NSColorWell alloc] initWithFrame:NSMakeRect(132, 136, 58, 32)];
-  [_settingsBackgroundColorWell setTarget:self];
-  [_settingsBackgroundColorWell setAction:@selector(settingsBackgroundColorChanged:)];
+    [[NSColorWell alloc] initWithFrame:NSMakeRect(132, 226, 58, 32)];
+  [_settingsBackgroundColorWell setEnabled:NO];
   [contentView addSubview:_settingsBackgroundColorWell];
 
+  label = [self settingsLabelWithTitle:@"Red"
+                                 frame:NSMakeRect(18, 194, 70, 20)];
+  [contentView addSubview:label];
+  _settingsRedSlider =
+    [self settingsColorSliderWithFrame:NSMakeRect(92, 190, 210, 24)];
+  [contentView addSubview:_settingsRedSlider];
+
+  label = [self settingsLabelWithTitle:@"Green"
+                                 frame:NSMakeRect(18, 164, 70, 20)];
+  [contentView addSubview:label];
+  _settingsGreenSlider =
+    [self settingsColorSliderWithFrame:NSMakeRect(92, 160, 210, 24)];
+  [contentView addSubview:_settingsGreenSlider];
+
+  label = [self settingsLabelWithTitle:@"Blue"
+                                 frame:NSMakeRect(18, 134, 70, 20)];
+  [contentView addSubview:label];
+  _settingsBlueSlider =
+    [self settingsColorSliderWithFrame:NSMakeRect(92, 130, 210, 24)];
+  [contentView addSubview:_settingsBlueSlider];
+
   label = [self settingsLabelWithTitle:@"Background"
-                                 frame:NSMakeRect(18, 98, 110, 20)];
+                                 frame:NSMakeRect(18, 88, 110, 20)];
   [contentView addSubview:label];
 
   _settingsBlackBackgroundButton =
     [self settingsButtonWithTitle:@"Solid Background"
-                            frame:NSMakeRect(132, 96, 170, 22)
+                            frame:NSMakeRect(132, 86, 170, 22)
                        buttonType:NSRadioButton
                            action:@selector(settingsBackgroundChanged:)];
   [_settingsBlackBackgroundButton setTag:DockBackgroundBlack];
@@ -1408,7 +1433,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
   _settingsTransparentBackgroundButton =
     [self settingsButtonWithTitle:@"Simulated Transparency"
-                            frame:NSMakeRect(132, 70, 170, 22)
+                            frame:NSMakeRect(132, 60, 170, 22)
                        buttonType:NSRadioButton
                            action:@selector(settingsBackgroundChanged:)];
   [_settingsTransparentBackgroundButton setTag:DockBackgroundSimulatedTransparency];
@@ -1435,16 +1460,24 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
 - (void) updateSettingsPanelControls
 {
+  NSColor *color;
+  CGFloat red = 0.0;
+  CGFloat green = 0.0;
+  CGFloat blue = 0.0;
+  CGFloat alpha = 1.0;
+
   if (!_settingsPanel) {
     return;
   }
 
   [_settingsPlacementPopup selectItemWithTag:(NSInteger)_dockPlacement];
-  if (![_settingsBackgroundColorWell isActive] &&
-      ![[_settingsBackgroundColorWell color] isEqual:
-        (_backgroundColor ? _backgroundColor : [NSColor blackColor])]) {
-    [_settingsBackgroundColorWell setColor:_backgroundColor ? _backgroundColor
-                                                       : [NSColor blackColor]];
+  if (![_settingsPanel isVisible]) {
+    color = DockCalibratedBackgroundColor(_backgroundColor);
+    [color getRed:&red green:&green blue:&blue alpha:&alpha];
+    [_settingsBackgroundColorWell setColor:color];
+    [_settingsRedSlider setDoubleValue:red * 255.0];
+    [_settingsGreenSlider setDoubleValue:green * 255.0];
+    [_settingsBlueSlider setDoubleValue:blue * 255.0];
   }
   [_settingsBlackBackgroundButton setState:
     (_backgroundMode == DockBackgroundBlack ? NSOnState : NSOffState)];
@@ -1463,20 +1496,16 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
 - (void) closeSettingsPanel: (id)sender
 {
-  [_settingsBackgroundColorWell deactivate];
-  if ([NSColorPanel sharedColorPanelExists]) {
-    [[NSColorPanel sharedColorPanel] orderOut:sender];
-  }
+  [self settingsColorSliderChanged:sender];
+  [[NSUserDefaults standardUserDefaults] synchronize];
   [_settingsPanel orderOut:sender];
 }
 
 - (void) windowWillClose: (NSNotification *)notification
 {
   if ([notification object] == _settingsPanel) {
-    [_settingsBackgroundColorWell deactivate];
-    if ([NSColorPanel sharedColorPanelExists]) {
-      [[NSColorPanel sharedColorPanel] orderOut:self];
-    }
+    [self settingsColorSliderChanged:self];
+    [[NSUserDefaults standardUserDefaults] synchronize];
   }
 }
 
@@ -1497,12 +1526,16 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [self updateDockMenu];
 }
 
-- (void) settingsBackgroundColorChanged: (id)sender
+- (void) settingsColorSliderChanged: (id)sender
 {
-  ASSIGN(_backgroundColor, [sender color]);
+  ASSIGN(_backgroundColor,
+         [NSColor colorWithCalibratedRed:[_settingsRedSlider doubleValue] / 255.0
+                                   green:[_settingsGreenSlider doubleValue] / 255.0
+                                    blue:[_settingsBlueSlider doubleValue] / 255.0
+                                   alpha:1.0]);
   [_dockView setBackgroundColor:_backgroundColor];
+  [_settingsBackgroundColorWell setColor:_backgroundColor];
   [self saveBackgroundColor];
-  [self updateDockBackgroundHidingWindow:YES];
 }
 
 - (void) applyDockPlacement
@@ -1566,23 +1599,6 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     [_window orderFrontRegardless];
   }
   _updatingDockBackground = NO;
-}
-
-- (void) selectBackgroundMode: (id)sender
-{
-  NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-
-  _backgroundMode = (DockBackgroundMode)[sender tag];
-  [defaults setInteger:_backgroundMode forKey:DockBackgroundModeDefaultsKey];
-  [defaults synchronize];
-  [self updateDockBackgroundHidingWindow:YES];
-  [self updateDockMenu];
-}
-
-- (void) selectDockPlacement: (id)sender
-{
-  _dockPlacement = (DockPlacement)[sender tag];
-  [self applyDockPlacement];
 }
 
 - (void) quitDock: (id)sender
