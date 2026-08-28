@@ -24,9 +24,11 @@
 {
   NSImage *_icon;
   NSString *_title;
+  NSString *_badgeLabel;
 }
 - (void) setIcon: (NSImage *)icon;
 - (void) setTitle: (NSString *)title;
+- (void) setBadgeLabel: (NSString *)label;
 @end
 
 @implementation DockTileIconView
@@ -35,6 +37,7 @@
 {
   DESTROY(_icon);
   DESTROY(_title);
+  DESTROY(_badgeLabel);
   DEALLOC;
 }
 
@@ -43,6 +46,16 @@
   if (_icon != icon)
     {
       ASSIGN(_icon, icon);
+      [self setNeedsDisplay:YES];
+    }
+}
+
+- (void) setBadgeLabel: (NSString *)label
+{
+  if (_badgeLabel != label &&
+      !(_badgeLabel && label && [_badgeLabel isEqualToString:label]))
+    {
+      ASSIGNCOPY(_badgeLabel, label);
       [self setNeedsDisplay:YES];
     }
 }
@@ -118,6 +131,46 @@
   if (![self drawImage:_icon inRect:iconRect])
     {
       [self drawFallbackInRect:bounds];
+    }
+
+  if ([_badgeLabel length])
+    {
+      NSString *displayString = _badgeLabel;
+      NSDictionary *attrs;
+      NSSize textSize;
+      NSSize badgeSize;
+      NSRect badgeRect;
+      CGFloat pad = MAX(4.0, size / 10.0);
+      CGFloat minSide = MAX(14.0, size / 3.2);
+
+      if ([displayString length] > 5)
+	{
+	  displayString = [NSString stringWithFormat:@"%@...%@",
+				    [displayString substringToIndex:2],
+				    [displayString substringFromIndex:
+						    [displayString length] - 2]];
+	}
+
+      attrs = [NSDictionary dictionaryWithObjectsAndKeys:
+			    [NSFont boldSystemFontOfSize:MAX(9.0, size / 5.0)],
+			    NSFontAttributeName,
+			    [NSColor whiteColor],
+			    NSForegroundColorAttributeName,
+			    nil];
+      textSize = [displayString sizeWithAttributes:attrs];
+      badgeSize = NSMakeSize(MAX(minSide, textSize.width + pad),
+			     MAX(minSide, textSize.height + pad / 2.0));
+      badgeRect = NSMakeRect(NSMaxX(iconRect) - badgeSize.width,
+			     NSMaxY(iconRect) - badgeSize.height,
+			     badgeSize.width,
+			     badgeSize.height);
+
+      [[NSColor colorWithCalibratedRed:0.82 green:0.05 blue:0.09 alpha:1.0] set];
+      [[NSBezierPath bezierPathWithOvalInRect:badgeRect] fill];
+      [displayString drawAtPoint:
+		       NSMakePoint(NSMidX(badgeRect) - textSize.width / 2.0,
+				   NSMidY(badgeRect) - textSize.height / 2.0)
+			 withAttributes:attrs];
     }
 }
 
@@ -542,6 +595,7 @@
   ASSIGNCOPY(item->_iconPath, iconPath);
   ASSIGNCOPY(item->_title, [[path lastPathComponent] stringByDeletingPathExtension]);
   ASSIGN(item->_icon, icon);
+  ASSIGN(item->_originalIcon, icon);
   item->_dockTile = [[NSDockTile alloc] init];
   [item->_dockTile setOwner:item];
   {
@@ -583,7 +637,9 @@
   DESTROY(_title);
   DESTROY(_path);
   DESTROY(_iconPath);
+  DESTROY(_badgeLabel);
   DESTROY(_icon);
+  DESTROY(_originalIcon);
   DESTROY(_dockTile);
   DEALLOC;
 }
@@ -622,6 +678,26 @@
 {
   return _icon;
 }
+
+- (NSString *) badgeLabel
+{
+  return _badgeLabel;
+}
+
+- (void) setBadgeLabel: (NSString *)label
+{
+  if (_badgeLabel != label &&
+      !(_badgeLabel && label && [_badgeLabel isEqualToString:label]))
+    {
+      ASSIGNCOPY(_badgeLabel, label);
+      if ([[_dockTile contentView] respondsToSelector:@selector(setBadgeLabel:)])
+	{
+	  [(DockTileIconView *)[_dockTile contentView] setBadgeLabel:label];
+	}
+      [_dockTile display];
+    }
+}
+
 - (BOOL) iconMatchesImage: (NSImage *)image
 {
   NSData *currentData;
@@ -653,6 +729,15 @@
       [_dockTile display];
     }
 }
+
+- (void) restoreOriginalIcon
+{
+  if (_originalIcon)
+    {
+      [self setIcon:_originalIcon];
+    }
+}
+
 - (NSDockTile *) dockTile
 {
   return _dockTile;

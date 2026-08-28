@@ -30,6 +30,7 @@
 
 #define DockGSWindowStyleAttr (1UL << 0)
 #define DockNSIconWindowMask 64UL
+#define DockNSMiniWindowMask 128UL
 
 static int X11DockManagerLastErrorCode = 0;
 static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
@@ -756,6 +757,7 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 
 - (NSImage *) iconForWindow: (Window)window
 {
+#if 0
   Display *display = (Display *)_display;
   Atom property = XInternAtom(display, "_NET_WM_ICON", False);
   Atom actualType;
@@ -898,6 +900,8 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
       icon = [NSImage imageNamed:@"NSApplicationIcon"];
     }
   return icon;
+#endif
+  return nil;
 }
 
 - (NSString *) executablePathForWindow: (Window)window
@@ -929,7 +933,8 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 	   containsObject:[NSNumber numberWithUnsignedLong:(unsigned long)window]];
 }
 
-- (BOOL) windowHasGNUstepIconStyle: (Window)window
+- (BOOL) windowHasGNUstepStyleMask: (unsigned long)styleMask
+                             window: (Window)window
 {
   Display *display = (Display *)_display;
   Atom property = XInternAtom(display, "_GNUSTEP_WM_ATTR", False);
@@ -953,7 +958,7 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 	  unsigned long *attrs = (unsigned long *)data;
 
 	  if ((attrs[0] & DockGSWindowStyleAttr) &&
-	      (attrs[1] & DockNSIconWindowMask))
+	      (attrs[1] & styleMask))
 	    {
 	      result = YES;
 	    }
@@ -964,11 +969,28 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   return result;
 }
 
+- (BOOL) windowHasGNUstepIconStyle: (Window)window
+{
+  return [self windowHasGNUstepStyleMask:DockNSIconWindowMask
+                                  window:window];
+}
+
+- (BOOL) windowHasGNUstepMiniWindowStyle: (Window)window
+{
+  return [self windowHasGNUstepStyleMask:DockNSMiniWindowMask
+                                  window:window];
+}
+
 - (void) handlePossiblyNewWindow: (Window)window
 {
   Display *display = (Display *)_display;
 
   if (!display || window == (Window)_hostWindow)
+    {
+      return;
+    }
+
+  if ([self windowHasGNUstepMiniWindowStyle:window])
     {
       return;
     }
@@ -998,6 +1020,10 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
       return NO;
     }
   if ([self windowIsRegisteredIconWindow:window])
+    {
+      return NO;
+    }
+  if ([self windowHasGNUstepMiniWindowStyle:window])
     {
       return NO;
     }
@@ -1144,6 +1170,11 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   return YES;
 }
 
+- (BOOL) windowExists: (unsigned long)xWindow
+{
+  return [self knownWindowStillExists:(Window)xWindow];
+}
+
 - (BOOL) windowShouldBeIgnoredWithTitle: (NSString *)title path: (NSString *)path
 {
   NSString *lowerTitle = [title lowercaseString];
@@ -1241,6 +1272,7 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 
 - (NSImage *) iconForIdentifier: (id)identifier
 {
+#if 0
   NSNumber *windowKey;
 
   if (!identifier)
@@ -1255,12 +1287,24 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
     }
 
   return [self imageFromWindowContents:(Window)[windowKey unsignedLongValue]];
+#endif
+  return nil;
 }
 
 - (BOOL) rememberApplicationIconWindow: (Window)window
                      processIdentifier: (int)processIdentifier
                                  title: (NSString *)title
 {
+  if (window == (Window)_hostWindow)
+    {
+      return NO;
+    }
+  if ([self windowHasGNUstepIconStyle:window])
+    {
+      return YES;
+    }
+
+#if 0
   id identifier;
   NSNumber *windowKey;
   XWindowAttributes attr;
@@ -1327,6 +1371,8 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
     }
 
   return YES;
+#endif
+  return NO;
 }
 
 - (void) discoverApplicationIconWindows: (Window *)children
@@ -1384,6 +1430,7 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 
 - (void) scanApplicationIconWindows
 {
+#if 0
   NSArray *iconKeys = [_iconWindowsByProcessID allKeys];
   NSUInteger i;
 
@@ -1434,6 +1481,7 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 	    }
 	}
     }
+#endif
 }
 
 - (void) scanClientWindow: (Window)window
@@ -1532,10 +1580,16 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 - (NSRect) setWindow: (unsigned int)aWindowNumber
         appProcessId: (int)aProcessId
 {
+#if 0
   NSNumber *processKey;
   NSNumber *windowKey;
+  NSImage *icon;
 
   if (aWindowNumber == 0 || aProcessId <= 0)
+    {
+      return NSMakeRect(0, 0, 64, 64);
+    }
+  if (![self windowHasGNUstepIconStyle:(Window)aWindowNumber])
     {
       return NSMakeRect(0, 0, 64, 64);
     }
@@ -1551,7 +1605,43 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   [_iconWindowsByProcessID setObject:windowKey forKey:processKey];
   [_knownWindows removeObject:windowKey];
 
+  icon = [self imageFromWindowContents:(Window)aWindowNumber];
+  if (icon && [_delegate respondsToSelector:
+			   @selector(x11DockManagerDidUpdateApplicationIcon:processIdentifier:title:)])
+    {
+      [_delegate x11DockManagerDidUpdateApplicationIcon:icon
+				      processIdentifier:aProcessId
+						  title:nil];
+    }
+
   return NSMakeRect(0, 0, 64, 64);
+#endif
+  return NSMakeRect(0, 0, 64, 64);
+}
+
+- (void) setApplicationIconData: (NSData *)data
+                      badgeText: (NSString *)badgeText
+                   appProcessId: (int)aProcessId
+{
+  NSImage *icon = nil;
+
+  if (aProcessId <= 0)
+    {
+      return;
+    }
+
+  if ([data length])
+    {
+      icon = AUTORELEASE([[NSImage alloc] initWithData:data]);
+    }
+
+  if ([_delegate respondsToSelector:
+		   @selector(x11DockManagerDidUpdateApplicationIcon:badgeLabel:processIdentifier:)])
+    {
+      [_delegate x11DockManagerDidUpdateApplicationIcon:icon
+					     badgeLabel:badgeText
+				      processIdentifier:aProcessId];
+    }
 }
 
 - (void) removeWindow: (unsigned int)aWindowNumber
@@ -1586,6 +1676,10 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   NSPoint origin;
 
   if (!display || !_hostWindow) return;
+  if (![self windowIsRegisteredIconWindow:(Window)xWindow])
+    {
+      return;
+    }
   origin = [_dockView cellOriginAtIndex:index];
   XReparentWindow(display, (Window)xWindow, (Window)_hostWindow,
                   (int)origin.x,
@@ -1610,11 +1704,7 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 
 - (void) hideWindow: (unsigned long)xWindow
 {
-  Display *display = (Display *)_display;
-
-  if (!display) return;
-  XUnmapWindow(display, (Window)xWindow);
-  XFlush(display);
+  return;
 }
 
 - (void) activateWindow: (unsigned long)xWindow
@@ -1626,6 +1716,10 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 
   if (!display) return;
   if ([self windowIsRegisteredIconWindow:(Window)xWindow])
+    {
+      return;
+    }
+  if ([self windowHasGNUstepMiniWindowStyle:(Window)xWindow])
     {
       return;
     }
@@ -1672,6 +1766,10 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
       int processIdentifier;
 
       if ([self windowIsRegisteredIconWindow:window])
+	{
+	  continue;
+	}
+      if ([self windowHasGNUstepMiniWindowStyle:window])
 	{
 	  continue;
 	}
@@ -1748,6 +1846,14 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   BOOL supportsDelete = NO;
 
   if (!display) return;
+  if ([self windowIsRegisteredIconWindow:(Window)xWindow])
+    {
+      return;
+    }
+  if ([self windowHasGNUstepMiniWindowStyle:(Window)xWindow])
+    {
+      return;
+    }
 
   wmProtocols = XInternAtom(display, "WM_PROTOCOLS", False);
   wmDeleteWindow = XInternAtom(display, "WM_DELETE_WINDOW", False);

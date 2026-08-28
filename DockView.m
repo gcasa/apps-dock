@@ -1022,6 +1022,60 @@ DockViewCalibratedBackgroundColor (NSColor *color)
       withAttributes:attrs];
 }
 
+- (void) drawBadgeForItem: (DockItem *)item inCell: (NSRect)cell iconSize: (CGFloat)size
+{
+  NSString *badgeLabel = [item badgeLabel];
+  NSString *displayString = badgeLabel;
+  NSDictionary *attrs;
+  NSSize textSize;
+  NSSize badgeSize;
+  NSRect iconRect;
+  NSRect badgeRect;
+  CGFloat pad;
+  CGFloat minSide;
+
+  if (![badgeLabel length])
+    {
+      return;
+    }
+
+  if ([displayString length] > 5)
+    {
+      displayString = [NSString stringWithFormat:@"%@...%@",
+				[displayString substringToIndex:2],
+				[displayString substringFromIndex:
+						[displayString length] - 2]];
+    }
+
+  pad = MAX(4.0, size / 10.0);
+  minSide = MAX(14.0, size / 3.2);
+  iconRect = NSMakeRect(NSMidX(cell) - size / 2.0,
+                        NSMidY(cell) - size / 2.0,
+                        size,
+                        size);
+
+  attrs = [NSDictionary dictionaryWithObjectsAndKeys:
+			[NSFont boldSystemFontOfSize:MAX(9.0, size / 5.0)],
+			NSFontAttributeName,
+			[NSColor whiteColor],
+			NSForegroundColorAttributeName,
+			nil];
+  textSize = [displayString sizeWithAttributes:attrs];
+  badgeSize = NSMakeSize(MAX(minSide, textSize.width + pad),
+			 MAX(minSide, textSize.height + pad / 2.0));
+  badgeRect = NSMakeRect(NSMaxX(iconRect) - badgeSize.width,
+			 NSMaxY(iconRect) - badgeSize.height,
+			 badgeSize.width,
+			 badgeSize.height);
+
+  [[NSColor colorWithCalibratedRed:0.82 green:0.05 blue:0.09 alpha:1.0] set];
+  [[NSBezierPath bezierPathWithOvalInRect:badgeRect] fill];
+  [displayString drawAtPoint:
+		   NSMakePoint(NSMidX(badgeRect) - textSize.width / 2.0,
+			       NSMidY(badgeRect) - textSize.height / 2.0)
+		     withAttributes:attrs];
+}
+
 - (void) drawDockTileForItem: (DockItem *)item inCell: (NSRect)cell size: (CGFloat)size
 {
   NSImage *icon = [item icon];
@@ -1040,6 +1094,7 @@ DockViewCalibratedBackgroundColor (NSColor *color)
     {
       [self drawFallbackIconForItem:item inCell:cell];
     }
+  [self drawBadgeForItem:item inCell:cell iconSize:size];
 }
 
 - (void) drawStateForItem: (DockItem *)item inCell: (NSRect)cell

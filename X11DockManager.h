@@ -45,6 +45,9 @@ typedef enum
 - (void) x11DockManagerDidUpdateApplicationIcon: (NSImage *)icon
                               processIdentifier: (int)processIdentifier
                                           title: (NSString *)title;
+- (void) x11DockManagerDidUpdateApplicationIcon: (NSImage *)icon
+                                     badgeLabel: (NSString *)badgeLabel
+                              processIdentifier: (int)processIdentifier;
 @end
 
 @interface X11DockManager : NSObject
@@ -71,6 +74,7 @@ typedef enum
 - (void) moveDockedWindow: (unsigned long)xWindow toIndex: (NSUInteger)index;
 - (void) hideWindow: (unsigned long)xWindow;
 - (void) activateWindow: (unsigned long)xWindow;
+- (BOOL) windowExists: (unsigned long)xWindow;
 - (BOOL) activateApplicationWithProcessIdentifiers: (NSArray *)processIdentifiers;
 - (void) closeWindow: (unsigned long)xWindow;
 

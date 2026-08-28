@@ -39,7 +39,9 @@ typedef enum
   NSString *_title;
   NSString *_path;
   NSString *_iconPath;
+  NSString *_badgeLabel;
   NSImage *_icon;
+  NSImage *_originalIcon;
   NSDockTile *_dockTile;
   unsigned long _xWindow;
   BOOL _pinned;
@@ -60,6 +62,9 @@ typedef enum
 - (NSString *) iconPath;
 - (NSImage *) icon;
 - (void) setIcon: (NSImage *)icon;
+- (void) restoreOriginalIcon;
+- (NSString *) badgeLabel;
+- (void) setBadgeLabel: (NSString *)label;
 - (NSDockTile *) dockTile;
 - (unsigned long) xWindow;
 - (void) setXWindow: (unsigned long)xWindow;

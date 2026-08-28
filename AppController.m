@@ -771,6 +771,29 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     }
 }
 
+- (void) x11DockManagerDidUpdateApplicationIcon: (NSImage *)icon
+                                     badgeLabel: (NSString *)badgeLabel
+                              processIdentifier: (int)processIdentifier
+{
+  DockItem *item = nil;
+
+  if (processIdentifier > 0)
+    {
+      item = [self applicationItemMatchingProcessIdentifier:
+				    [NSNumber numberWithInt:processIdentifier]];
+    }
+
+  if (item)
+    {
+      if (icon)
+	{
+	  [item setIcon:icon];
+	}
+      [item setBadgeLabel:badgeLabel];
+      [self refreshDock];
+    }
+}
+
 - (BOOL) applicationBundlePathIsDockWM: (NSString *)path
 {
   NSString *candidateBundlePath = [DockItem applicationBundlePathForPath:path];
@@ -1005,11 +1028,24 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
       running = [self applicationItemHasRunningProcess:item paths:processPaths];
       if (!running && [item xWindow])
 	{
-	  continue;
+	  if ([_x11 windowExists:[item xWindow]])
+	    {
+	      continue;
+	    }
 	}
 
       newState = running ? DockItemRunning : DockItemNotRunning;
-      if ([item state] != newState)
+      if (!running)
+	{
+	  if ([item state] != DockItemNotRunning ||
+	      [item xWindow] ||
+	      [[item badgeLabel] length])
+	    {
+	      [self restoreApplicationItemAfterExit:item];
+	      changed = YES;
+	    }
+	}
+      else if ([item state] != newState)
 	{
 	  [item setState:newState];
 	  changed = YES;
@@ -1830,6 +1866,26 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 				  forKey:[NSNumber numberWithUnsignedLong:xWindow]];
 }
 
+- (void) removeApplicationIconWindowsForItem: (DockItem *)item
+{
+  NSArray *keys = [_applicationIconWindowItems allKeysForObject:item];
+  NSUInteger i;
+
+  for (i = 0; i < [keys count]; i++)
+    {
+      [_applicationIconWindowItems removeObjectForKey:[keys objectAtIndex:i]];
+    }
+}
+
+- (void) restoreApplicationItemAfterExit: (DockItem *)item
+{
+  [item setState:DockItemNotRunning];
+  [item setXWindow:0];
+  [item restoreOriginalIcon];
+  [item setBadgeLabel:nil];
+  [self removeApplicationIconWindowsForItem:item];
+}
+
 - (NSUInteger) indexForItem: (DockItem *)targetItem
 {
   NSUInteger i;
@@ -2068,17 +2124,16 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 {
   NSUInteger index;
 
-  if ([item xWindow])
-    {
-      [_x11 closeWindow:[item xWindow]];
-    }
-
   if ([item kind] == DockItemApplication)
     {
       [self terminateApplicationItemProcesses:item];
+      [self restoreApplicationItemAfterExit:item];
     }
-
-  [item setState:DockItemNotRunning];
+  else if ([item xWindow])
+    {
+      [_x11 closeWindow:[item xWindow]];
+      [item setState:DockItemNotRunning];
+    }
   if (![item isPinned])
     {
       index = [self indexForItem:item];
