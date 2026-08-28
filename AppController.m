@@ -186,7 +186,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
 - (BOOL) applicationShouldTerminateAfterLastWindowClosed: (NSApplication *)sender
 {
-  return YES;
+  return NO;
 }
 
 - (void) applicationWillTerminate: (NSNotification *)notification
@@ -1665,13 +1665,19 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [_settingsPanel orderOut:sender];
 }
 
+- (BOOL) windowShouldClose: (id)sender
+{
+  if (sender == _settingsPanel)
+    {
+      [self closeSettingsPanel:sender];
+      return NO;
+    }
+
+  return YES;
+}
+
 - (void) windowWillClose: (NSNotification *)notification
 {
-  if ([notification object] == _settingsPanel)
-    {
-      [self settingsColorSliderChanged:self];
-      [[NSUserDefaults standardUserDefaults] synchronize];
-    }
 }
 
 - (void) settingsPlacementChanged: (id)sender
@@ -1693,6 +1699,11 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
 - (void) settingsColorSliderChanged: (id)sender
 {
+  if (!_settingsRedSlider || !_settingsGreenSlider || !_settingsBlueSlider)
+    {
+      return;
+    }
+
   ASSIGN(_backgroundColor,
          [NSColor colorWithCalibratedRed:[_settingsRedSlider doubleValue] / 255.0
                                    green:[_settingsGreenSlider doubleValue] / 255.0
