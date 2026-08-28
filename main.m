@@ -28,8 +28,8 @@ main(int argc, const char **argv)
   NSApplication *app;
 
   ENTER_POOL
-  [[NSUserDefaults standardUserDefaults] setBool: YES
-                                          forKey: @"GSSuppressAppIcon"];
+    [[NSUserDefaults standardUserDefaults] setBool: YES
+					    forKey: @"GSSuppressAppIcon"];
   app = [NSApplication sharedApplication];
   delegate = [AppController new];
 
@@ -38,5 +38,5 @@ main(int argc, const char **argv)
 
   DESTROY(delegate);
   LEAVE_POOL
-  return 0;
+    return 0;
 }

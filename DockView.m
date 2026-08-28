@@ -53,22 +53,22 @@ DockViewCalibratedBackgroundColor (NSColor *color)
 
   NS_DURING
     rgbColor = [color colorUsingColorSpaceName:NSCalibratedRGBColorSpace];
-    if (!rgbColor)
-      {
-        rgbColor = [color colorUsingColorSpaceName:NSDeviceRGBColorSpace];
-      }
-    if (rgbColor)
-      {
-        [rgbColor getRed:&red green:&green blue:&blue alpha:&alpha];
-      }
+  if (!rgbColor)
+    {
+      rgbColor = [color colorUsingColorSpaceName:NSDeviceRGBColorSpace];
+    }
+  if (rgbColor)
+    {
+      [rgbColor getRed:&red green:&green blue:&blue alpha:&alpha];
+    }
   NS_HANDLER
     rgbColor = nil;
   NS_ENDHANDLER
 
-  if (!rgbColor)
-    {
-      return [NSColor blackColor];
-    }
+    if (!rgbColor)
+      {
+	return [NSColor blackColor];
+      }
 
   return [NSColor colorWithCalibratedRed:red
                                    green:green
@@ -81,35 +81,36 @@ DockViewCalibratedBackgroundColor (NSColor *color)
 - (id) initWithFrame: (NSRect)frame
 {
   self = [super initWithFrame:frame];
-  if (self) {
-    _items = [NSMutableArray new];
-    _draggingPaths = NO;
-    _performedDragOperation = NO;
-    _lastMouseDownIndex = NSNotFound;
-    _lastMouseDownTime = 0.0;
-    _hoveredItemIndex = DockHoverNone;
-    _tooltipItemIndex = DockHoverNone;
-    _trackingRectTag = 0;
-    _mouseDownItemIndex = NSNotFound;
-    _draggedItemIndex = NSNotFound;
-    _dropIndex = NSNotFound;
-    _pinnedItemCount = 0;
-    _backgroundMode = DockBackgroundBlack;
-    _backgroundColor = RETAIN([NSColor blackColor]);
-    _gnustepIcon = RETAIN([self loadGNUstepIcon]);
-    _recyclerIcon = RETAIN([self loadRecyclerIcon]);
-    [self registerForDraggedTypes:
-      [NSArray arrayWithObjects:NSFilenamesPboardType,
-                                NSURLPboardType,
-                                NSStringPboardType,
-                                @"text/uri-list",
-                                @"text/plain",
-                                DockReorderPboardType,
-                                GWRemoteFilenamesPboardType,
-                                GWLSFolderPboardType,
-                                GWDockIconPboardType,
-                                nil]];
-  }
+  if (self)
+    {
+      _items = [NSMutableArray new];
+      _draggingPaths = NO;
+      _performedDragOperation = NO;
+      _lastMouseDownIndex = NSNotFound;
+      _lastMouseDownTime = 0.0;
+      _hoveredItemIndex = DockHoverNone;
+      _tooltipItemIndex = DockHoverNone;
+      _trackingRectTag = 0;
+      _mouseDownItemIndex = NSNotFound;
+      _draggedItemIndex = NSNotFound;
+      _dropIndex = NSNotFound;
+      _pinnedItemCount = 0;
+      _backgroundMode = DockBackgroundBlack;
+      _backgroundColor = RETAIN([NSColor blackColor]);
+      _gnustepIcon = RETAIN([self loadGNUstepIcon]);
+      _recyclerIcon = RETAIN([self loadRecyclerIcon]);
+      [self registerForDraggedTypes:
+	      [NSArray arrayWithObjects:NSFilenamesPboardType,
+		       NSURLPboardType,
+		       NSStringPboardType,
+		       @"text/uri-list",
+		       @"text/plain",
+		       DockReorderPboardType,
+		       GWRemoteFilenamesPboardType,
+		       GWLSFolderPboardType,
+		       GWDockIconPboardType,
+		       nil]];
+    }
   return self;
 }
 
@@ -122,9 +123,10 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   [_recyclerWiggleTimer invalidate];
   DESTROY(_recyclerWiggleTimer);
   DESTROY(_wiggleItem);
-  if (_trackingRectTag) {
-    [self removeTrackingRect:_trackingRectTag];
-  }
+  if (_trackingRectTag)
+    {
+      [self removeTrackingRect:_trackingRectTag];
+    }
   DESTROY(_backgroundImage);
   DESTROY(_backgroundColor);
   DESTROY(_gnustepIcon);
@@ -139,10 +141,11 @@ DockViewCalibratedBackgroundColor (NSColor *color)
                                                    ofType:@"png"];
   NSImage *image;
 
-  if (![path length]) {
-    path = [[@"Resources" stringByAppendingPathComponent:@"GNUstep_circle"]
-      stringByAppendingPathExtension:@"png"];
-  }
+  if (![path length])
+    {
+      path = [[@"Resources" stringByAppendingPathComponent:@"GNUstep_circle"]
+		  stringByAppendingPathExtension:@"png"];
+    }
 
   image = AUTORELEASE([[NSImage alloc] initWithContentsOfFile:path]);
   return image;
@@ -154,25 +157,28 @@ DockViewCalibratedBackgroundColor (NSColor *color)
                                                    ofType:@"xpm"];
   NSImage *image;
 
-  if (![path length]) {
-    path = [[@"Resources" stringByAppendingPathComponent:@"Recycler.GNUstep"]
-      stringByAppendingPathExtension:@"xpm"];
-  }
+  if (![path length])
+    {
+      path = [[@"Resources" stringByAppendingPathComponent:@"Recycler.GNUstep"]
+		  stringByAppendingPathExtension:@"xpm"];
+    }
 
   image = AUTORELEASE([[NSImage alloc] initWithContentsOfFile:path]);
-  if (image) {
-    return image;
-  }
+  if (image)
+    {
+      return image;
+    }
 
   return nil;
 }
 
 - (void) updateTrackingRect
 {
-  if (_trackingRectTag) {
-    [self removeTrackingRect:_trackingRectTag];
-    _trackingRectTag = 0;
-  }
+  if (_trackingRectTag)
+    {
+      [self removeTrackingRect:_trackingRectTag];
+      _trackingRectTag = 0;
+    }
 
   _trackingRectTag = [self addTrackingRect:[self bounds]
                                      owner:self
@@ -205,23 +211,26 @@ DockViewCalibratedBackgroundColor (NSColor *color)
 - (void) setItems: (NSArray *)items
 {
   [_items setArray:items];
-  if (_pinnedItemCount > [_items count]) {
-    _pinnedItemCount = [_items count];
-  }
+  if (_pinnedItemCount > [_items count])
+    {
+      _pinnedItemCount = [_items count];
+    }
   [self hideTooltip];
   [self setNeedsDisplay:YES];
 }
 
 - (void) setPinnedItemCount: (NSUInteger)count
 {
-  if (count > [_items count]) {
-    count = [_items count];
-  }
+  if (count > [_items count])
+    {
+      count = [_items count];
+    }
 
-  if (_pinnedItemCount != count) {
-    _pinnedItemCount = count;
-    [self setNeedsDisplay:YES];
-  }
+  if (_pinnedItemCount != count)
+    {
+      _pinnedItemCount = count;
+      [self setNeedsDisplay:YES];
+    }
 }
 
 - (void) stopWiggle
@@ -237,19 +246,21 @@ DockViewCalibratedBackgroundColor (NSColor *color)
 {
   NSTimeInterval now = [NSDate timeIntervalSinceReferenceDate];
 
-  if (!_wiggleItem || now - _wiggleStartTime >= DockWiggleDuration) {
-    [self stopWiggle];
-    return;
-  }
+  if (!_wiggleItem || now - _wiggleStartTime >= DockWiggleDuration)
+    {
+      [self stopWiggle];
+      return;
+    }
 
   [self setNeedsDisplay:YES];
 }
 
 - (void) startWiggleForItem: (DockItem *)item
 {
-  if (!item) {
-    return;
-  }
+  if (!item)
+    {
+      return;
+    }
 
   [_wiggleTimer invalidate];
   DESTROY(_wiggleTimer);
@@ -259,7 +270,7 @@ DockViewCalibratedBackgroundColor (NSColor *color)
                                                   target:self
                                                 selector:@selector(stepWiggle:)
                                                 userInfo:nil
-                                                repeats:YES];
+						 repeats:YES];
   _wiggleTimer = RETAIN(_wiggleTimer);
   [self setNeedsDisplay:YES];
 }
@@ -277,10 +288,11 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   NSTimeInterval now = [NSDate timeIntervalSinceReferenceDate];
 
   if (!_recyclerWiggleStartTime ||
-      now - _recyclerWiggleStartTime >= DockWiggleDuration) {
-    [self stopRecyclerWiggle];
-    return;
-  }
+      now - _recyclerWiggleStartTime >= DockWiggleDuration)
+    {
+      [self stopRecyclerWiggle];
+      return;
+    }
 
   [self setNeedsDisplay:YES];
 }
@@ -301,44 +313,49 @@ DockViewCalibratedBackgroundColor (NSColor *color)
 
 - (void) setBackgroundImage: (NSImage *)image
 {
-  if (_backgroundImage != image) {
-    ASSIGN(_backgroundImage, image);
-    [self setNeedsDisplay:YES];
-  }
+  if (_backgroundImage != image)
+    {
+      ASSIGN(_backgroundImage, image);
+      [self setNeedsDisplay:YES];
+    }
 }
 
 - (void) setBackgroundColor: (NSColor *)color
 {
   color = DockViewCalibratedBackgroundColor(color);
 
-  if (_backgroundColor != color) {
-    ASSIGN(_backgroundColor, color);
-    [self setNeedsDisplay:YES];
-  }
+  if (_backgroundColor != color)
+    {
+      ASSIGN(_backgroundColor, color);
+      [self setNeedsDisplay:YES];
+    }
 }
 
 - (void) setBackgroundMode: (DockBackgroundMode)mode
 {
-  if (_backgroundMode != mode) {
-    _backgroundMode = mode;
-    [self setNeedsDisplay:YES];
-  }
+  if (_backgroundMode != mode)
+    {
+      _backgroundMode = mode;
+      [self setNeedsDisplay:YES];
+    }
 }
 
 - (void) setRecyclerHasContents: (BOOL)hasContents
 {
-  if (_recyclerHasContents != hasContents) {
-    _recyclerHasContents = hasContents;
-    [self setNeedsDisplay:YES];
-  }
+  if (_recyclerHasContents != hasContents)
+    {
+      _recyclerHasContents = hasContents;
+      [self setNeedsDisplay:YES];
+    }
 }
 
 - (void) setHorizontal: (BOOL)horizontal
 {
-  if (_horizontal != horizontal) {
-    _horizontal = horizontal;
-    [self setNeedsDisplay:YES];
-  }
+  if (_horizontal != horizontal)
+    {
+      _horizontal = horizontal;
+      [self setNeedsDisplay:YES];
+    }
 }
 
 - (BOOL) isHorizontal
@@ -354,30 +371,36 @@ DockViewCalibratedBackgroundColor (NSColor *color)
 - (NSRect) topTileRect
 {
   NSRect bounds = [self bounds];
-  if (_horizontal) {
-    return NSMakeRect(DockPad,
-                      DockPad,
-                      DockCell,
-                      DockCell);
-  } else {
-    return NSMakeRect(DockPad,
-                      NSMaxY(bounds) - DockPad - DockCell,
-                      DockCell,
-                      DockCell);
-  }
+  if (_horizontal)
+    {
+      return NSMakeRect(DockPad,
+			DockPad,
+			DockCell,
+			DockCell);
+    }
+  else
+    {
+      return NSMakeRect(DockPad,
+			NSMaxY(bounds) - DockPad - DockCell,
+			DockCell,
+			DockCell);
+    }
 }
 
 - (NSPoint) cellOriginAtIndex: (NSUInteger)index
 {
   NSRect topTile = [self topTileRect];
-  if (_horizontal) {
-    return NSMakePoint(NSMaxX(topTile) + DockGap + index * (DockCell + DockGap),
-                       NSMinY(topTile));
-  } else {
-    return NSMakePoint(DockPad,
-                       NSMinY(topTile) - DockGap - DockCell
-                         - index * (DockCell + DockGap));
-  }
+  if (_horizontal)
+    {
+      return NSMakePoint(NSMaxX(topTile) + DockGap + index * (DockCell + DockGap),
+			 NSMinY(topTile));
+    }
+  else
+    {
+      return NSMakePoint(DockPad,
+			 NSMinY(topTile) - DockGap - DockCell
+			 - index * (DockCell + DockGap));
+    }
 }
 
 - (NSRect) recyclerTileRect
@@ -389,14 +412,16 @@ DockViewCalibratedBackgroundColor (NSColor *color)
 - (NSUInteger) indexAtPoint: (NSPoint)p
 {
   NSUInteger i;
-  for (i = 0; i < [_items count]; i++) {
-    NSRect r = NSMakeRect([self cellOriginAtIndex:i].x,
-                         [self cellOriginAtIndex:i].y,
-                         DockCell, DockCell);
-    if (NSPointInRect(p, r)) {
-      return i;
+  for (i = 0; i < [_items count]; i++)
+    {
+      NSRect r = NSMakeRect([self cellOriginAtIndex:i].x,
+			    [self cellOriginAtIndex:i].y,
+			    DockCell, DockCell);
+      if (NSPointInRect(p, r))
+	{
+	  return i;
+	}
     }
-  }
   return NSNotFound;
 }
 
@@ -409,24 +434,31 @@ DockViewCalibratedBackgroundColor (NSColor *color)
 {
   NSUInteger i;
 
-  if (![_items count]) {
-    return 0;
-  }
-
-  for (i = 0; i < [_items count]; i++) {
-    NSPoint origin = [self cellOriginAtIndex:i];
-    NSRect cell = NSMakeRect(origin.x, origin.y, DockCell, DockCell);
-
-    if (_horizontal) {
-      if (p.x < NSMidX(cell)) {
-        return i;
-      }
-    } else {
-      if (p.y > NSMidY(cell)) {
-        return i;
-      }
+  if (![_items count])
+    {
+      return 0;
     }
-  }
+
+  for (i = 0; i < [_items count]; i++)
+    {
+      NSPoint origin = [self cellOriginAtIndex:i];
+      NSRect cell = NSMakeRect(origin.x, origin.y, DockCell, DockCell);
+
+      if (_horizontal)
+	{
+	  if (p.x < NSMidX(cell))
+	    {
+	      return i;
+	    }
+	}
+      else
+	{
+	  if (p.y > NSMidY(cell))
+	    {
+	      return i;
+	    }
+	}
+    }
 
   return [_items count];
 }
@@ -443,9 +475,10 @@ DockViewCalibratedBackgroundColor (NSColor *color)
 {
   NSUInteger index = [self insertionIndexAtPoint:p];
 
-  if (fromIndex < _pinnedItemCount) {
-    return MIN(index, _pinnedItemCount);
-  }
+  if (fromIndex < _pinnedItemCount)
+    {
+      return MIN(index, _pinnedItemCount);
+    }
 
   return index;
 }
@@ -459,13 +492,15 @@ DockViewCalibratedBackgroundColor (NSColor *color)
 {
   NSUInteger index;
 
-  if ([self topIconContainsPoint:p]) {
-    return DockHoverTopIcon;
-  }
+  if ([self topIconContainsPoint:p])
+    {
+      return DockHoverTopIcon;
+    }
 
-  if ([self recyclerContainsPoint:p]) {
-    return DockHoverRecycler;
-  }
+  if ([self recyclerContainsPoint:p])
+    {
+      return DockHoverRecycler;
+    }
 
   index = [self indexAtPoint:p];
   return index == NSNotFound ? DockHoverNone : (NSInteger)index;
@@ -473,36 +508,42 @@ DockViewCalibratedBackgroundColor (NSColor *color)
 
 - (NSRect) cellRectForHoverIndex: (NSInteger)index
 {
-  if (index == DockHoverTopIcon) {
-    return [self topTileRect];
-  }
+  if (index == DockHoverTopIcon)
+    {
+      return [self topTileRect];
+    }
 
-  if (index == DockHoverRecycler) {
-    return [self recyclerTileRect];
-  }
+  if (index == DockHoverRecycler)
+    {
+      return [self recyclerTileRect];
+    }
 
-  if (index >= 0 && index < (NSInteger)[_items count]) {
-    NSPoint origin = [self cellOriginAtIndex: (NSUInteger)index];
-    return NSMakeRect(origin.x, origin.y, DockCell, DockCell);
-  }
+  if (index >= 0 && index < (NSInteger)[_items count])
+    {
+      NSPoint origin = [self cellOriginAtIndex: (NSUInteger)index];
+      return NSMakeRect(origin.x, origin.y, DockCell, DockCell);
+    }
 
   return NSZeroRect;
 }
 
 - (NSString *) tooltipTitleForHoverIndex: (NSInteger)index
 {
-  if (index == DockHoverTopIcon) {
-    return @"DockWM";
-  }
+  if (index == DockHoverTopIcon)
+    {
+      return @"DockWM";
+    }
 
-  if (index == DockHoverRecycler) {
-    return @"Recycler";
-  }
+  if (index == DockHoverRecycler)
+    {
+      return @"Recycler";
+    }
 
-  if (index >= 0 && index < (NSInteger)[_items count]) {
-    DockItem *item = [_items objectAtIndex: (NSUInteger)index];
-    return [[item title] length] ? [item title] : [[item path] lastPathComponent];
-  }
+  if (index >= 0 && index < (NSInteger)[_items count])
+    {
+      DockItem *item = [_items objectAtIndex: (NSUInteger)index];
+      return [[item title] length] ? [item title] : [[item path] lastPathComponent];
+    }
 
   return nil;
 }
@@ -511,10 +552,11 @@ DockViewCalibratedBackgroundColor (NSColor *color)
 {
   [_tooltipTimer invalidate];
   DESTROY(_tooltipTimer);
-  if (_tooltipItemIndex != DockHoverNone) {
-    _tooltipItemIndex = DockHoverNone;
-    [self setNeedsDisplay:YES];
-  }
+  if (_tooltipItemIndex != DockHoverNone)
+    {
+      _tooltipItemIndex = DockHoverNone;
+      [self setNeedsDisplay:YES];
+    }
 }
 
 - (NSMenuItem *) menuItemWithTitle: (NSString *)title
@@ -524,8 +566,8 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   NSMenuItem *menuItem;
 
   menuItem = AUTORELEASE([[NSMenuItem alloc] initWithTitle:title
-                                                     action:action
-                                              keyEquivalent:@""]);
+						    action:action
+					     keyEquivalent:@""]);
   [menuItem setTarget:self];
   [menuItem setRepresentedObject:item];
   return menuItem;
@@ -539,9 +581,10 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   BOOL openAtLogin = NO;
 
   if ([_delegate respondsToSelector:
-        @selector(dockView:itemIsOpenAtLogin:)]) {
-    openAtLogin = [_delegate dockView:self itemIsOpenAtLogin:item];
-  }
+		 @selector(dockView:itemIsOpenAtLogin:)])
+    {
+      openAtLogin = [_delegate dockView:self itemIsOpenAtLogin:item];
+    }
 
   menuItem = [self menuItemWithTitle:@"Open At Login"
                               action:@selector(toggleOpenAtLogin:)
@@ -582,9 +625,10 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   DockItem *item = [sender representedObject];
 
   if ([_delegate respondsToSelector:
-        @selector(dockView:didToggleOpenAtLoginForItem:)]) {
-    [_delegate dockView:self didToggleOpenAtLoginForItem:item];
-  }
+		 @selector(dockView:didToggleOpenAtLoginForItem:)])
+    {
+      [_delegate dockView:self didToggleOpenAtLoginForItem:item];
+    }
 }
 
 - (void) showItemInFileViewer: (id)sender
@@ -592,25 +636,28 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   DockItem *item = [sender representedObject];
 
   if ([_delegate respondsToSelector:
-        @selector(dockView:didShowItemInFileViewer:)]) {
-    [_delegate dockView:self didShowItemInFileViewer:item];
-  }
+		 @selector(dockView:didShowItemInFileViewer:)])
+    {
+      [_delegate dockView:self didShowItemInFileViewer:item];
+    }
 }
 
 - (void) quitItem: (id)sender
 {
   DockItem *item = [sender representedObject];
 
-  if ([_delegate respondsToSelector:@selector(dockView:didQuitItem:)]) {
-    [_delegate dockView:self didQuitItem:item];
-  }
+  if ([_delegate respondsToSelector:@selector(dockView:didQuitItem:)])
+    {
+      [_delegate dockView:self didQuitItem:item];
+    }
 }
 
 - (void) emptyRecycler: (id)sender
 {
-  if ([_delegate respondsToSelector:@selector(dockViewDidEmptyRecycler:)]) {
-    [_delegate dockViewDidEmptyRecycler:self];
-  }
+  if ([_delegate respondsToSelector:@selector(dockViewDidEmptyRecycler:)])
+    {
+      [_delegate dockViewDidEmptyRecycler:self];
+    }
 }
 
 - (void) scheduleTooltipForHoverIndex: (NSInteger)index
@@ -619,16 +666,17 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   DESTROY(_tooltipTimer);
   _tooltipItemIndex = DockHoverNone;
 
-  if (index == DockHoverNone) {
-    [self setNeedsDisplay:YES];
-    return;
-  }
+  if (index == DockHoverNone)
+    {
+      [self setNeedsDisplay:YES];
+      return;
+    }
 
   _tooltipTimer = [NSTimer scheduledTimerWithTimeInterval:0.5
                                                    target:self
                                                  selector:@selector(showTooltip:)
                                                  userInfo:nil
-                                                 repeats:NO];
+						  repeats:NO];
   _tooltipTimer = RETAIN(_tooltipTimer);
   [self setNeedsDisplay:YES];
 }
@@ -645,44 +693,53 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   NSPoint textPoint;
   NSRect bounds = [self bounds];
 
-  if (![title length]) {
-    return;
-  }
+  if (![title length])
+    {
+      return;
+    }
 
   cell = [self cellRectForHoverIndex:_tooltipItemIndex];
-  if (NSIsEmptyRect(cell)) {
-    return;
-  }
+  if (NSIsEmptyRect(cell))
+    {
+      return;
+    }
 
   attrs = [NSDictionary dictionaryWithObjectsAndKeys:
-    [NSFont systemFontOfSize:11.0], NSFontAttributeName,
-    [NSColor whiteColor], NSForegroundColorAttributeName,
-    nil];
+			    [NSFont systemFontOfSize:11.0], NSFontAttributeName,
+			[NSColor whiteColor], NSForegroundColorAttributeName,
+			nil];
   textSize = [title sizeWithAttributes:attrs];
 
   tooltipRect = NSMakeRect(0.0, 0.0,
                            textSize.width + padX * 2.0,
                            textSize.height + padY * 2.0);
-  if (_horizontal) {
-    tooltipRect.origin.x = NSMidX(cell) - NSWidth(tooltipRect) / 2.0;
-    tooltipRect.origin.y = NSMaxY(cell) - NSHeight(tooltipRect) - 2.0;
-  } else {
-    tooltipRect.origin.x = NSMaxX(cell) - NSWidth(tooltipRect) - 2.0;
-    tooltipRect.origin.y = NSMidY(cell) - NSHeight(tooltipRect) / 2.0;
-  }
+  if (_horizontal)
+    {
+      tooltipRect.origin.x = NSMidX(cell) - NSWidth(tooltipRect) / 2.0;
+      tooltipRect.origin.y = NSMaxY(cell) - NSHeight(tooltipRect) - 2.0;
+    }
+  else
+    {
+      tooltipRect.origin.x = NSMaxX(cell) - NSWidth(tooltipRect) - 2.0;
+      tooltipRect.origin.y = NSMidY(cell) - NSHeight(tooltipRect) / 2.0;
+    }
 
-  if (NSMinX(tooltipRect) < NSMinX(bounds) + 2.0) {
-    tooltipRect.origin.x = NSMinX(bounds) + 2.0;
-  }
-  if (NSMaxX(tooltipRect) > NSMaxX(bounds) - 2.0) {
-    tooltipRect.origin.x = NSMaxX(bounds) - NSWidth(tooltipRect) - 2.0;
-  }
-  if (NSMinY(tooltipRect) < NSMinY(bounds) + 2.0) {
-    tooltipRect.origin.y = NSMinY(bounds) + 2.0;
-  }
-  if (NSMaxY(tooltipRect) > NSMaxY(bounds) - 2.0) {
-    tooltipRect.origin.y = NSMaxY(bounds) - NSHeight(tooltipRect) - 2.0;
-  }
+  if (NSMinX(tooltipRect) < NSMinX(bounds) + 2.0)
+    {
+      tooltipRect.origin.x = NSMinX(bounds) + 2.0;
+    }
+  if (NSMaxX(tooltipRect) > NSMaxX(bounds) - 2.0)
+    {
+      tooltipRect.origin.x = NSMaxX(bounds) - NSWidth(tooltipRect) - 2.0;
+    }
+  if (NSMinY(tooltipRect) < NSMinY(bounds) + 2.0)
+    {
+      tooltipRect.origin.y = NSMinY(bounds) + 2.0;
+    }
+  if (NSMaxY(tooltipRect) > NSMaxY(bounds) - 2.0)
+    {
+      tooltipRect.origin.y = NSMaxY(bounds) - NSHeight(tooltipRect) - 2.0;
+    }
 
   [[NSColor colorWithCalibratedWhite:0.0 alpha:0.82] set];
   [[NSBezierPath bezierPathWithRoundedRect:tooltipRect
@@ -698,10 +755,11 @@ DockViewCalibratedBackgroundColor (NSColor *color)
 {
   DESTROY(_tooltipTimer);
 
-  if (_hoveredItemIndex != DockHoverNone) {
-    _tooltipItemIndex = _hoveredItemIndex;
-    [self setNeedsDisplay:YES];
-  }
+  if (_hoveredItemIndex != DockHoverNone)
+    {
+      _tooltipItemIndex = _hoveredItemIndex;
+      [self setNeedsDisplay:YES];
+    }
 }
 
 - (NSArray *) pathsFromPasteboard: (NSPasteboard *)pb
@@ -713,62 +771,75 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   NSURL *url;
   NSUInteger i;
 
-  if ([types containsObject:NSFilenamesPboardType]) {
-    paths = [pb propertyListForType:NSFilenamesPboardType];
-    if ([paths count]) {
-      return paths;
+  if ([types containsObject:NSFilenamesPboardType])
+    {
+      paths = [pb propertyListForType:NSFilenamesPboardType];
+      if ([paths count])
+	{
+	  return paths;
+	}
     }
-  }
 
-  if ([types containsObject:NSURLPboardType]) {
-    url = [NSURL URLFromPasteboard:pb];
-    if ([url isFileURL] && [[url path] length]) {
-      return [NSArray arrayWithObject:[url path]];
+  if ([types containsObject:NSURLPboardType])
+    {
+      url = [NSURL URLFromPasteboard:pb];
+      if ([url isFileURL] && [[url path] length])
+	{
+	  return [NSArray arrayWithObject:[url path]];
+	}
     }
-  }
 
-  if ([types containsObject:GWRemoteFilenamesPboardType]) {
-    NSData *data = [pb dataForType:GWRemoteFilenamesPboardType];
-    id dict = data ? [NSUnarchiver unarchiveObjectWithData:data] : nil;
-    if ([dict isKindOfClass:[NSDictionary class]]) {
-      [self addPathsFromPasteboardObject:[dict objectForKey:@"paths"]
-                                 toArray:collectedPaths];
+  if ([types containsObject:GWRemoteFilenamesPboardType])
+    {
+      NSData *data = [pb dataForType:GWRemoteFilenamesPboardType];
+      id dict = data ? [NSUnarchiver unarchiveObjectWithData:data] : nil;
+      if ([dict isKindOfClass:[NSDictionary class]])
+	{
+	  [self addPathsFromPasteboardObject:[dict objectForKey:@"paths"]
+				     toArray:collectedPaths];
+	}
     }
-  }
 
-  if ([types containsObject:GWLSFolderPboardType]) {
-    NSData *data = [pb dataForType:GWLSFolderPboardType];
-    id dict = data ? [NSUnarchiver unarchiveObjectWithData:data] : nil;
-    if ([dict isKindOfClass:[NSDictionary class]]) {
-      [self addPathsFromPasteboardObject:[dict objectForKey:@"paths"]
-                                 toArray:collectedPaths];
+  if ([types containsObject:GWLSFolderPboardType])
+    {
+      NSData *data = [pb dataForType:GWLSFolderPboardType];
+      id dict = data ? [NSUnarchiver unarchiveObjectWithData:data] : nil;
+      if ([dict isKindOfClass:[NSDictionary class]])
+	{
+	  [self addPathsFromPasteboardObject:[dict objectForKey:@"paths"]
+				     toArray:collectedPaths];
+	}
     }
-  }
 
-  if ([types containsObject:GWDockIconPboardType]) {
-    NSData *data = [pb dataForType:GWDockIconPboardType];
-    id dict = data ? [NSUnarchiver unarchiveObjectWithData:data] : nil;
-    if ([dict isKindOfClass:[NSDictionary class]]) {
-      [self addPathsFromPasteboardObject:[dict objectForKey:@"path"]
-                                 toArray:collectedPaths];
+  if ([types containsObject:GWDockIconPboardType])
+    {
+      NSData *data = [pb dataForType:GWDockIconPboardType];
+      id dict = data ? [NSUnarchiver unarchiveObjectWithData:data] : nil;
+      if ([dict isKindOfClass:[NSDictionary class]])
+	{
+	  [self addPathsFromPasteboardObject:[dict objectForKey:@"path"]
+				     toArray:collectedPaths];
+	}
     }
-  }
 
-  for (i = 0; i < [types count]; i++) {
-    NSString *type = [types objectAtIndex:i];
-    id plist = [pb propertyListForType:type];
+  for (i = 0; i < [types count]; i++)
+    {
+      NSString *type = [types objectAtIndex:i];
+      id plist = [pb propertyListForType:type];
 
-    [self addPathsFromPasteboardObject:plist toArray:collectedPaths];
+      [self addPathsFromPasteboardObject:plist toArray:collectedPaths];
 
-    string = [pb stringForType:type];
-    if ([string length]) {
-      [self addPathsFromPasteboardString:string toArray:collectedPaths];
+      string = [pb stringForType:type];
+      if ([string length])
+	{
+	  [self addPathsFromPasteboardString:string toArray:collectedPaths];
+	}
     }
-  }
 
-  if ([collectedPaths count]) {
-    return collectedPaths;
-  }
+  if ([collectedPaths count])
+    {
+      return collectedPaths;
+    }
 
   return nil;
 }
@@ -776,34 +847,41 @@ DockViewCalibratedBackgroundColor (NSColor *color)
 - (BOOL) pasteboardHasSupportedType: (NSPasteboard *)pb
 {
   NSArray *supportedTypes = [NSArray arrayWithObjects:NSFilenamesPboardType,
-                                                       NSURLPboardType,
-                                                       NSStringPboardType,
-                                                       @"text/uri-list",
-                                                       @"text/plain",
-                                                       GWRemoteFilenamesPboardType,
-                                                       GWLSFolderPboardType,
-                                                       GWDockIconPboardType,
-                                                       nil];
+				     NSURLPboardType,
+				     NSStringPboardType,
+				     @"text/uri-list",
+				     @"text/plain",
+				     GWRemoteFilenamesPboardType,
+				     GWLSFolderPboardType,
+				     GWDockIconPboardType,
+				     nil];
   return [pb availableTypeFromArray:supportedTypes] != nil;
 }
 
 - (void) addPathsFromPasteboardObject: (id)object toArray: (NSMutableArray *)paths
 {
-  if ([object isKindOfClass:[NSString class]]) {
-    [self addPathsFromPasteboardString:object toArray:paths];
-  } else if ([object isKindOfClass:[NSArray class]]) {
-    NSUInteger i;
-    for (i = 0; i < [object count]; i++) {
-      [self addPathsFromPasteboardObject:[object objectAtIndex:i] toArray:paths];
+  if ([object isKindOfClass:[NSString class]])
+    {
+      [self addPathsFromPasteboardString:object toArray:paths];
     }
-  } else if ([object isKindOfClass:[NSDictionary class]]) {
-    NSEnumerator *enumerator = [object objectEnumerator];
-    id value;
+  else if ([object isKindOfClass:[NSArray class]])
+    {
+      NSUInteger i;
+      for (i = 0; i < [object count]; i++)
+	{
+	  [self addPathsFromPasteboardObject:[object objectAtIndex:i] toArray:paths];
+	}
+    }
+  else if ([object isKindOfClass:[NSDictionary class]])
+    {
+      NSEnumerator *enumerator = [object objectEnumerator];
+      id value;
 
-    while ((value = [enumerator nextObject])) {
-      [self addPathsFromPasteboardObject:value toArray:paths];
+      while ((value = [enumerator nextObject]))
+	{
+	  [self addPathsFromPasteboardObject:value toArray:paths];
+	}
     }
-  }
 }
 
 - (void) addPathsFromPasteboardString: (NSString *)string toArray: (NSMutableArray *)paths
@@ -811,39 +889,48 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   NSArray *lines;
   NSUInteger i;
 
-  if (![string length]) {
-    return;
-  }
+  if (![string length])
+    {
+      return;
+    }
 
   lines = [string componentsSeparatedByCharactersInSet:
-    [NSCharacterSet newlineCharacterSet]];
+		    [NSCharacterSet newlineCharacterSet]];
 
-  for (i = 0; i < [lines count]; i++) {
-    NSString *line = [[lines objectAtIndex:i]
-      stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-    NSString *path = nil;
+  for (i = 0; i < [lines count]; i++)
+    {
+      NSString *line = [[lines objectAtIndex:i]
+			    stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+      NSString *path = nil;
 
-    if (![line length] || [line hasPrefix:@"#"]) {
-      continue;
+      if (![line length] || [line hasPrefix:@"#"])
+	{
+	  continue;
+	}
+
+      if ([line hasPrefix:@"\""] && [line hasSuffix:@"\""] && [line length] > 1)
+	{
+	  line = [line substringWithRange:NSMakeRange(1, [line length] - 2)];
+	}
+
+      if ([line hasPrefix:@"file:"])
+	{
+	  NSURL *fileURL = [NSURL URLWithString:line];
+	  if ([fileURL isFileURL])
+	    {
+	      path = [fileURL path];
+	    }
+	}
+      else if ([line isAbsolutePath])
+	{
+	  path = line;
+	}
+
+      if ([path length] && ![paths containsObject:path])
+	{
+	  [paths addObject:path];
+	}
     }
-
-    if ([line hasPrefix:@"\""] && [line hasSuffix:@"\""] && [line length] > 1) {
-      line = [line substringWithRange:NSMakeRange(1, [line length] - 2)];
-    }
-
-    if ([line hasPrefix:@"file:"]) {
-      NSURL *fileURL = [NSURL URLWithString:line];
-      if ([fileURL isFileURL]) {
-        path = [fileURL path];
-      }
-    } else if ([line isAbsolutePath]) {
-      path = line;
-    }
-
-    if ([path length] && ![paths containsObject:path]) {
-      [paths addObject:path];
-    }
-  }
 }
 
 - (NSDragOperation) dragOperationForSender: (id <NSDraggingInfo>)sender
@@ -857,31 +944,35 @@ DockViewCalibratedBackgroundColor (NSColor *color)
 }
 
 - (BOOL) drawImage: (NSImage *)image
-           inCell: (NSRect)cell
-             size: (CGFloat)size
-            angle: (CGFloat)angle
+	    inCell: (NSRect)cell
+	      size: (CGFloat)size
+	     angle: (CGFloat)angle
 {
   NSSize imageSize;
   NSRect sourceRect;
   NSRect destRect;
 
-  if (!image || (![[image representations] count] && ![image isValid])) {
-    return NO;
-  }
+  if (!image || (![[image representations] count] && ![image isValid]))
+    {
+      return NO;
+    }
 
   imageSize = [image size];
-  if (imageSize.width <= 0.0 || imageSize.height <= 0.0) {
-    NSImageRep *rep = [[image representations] count]
-      ? [[image representations] objectAtIndex:0] : nil;
-    if (rep) {
-      imageSize = NSMakeSize([rep pixelsWide], [rep pixelsHigh]);
-      [image setSize:imageSize];
+  if (imageSize.width <= 0.0 || imageSize.height <= 0.0)
+    {
+      NSImageRep *rep = [[image representations] count]
+	? [[image representations] objectAtIndex:0] : nil;
+      if (rep)
+	{
+	  imageSize = NSMakeSize([rep pixelsWide], [rep pixelsHigh]);
+	  [image setSize:imageSize];
+	}
     }
-  }
 
-  if (imageSize.width <= 0.0 || imageSize.height <= 0.0) {
-    return NO;
-  }
+  if (imageSize.width <= 0.0 || imageSize.height <= 0.0)
+    {
+      return NO;
+    }
 
   sourceRect = NSMakeRect(0, 0, imageSize.width, imageSize.height);
   destRect = NSMakeRect(NSMidX(cell) - size / 2.0,
@@ -889,23 +980,25 @@ DockViewCalibratedBackgroundColor (NSColor *color)
                         size,
                         size);
 
-  if (angle != 0.0) {
-    NSAffineTransform *transform = [NSAffineTransform transform];
+  if (angle != 0.0)
+    {
+      NSAffineTransform *transform = [NSAffineTransform transform];
 
-    [NSGraphicsContext saveGraphicsState];
-    [transform translateXBy:NSMidX(destRect) yBy:NSMidY(destRect)];
-    [transform rotateByDegrees:angle];
-    [transform translateXBy:-NSMidX(destRect) yBy:-NSMidY(destRect)];
-    [transform concat];
-  }
+      [NSGraphicsContext saveGraphicsState];
+      [transform translateXBy:NSMidX(destRect) yBy:NSMidY(destRect)];
+      [transform rotateByDegrees:angle];
+      [transform translateXBy:-NSMidX(destRect) yBy:-NSMidY(destRect)];
+      [transform concat];
+    }
 
   [image drawInRect:destRect
            fromRect:sourceRect
           operation:NSCompositeSourceOver
            fraction:1.0];
-  if (angle != 0.0) {
-    [NSGraphicsContext restoreGraphicsState];
-  }
+  if (angle != 0.0)
+    {
+      [NSGraphicsContext restoreGraphicsState];
+    }
   return YES;
 }
 
@@ -917,9 +1010,9 @@ DockViewCalibratedBackgroundColor (NSColor *color)
 - (void) drawFallbackIconForItem: (DockItem *)item inCell: (NSRect)cell
 {
   NSDictionary *attrs = [NSDictionary dictionaryWithObjectsAndKeys:
-    [NSFont boldSystemFontOfSize:18], NSFontAttributeName,
-    [NSColor colorWithCalibratedWhite:0.95 alpha:1.0], NSForegroundColorAttributeName,
-    nil];
+				      [NSFont boldSystemFontOfSize:18], NSFontAttributeName,
+				 [NSColor colorWithCalibratedWhite:0.95 alpha:1.0], NSForegroundColorAttributeName,
+				      nil];
   NSString *title = [[item title] length] ? [item title] : @"?";
   NSString *label = [[title substringToIndex:MIN((NSUInteger)2, [title length])] uppercaseString];
   NSSize size = [label sizeWithAttributes:attrs];
@@ -934,17 +1027,19 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   NSImage *icon = [item icon];
   CGFloat angle = 0.0;
 
-  if (item == _wiggleItem) {
-    NSTimeInterval elapsed = [NSDate timeIntervalSinceReferenceDate] - _wiggleStartTime;
-    CGFloat progress = (CGFloat)(elapsed / DockWiggleDuration);
-    CGFloat decay = MAX(0.0, 1.0 - progress);
+  if (item == _wiggleItem)
+    {
+      NSTimeInterval elapsed = [NSDate timeIntervalSinceReferenceDate] - _wiggleStartTime;
+      CGFloat progress = (CGFloat)(elapsed / DockWiggleDuration);
+      CGFloat decay = MAX(0.0, 1.0 - progress);
 
-    angle = sin(progress * 8.0 * M_PI) * 8.0 * decay;
-  }
+      angle = sin(progress * 8.0 * M_PI) * 8.0 * decay;
+    }
 
-  if (![self drawImage:icon inCell:cell size:size angle:angle]) {
-    [self drawFallbackIconForItem:item inCell:cell];
-  }
+  if (![self drawImage:icon inCell:cell size:size angle:angle])
+    {
+      [self drawFallbackIconForItem:item inCell:cell];
+    }
 }
 
 - (void) drawStateForItem: (DockItem *)item inCell: (NSRect)cell
@@ -954,19 +1049,20 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   CGFloat y = NSMinY(cell) + 2.0;
 
   if ([item kind] != DockItemApplication ||
-      [item state] == DockItemNotRunning) {
-    return;
-  }
+      [item state] == DockItemNotRunning)
+    {
+      return;
+    }
 
   x = NSMidX(cell) - dotSize / 2.0;
 
   [[NSColor colorWithCalibratedWhite:0.0 alpha:0.65] set];
   [[NSBezierPath bezierPathWithOvalInRect:
-    NSMakeRect(x - 1.0, y - 1.0, dotSize + 2.0, dotSize + 2.0)] fill];
+		   NSMakeRect(x - 1.0, y - 1.0, dotSize + 2.0, dotSize + 2.0)] fill];
 
   [[NSColor colorWithCalibratedWhite:0.92 alpha:0.95] set];
   [[NSBezierPath bezierPathWithOvalInRect:
-    NSMakeRect(x, y, dotSize, dotSize)] fill];
+		   NSMakeRect(x, y, dotSize, dotSize)] fill];
 }
 
 - (void) drawTopTile
@@ -984,33 +1080,34 @@ DockViewCalibratedBackgroundColor (NSColor *color)
 
   [[NSColor colorWithCalibratedWhite:0.88 alpha:0.95] set];
 
-  for (i = 0; i < 3; i++) {
-    CGFloat angle = (CGFloat)i * 120.0;
-    CGFloat start = angle + 18.0;
-    CGFloat end = angle + 92.0;
-    CGFloat arrowAngle = end * M_PI / 180.0;
-    NSBezierPath *arc = [NSBezierPath bezierPath];
-    NSPoint arrowPoint = NSMakePoint(center.x + cos(arrowAngle) * radius,
-                                     center.y + sin(arrowAngle) * radius);
-    NSBezierPath *head = [NSBezierPath bezierPath];
+  for (i = 0; i < 3; i++)
+    {
+      CGFloat angle = (CGFloat)i * 120.0;
+      CGFloat start = angle + 18.0;
+      CGFloat end = angle + 92.0;
+      CGFloat arrowAngle = end * M_PI / 180.0;
+      NSBezierPath *arc = [NSBezierPath bezierPath];
+      NSPoint arrowPoint = NSMakePoint(center.x + cos(arrowAngle) * radius,
+				       center.y + sin(arrowAngle) * radius);
+      NSBezierPath *head = [NSBezierPath bezierPath];
 
-    [arc appendBezierPathWithArcWithCenter:center
-                                    radius:radius
-                                startAngle:start
-                                  endAngle:end];
-    [arc setLineWidth:3.0];
-    [arc stroke];
+      [arc appendBezierPathWithArcWithCenter:center
+				      radius:radius
+				  startAngle:start
+				    endAngle:end];
+      [arc setLineWidth:3.0];
+      [arc stroke];
 
-    [head moveToPoint:arrowPoint];
-    [head relativeLineToPoint:NSMakePoint(-8.0 * sin(arrowAngle) -
-                                          4.0 * cos(arrowAngle),
-                                          8.0 * cos(arrowAngle) -
-                                          4.0 * sin(arrowAngle))];
-    [head relativeLineToPoint:NSMakePoint(8.0 * cos(arrowAngle),
-                                          8.0 * sin(arrowAngle))];
-    [head closePath];
-    [head fill];
-  }
+      [head moveToPoint:arrowPoint];
+      [head relativeLineToPoint:NSMakePoint(-8.0 * sin(arrowAngle) -
+					    4.0 * cos(arrowAngle),
+					    8.0 * cos(arrowAngle) -
+					    4.0 * sin(arrowAngle))];
+      [head relativeLineToPoint:NSMakePoint(8.0 * cos(arrowAngle),
+					    8.0 * sin(arrowAngle))];
+      [head closePath];
+      [head fill];
+    }
 }
 
 - (void) drawRecyclerContentsIndicatorInCell: (NSRect)cell
@@ -1019,20 +1116,21 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   CGFloat x = NSMidX(cell) - dotSize / 2.0;
   CGFloat y = NSMidY(cell) - dotSize / 2.0;
 
-  if (!_recyclerHasContents) {
-    return;
-  }
+  if (!_recyclerHasContents)
+    {
+      return;
+    }
 
   [[NSColor colorWithCalibratedWhite:0.0 alpha:0.70] set];
   [[NSBezierPath bezierPathWithOvalInRect:
-    NSMakeRect(x - 1.0, y - 1.0, dotSize + 2.0, dotSize + 2.0)] fill];
+		   NSMakeRect(x - 1.0, y - 1.0, dotSize + 2.0, dotSize + 2.0)] fill];
 
   [[NSColor colorWithCalibratedRed:0.10
                              green:0.80
                               blue:0.35
                              alpha:0.96] set];
   [[NSBezierPath bezierPathWithOvalInRect:
-    NSMakeRect(x, y, dotSize, dotSize)] fill];
+		   NSMakeRect(x, y, dotSize, dotSize)] fill];
 }
 
 - (void) drawRecyclerTile
@@ -1040,30 +1138,35 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   NSRect cell = [self recyclerTileRect];
   CGFloat angle = 0.0;
 
-  if (_recyclerWiggleStartTime) {
-    NSTimeInterval elapsed = [NSDate timeIntervalSinceReferenceDate] -
-      _recyclerWiggleStartTime;
-    CGFloat progress = (CGFloat)(elapsed / DockWiggleDuration);
-    CGFloat decay = MAX(0.0, 1.0 - progress);
+  if (_recyclerWiggleStartTime)
+    {
+      NSTimeInterval elapsed = [NSDate timeIntervalSinceReferenceDate] -
+	_recyclerWiggleStartTime;
+      CGFloat progress = (CGFloat)(elapsed / DockWiggleDuration);
+      CGFloat decay = MAX(0.0, 1.0 - progress);
 
-    angle = sin(progress * 8.0 * M_PI) * 8.0 * decay;
-  }
-
-  if (![self drawImage:_recyclerIcon inCell:cell size:46.0 angle:angle]) {
-    if (angle != 0.0) {
-      NSAffineTransform *transform = [NSAffineTransform transform];
-
-      [NSGraphicsContext saveGraphicsState];
-      [transform translateXBy:NSMidX(cell) yBy:NSMidY(cell)];
-      [transform rotateByDegrees:angle];
-      [transform translateXBy:-NSMidX(cell) yBy:-NSMidY(cell)];
-      [transform concat];
-      [self drawRecyclerFallbackInCell:cell];
-      [NSGraphicsContext restoreGraphicsState];
-    } else {
-      [self drawRecyclerFallbackInCell:cell];
+      angle = sin(progress * 8.0 * M_PI) * 8.0 * decay;
     }
-  }
+
+  if (![self drawImage:_recyclerIcon inCell:cell size:46.0 angle:angle])
+    {
+      if (angle != 0.0)
+	{
+	  NSAffineTransform *transform = [NSAffineTransform transform];
+
+	  [NSGraphicsContext saveGraphicsState];
+	  [transform translateXBy:NSMidX(cell) yBy:NSMidY(cell)];
+	  [transform rotateByDegrees:angle];
+	  [transform translateXBy:-NSMidX(cell) yBy:-NSMidY(cell)];
+	  [transform concat];
+	  [self drawRecyclerFallbackInCell:cell];
+	  [NSGraphicsContext restoreGraphicsState];
+	}
+      else
+	{
+	  [self drawRecyclerFallbackInCell:cell];
+	}
+    }
   [self drawRecyclerContentsIndicatorInCell:cell];
 }
 
@@ -1074,29 +1177,36 @@ DockViewCalibratedBackgroundColor (NSColor *color)
 
   if ((!_draggingPaths && _draggedItemIndex == NSNotFound) ||
       _dropIndex == NSNotFound ||
-      _dropIndex > [_items count]) {
-    return;
-  }
+      _dropIndex > [_items count])
+    {
+      return;
+    }
 
-  if (_dropIndex < [_items count]) {
-    NSPoint origin = [self cellOriginAtIndex:_dropIndex];
-    cell = NSMakeRect(origin.x, origin.y, DockCell, DockCell);
-  } else {
-    cell = [self recyclerTileRect];
-  }
+  if (_dropIndex < [_items count])
+    {
+      NSPoint origin = [self cellOriginAtIndex:_dropIndex];
+      cell = NSMakeRect(origin.x, origin.y, DockCell, DockCell);
+    }
+  else
+    {
+      cell = [self recyclerTileRect];
+    }
 
   [[NSColor colorWithCalibratedWhite:0.95 alpha:0.95] set];
-  if (_horizontal) {
-    NSRectFill(NSMakeRect(NSMinX(cell) - DockGap / 2.0 - thickness / 2.0,
-                          NSMinY(cell) + 8.0,
-                          thickness,
-                          NSHeight(cell) - 16.0));
-  } else {
-    NSRectFill(NSMakeRect(NSMinX(cell) + 8.0,
-                          NSMaxY(cell) + DockGap / 2.0 - thickness / 2.0,
-                          NSWidth(cell) - 16.0,
-                          thickness));
-  }
+  if (_horizontal)
+    {
+      NSRectFill(NSMakeRect(NSMinX(cell) - DockGap / 2.0 - thickness / 2.0,
+			    NSMinY(cell) + 8.0,
+			    thickness,
+			    NSHeight(cell) - 16.0));
+    }
+  else
+    {
+      NSRectFill(NSMakeRect(NSMinX(cell) + 8.0,
+			    NSMaxY(cell) + DockGap / 2.0 - thickness / 2.0,
+			    NSWidth(cell) - 16.0,
+			    thickness));
+    }
 }
 
 - (void) drawSeparatorBeforeIndex: (NSUInteger)index
@@ -1108,46 +1218,57 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   CGFloat y;
   NSBezierPath *path;
 
-  if (index > [_items count]) {
-    return;
-  }
+  if (index > [_items count])
+    {
+      return;
+    }
 
-  if (index > 0) {
-    origin = [self cellOriginAtIndex:index - 1];
-    previousCell = NSMakeRect(origin.x, origin.y, DockCell, DockCell);
-  } else {
-    previousCell = [self topTileRect];
-  }
+  if (index > 0)
+    {
+      origin = [self cellOriginAtIndex:index - 1];
+      previousCell = NSMakeRect(origin.x, origin.y, DockCell, DockCell);
+    }
+  else
+    {
+      previousCell = [self topTileRect];
+    }
 
-  if (index < [_items count]) {
-    origin = [self cellOriginAtIndex:index];
-    nextCell = NSMakeRect(origin.x, origin.y, DockCell, DockCell);
-  } else {
-    nextCell = [self recyclerTileRect];
-  }
+  if (index < [_items count])
+    {
+      origin = [self cellOriginAtIndex:index];
+      nextCell = NSMakeRect(origin.x, origin.y, DockCell, DockCell);
+    }
+  else
+    {
+      nextCell = [self recyclerTileRect];
+    }
 
   path = [NSBezierPath bezierPath];
   [path setLineWidth:1.0];
   [[NSColor colorWithCalibratedWhite:1.0 alpha:0.55] set];
 
-  if (_horizontal) {
-    x = floor((NSMaxX(previousCell) + NSMinX(nextCell)) / 2.0) + 0.5;
-    [path moveToPoint:NSMakePoint(x, NSMinY(nextCell) + DockSeparatorInset)];
-    [path lineToPoint:NSMakePoint(x, NSMaxY(nextCell) - DockSeparatorInset)];
-  } else {
-    y = floor((NSMinY(previousCell) + NSMaxY(nextCell)) / 2.0) + 0.5;
-    [path moveToPoint:NSMakePoint(NSMinX(nextCell) + DockSeparatorInset, y)];
-    [path lineToPoint:NSMakePoint(NSMaxX(nextCell) - DockSeparatorInset, y)];
-  }
+  if (_horizontal)
+    {
+      x = floor((NSMaxX(previousCell) + NSMinX(nextCell)) / 2.0) + 0.5;
+      [path moveToPoint:NSMakePoint(x, NSMinY(nextCell) + DockSeparatorInset)];
+      [path lineToPoint:NSMakePoint(x, NSMaxY(nextCell) - DockSeparatorInset)];
+    }
+  else
+    {
+      y = floor((NSMinY(previousCell) + NSMaxY(nextCell)) / 2.0) + 0.5;
+      [path moveToPoint:NSMakePoint(NSMinX(nextCell) + DockSeparatorInset, y)];
+      [path lineToPoint:NSMakePoint(NSMaxX(nextCell) - DockSeparatorInset, y)];
+    }
 
   [path stroke];
 }
 
 - (void) drawDockSeparators
 {
-  if (_pinnedItemCount >= [_items count]) {
-    return;
-  }
+  if (_pinnedItemCount >= [_items count])
+    {
+      return;
+    }
 
   [self drawSeparatorBeforeIndex:_pinnedItemCount];
   [self drawSeparatorBeforeIndex:[_items count]];
@@ -1158,29 +1279,33 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   NSUInteger i;
 
   if (_backgroundMode == DockBackgroundSimulatedTransparency &&
-      _backgroundImage) {
-    [_backgroundImage drawInRect:[self bounds]
-                         fromRect:NSMakeRect(0, 0,
-                                             [_backgroundImage size].width,
-                                             [_backgroundImage size].height)
-                        operation:NSCompositeSourceOver
-                         fraction:1.0];
-  } else if (_backgroundMode == DockBackgroundBlack) {
-    [_backgroundColor set];
-    NSRectFill([self bounds]);
-  }
+      _backgroundImage)
+    {
+      [_backgroundImage drawInRect:[self bounds]
+			  fromRect:NSMakeRect(0, 0,
+					      [_backgroundImage size].width,
+					      [_backgroundImage size].height)
+			 operation:NSCompositeSourceOver
+			  fraction:1.0];
+    }
+  else if (_backgroundMode == DockBackgroundBlack)
+    {
+      [_backgroundColor set];
+      NSRectFill([self bounds]);
+    }
 
   [self drawTopTile];
   [self drawDockSeparators];
 
-  for (i = 0; i < [_items count]; i++) {
-    DockItem *item = [_items objectAtIndex:i];
-    NSPoint origin = [self cellOriginAtIndex:i];
-    NSRect cell = NSMakeRect(origin.x, origin.y, DockCell, DockCell);
+  for (i = 0; i < [_items count]; i++)
+    {
+      DockItem *item = [_items objectAtIndex:i];
+      NSPoint origin = [self cellOriginAtIndex:i];
+      NSRect cell = NSMakeRect(origin.x, origin.y, DockCell, DockCell);
 
-    [self drawDockTileForItem:item inCell:cell size:46.0];
-    [self drawStateForItem:item inCell:cell];
-  }
+      [self drawDockTileForItem:item inCell:cell size:46.0];
+      [self drawStateForItem:item inCell:cell];
+    }
 
   [self drawDropIndicator];
   [self drawRecyclerTile];
@@ -1192,10 +1317,11 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   NSPoint location = [self convertPoint:[event locationInWindow] fromView:nil];
   NSInteger hoverIndex = [self hoverIndexAtPoint:location];
 
-  if (hoverIndex != _hoveredItemIndex) {
-    _hoveredItemIndex = hoverIndex;
-    [self scheduleTooltipForHoverIndex:hoverIndex];
-  }
+  if (hoverIndex != _hoveredItemIndex)
+    {
+      _hoveredItemIndex = hoverIndex;
+      [self scheduleTooltipForHoverIndex:hoverIndex];
+    }
 }
 
 - (void) mouseExited: (NSEvent *)event
@@ -1212,28 +1338,35 @@ DockViewCalibratedBackgroundColor (NSColor *color)
 
   [self hideTooltip];
 
-  if ([self topIconContainsPoint:location]) {
-    contextMenu = [self menu];
-  } else if ([self recyclerContainsPoint:location]) {
-    contextMenu = [self menuForRecycler];
-  } else if (index != NSNotFound && index < [_items count]) {
-    contextMenu = [self menuForDockItem:[_items objectAtIndex:index]];
-  }
+  if ([self topIconContainsPoint:location])
+    {
+      contextMenu = [self menu];
+    }
+  else if ([self recyclerContainsPoint:location])
+    {
+      contextMenu = [self menuForRecycler];
+    }
+  else if (index != NSNotFound && index < [_items count])
+    {
+      contextMenu = [self menuForDockItem:[_items objectAtIndex:index]];
+    }
 
-  if (contextMenu) {
-    [NSMenu popUpContextMenu:contextMenu withEvent:event forView:self];
-  }
+  if (contextMenu)
+    {
+      [NSMenu popUpContextMenu:contextMenu withEvent:event forView:self];
+    }
 }
 
 - (NSImage *) dragImageForItemAtIndex: (NSUInteger)index
 {
   NSImage *image = AUTORELEASE([[NSImage alloc]
-    initWithSize:NSMakeSize(DockCell, DockCell)]);
+				 initWithSize:NSMakeSize(DockCell, DockCell)]);
   NSRect cell = NSMakeRect(0.0, 0.0, DockCell, DockCell);
 
-  if (index >= [_items count]) {
-    return nil;
-  }
+  if (index >= [_items count])
+    {
+      return nil;
+    }
 
   [image lockFocus];
   [self drawDockTileForItem:[_items objectAtIndex:index] inCell:cell size:46.0];
@@ -1250,9 +1383,10 @@ DockViewCalibratedBackgroundColor (NSColor *color)
 
   if (_mouseDownItemIndex == NSNotFound ||
       _mouseDownItemIndex >= [_items count] ||
-      (dx * dx + dy * dy) < 16.0) {
-    return;
-  }
+      (dx * dx + dy * dy) < 16.0)
+    {
+      return;
+    }
 
   _draggedItemIndex = _mouseDownItemIndex;
   _dropIndex = _mouseDownItemIndex;
@@ -1267,7 +1401,7 @@ DockViewCalibratedBackgroundColor (NSColor *color)
     [pasteboard declareTypes:[NSArray arrayWithObject:DockReorderPboardType]
                        owner:nil];
     [pasteboard setString:[NSString stringWithFormat:@"%lu",
-                                                    (unsigned long)_mouseDownItemIndex]
+				    (unsigned long)_mouseDownItemIndex]
                   forType:DockReorderPboardType];
     [self dragImage:dragImage
                  at:dragPoint
@@ -1289,9 +1423,10 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   NSPoint windowPoint;
   NSPoint viewPoint;
 
-  if (![self window]) {
-    return NO;
-  }
+  if (![self window])
+    {
+      return NO;
+    }
 
   windowPoint = [[self window] convertScreenToBase:screenPoint];
   viewPoint = [self convertPoint:windowPoint fromView:nil];
@@ -1306,9 +1441,10 @@ DockViewCalibratedBackgroundColor (NSColor *color)
       draggedIndex != NSNotFound &&
       draggedIndex < [_items count] &&
       [_delegate respondsToSelector:
-        @selector(dockViewDidRemoveItemAtIndex:)]) {
-    [_delegate dockViewDidRemoveItemAtIndex:draggedIndex];
-  }
+		   @selector(dockViewDidRemoveItemAtIndex:)])
+    {
+      [_delegate dockViewDidRemoveItemAtIndex:draggedIndex];
+    }
 
   _mouseDownItemIndex = NSNotFound;
   _draggedItemIndex = NSNotFound;
@@ -1317,19 +1453,19 @@ DockViewCalibratedBackgroundColor (NSColor *color)
 }
 
 - (void) draggedImage: (NSImage *)image
-             endedAt: (NSPoint)screenPoint
-           operation: (NSDragOperation)operation
+	      endedAt: (NSPoint)screenPoint
+	    operation: (NSDragOperation)operation
 {
   [self finishDraggingItemWithRemove:
-    ![self screenPointIsInsideDock:screenPoint]];
+	  ![self screenPointIsInsideDock:screenPoint]];
 }
 
 - (void) draggedImage: (NSImage *)image
-             endedAt: (NSPoint)screenPoint
-           deposited: (BOOL)flag
+	      endedAt: (NSPoint)screenPoint
+	    deposited: (BOOL)flag
 {
   [self finishDraggingItemWithRemove:
-    ![self screenPointIsInsideDock:screenPoint]];
+	  ![self screenPointIsInsideDock:screenPoint]];
 }
 
 - (NSDragOperation) draggingEntered: (id <NSDraggingInfo>)sender
@@ -1339,25 +1475,28 @@ DockViewCalibratedBackgroundColor (NSColor *color)
 
   [self hideTooltip];
 
-  if ([self pasteboardHasReorderType:pasteboard]) {
-    if ([self recyclerContainsPoint:location]) {
-      _dropIndex = NSNotFound;
+  if ([self pasteboardHasReorderType:pasteboard])
+    {
+      if ([self recyclerContainsPoint:location])
+	{
+	  _dropIndex = NSNotFound;
+	  [self setNeedsDisplay:YES];
+	  return NSDragOperationDelete;
+	}
+      _dropIndex = [self reorderInsertionIndexAtPoint:location
+					    fromIndex:_draggedItemIndex];
       [self setNeedsDisplay:YES];
-      return NSDragOperationDelete;
+      return NSDragOperationMove;
     }
-    _dropIndex = [self reorderInsertionIndexAtPoint:location
-                                          fromIndex:_draggedItemIndex];
-    [self setNeedsDisplay:YES];
-    return NSDragOperationMove;
-  }
 
-  if ([self pasteboardHasSupportedType:pasteboard]) {
-    _draggingPaths = YES;
-    _dropIndex = [self recyclerContainsPoint:location]
-      ? NSNotFound : [self pinnedInsertionIndexAtPoint:location];
-    [self setNeedsDisplay:YES];
-    return [self dragOperationForSender:sender];
-  }
+  if ([self pasteboardHasSupportedType:pasteboard])
+    {
+      _draggingPaths = YES;
+      _dropIndex = [self recyclerContainsPoint:location]
+	? NSNotFound : [self pinnedInsertionIndexAtPoint:location];
+      [self setNeedsDisplay:YES];
+      return [self dragOperationForSender:sender];
+    }
   return NSDragOperationNone;
 }
 
@@ -1365,28 +1504,32 @@ DockViewCalibratedBackgroundColor (NSColor *color)
 {
   NSPoint location = [self convertPoint:[sender draggingLocation] fromView:nil];
 
-  if ([self pasteboardHasReorderType:[sender draggingPasteboard]]) {
-    if ([self recyclerContainsPoint:location]) {
-      _dropIndex = NSNotFound;
+  if ([self pasteboardHasReorderType:[sender draggingPasteboard]])
+    {
+      if ([self recyclerContainsPoint:location])
+	{
+	  _dropIndex = NSNotFound;
+	  [self setNeedsDisplay:YES];
+	  return NSDragOperationDelete;
+	}
+      _dropIndex = [self reorderInsertionIndexAtPoint:location
+					    fromIndex:_draggedItemIndex];
       [self setNeedsDisplay:YES];
-      return NSDragOperationDelete;
+      return NSDragOperationMove;
     }
-    _dropIndex = [self reorderInsertionIndexAtPoint:location
-                                          fromIndex:_draggedItemIndex];
-    [self setNeedsDisplay:YES];
-    return NSDragOperationMove;
-  }
 
-  if ([self pasteboardHasSupportedType:[sender draggingPasteboard]]) {
-    if ([self recyclerContainsPoint:location]) {
-      _dropIndex = NSNotFound;
+  if ([self pasteboardHasSupportedType:[sender draggingPasteboard]])
+    {
+      if ([self recyclerContainsPoint:location])
+	{
+	  _dropIndex = NSNotFound;
+	  [self setNeedsDisplay:YES];
+	  return [self dragOperationForSender:sender];
+	}
+      _dropIndex = [self pinnedInsertionIndexAtPoint:location];
       [self setNeedsDisplay:YES];
       return [self dragOperationForSender:sender];
     }
-    _dropIndex = [self pinnedInsertionIndexAtPoint:location];
-    [self setNeedsDisplay:YES];
-    return [self dragOperationForSender:sender];
-  }
 
   return [self draggingEntered:sender];
 }
@@ -1401,9 +1544,10 @@ DockViewCalibratedBackgroundColor (NSColor *color)
 
 - (BOOL) prepareForDragOperation: (id <NSDraggingInfo>)sender
 {
-  if ([self pasteboardHasReorderType:[sender draggingPasteboard]]) {
-    return YES;
-  }
+  if ([self pasteboardHasReorderType:[sender draggingPasteboard]])
+    {
+      return YES;
+    }
 
   return [self pasteboardHasSupportedType:[sender draggingPasteboard]];
 }
@@ -1416,93 +1560,110 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   _draggingPaths = NO;
   [self setNeedsDisplay:YES];
 
-  if ([self pasteboardHasReorderType:pasteboard]) {
-    NSString *indexString = [pasteboard stringForType:DockReorderPboardType];
-    NSUInteger fromIndex = (NSUInteger)[indexString integerValue];
+  if ([self pasteboardHasReorderType:pasteboard])
+    {
+      NSString *indexString = [pasteboard stringForType:DockReorderPboardType];
+      NSUInteger fromIndex = (NSUInteger)[indexString integerValue];
 
-    if ([self recyclerContainsPoint:location]) {
-      _dropIndex = NSNotFound;
-      _draggedItemIndex = NSNotFound;
-      _performedDragOperation = YES;
-      if (fromIndex < [_items count] &&
-          [_delegate respondsToSelector:
-            @selector(dockViewDidRemoveItemAtIndex:)]) {
-        [_delegate dockViewDidRemoveItemAtIndex:fromIndex];
-        return YES;
+      if ([self recyclerContainsPoint:location])
+	{
+	  _dropIndex = NSNotFound;
+	  _draggedItemIndex = NSNotFound;
+	  _performedDragOperation = YES;
+	  if (fromIndex < [_items count] &&
+	      [_delegate respondsToSelector:
+			   @selector(dockViewDidRemoveItemAtIndex:)])
+	    {
+	      [_delegate dockViewDidRemoveItemAtIndex:fromIndex];
+	      return YES;
+	    }
+	  return NO;
+	}
+
+      {
+	NSUInteger toIndex = [self reorderInsertionIndexAtPoint:location
+						      fromIndex:fromIndex];
+
+	_dropIndex = NSNotFound;
+	_draggedItemIndex = NSNotFound;
+	_performedDragOperation = YES;
+	if (fromIndex < [_items count] &&
+	    toIndex <= [_items count] &&
+	    [_delegate respondsToSelector:
+			 @selector(dockViewDidMoveItemFromIndex:toIndex:)])
+	  {
+	    [_delegate dockViewDidMoveItemFromIndex:fromIndex toIndex:toIndex];
+	    return YES;
+	  }
       }
       return NO;
     }
 
+  if ([self recyclerContainsPoint:location])
     {
-      NSUInteger toIndex = [self reorderInsertionIndexAtPoint:location
-                                                    fromIndex:fromIndex];
-
-      _dropIndex = NSNotFound;
-      _draggedItemIndex = NSNotFound;
-      _performedDragOperation = YES;
-      if (fromIndex < [_items count] &&
-          toIndex <= [_items count] &&
-          [_delegate respondsToSelector:
-            @selector(dockViewDidMoveItemFromIndex:toIndex:)]) {
-        [_delegate dockViewDidMoveItemFromIndex:fromIndex toIndex:toIndex];
-        return YES;
-      }
+      if ([paths count] &&
+	  [_delegate respondsToSelector:
+		       @selector(dockViewDidReceivePathsInRecycler:)])
+	{
+	  [_delegate dockViewDidReceivePathsInRecycler:paths];
+	  _performedDragOperation = YES;
+	  _dropIndex = NSNotFound;
+	  return YES;
+	}
+      return NO;
     }
-    return NO;
-  }
 
-  if ([self recyclerContainsPoint:location]) {
-    if ([paths count] &&
-        [_delegate respondsToSelector:
-          @selector(dockViewDidReceivePathsInRecycler:)]) {
-      [_delegate dockViewDidReceivePathsInRecycler:paths];
+  if ([paths count] && [_delegate respondsToSelector:@selector(dockViewDidReceivePaths:)])
+    {
+      NSUInteger toIndex = [self pinnedInsertionIndexAtPoint:location];
+
+      if ([_delegate respondsToSelector:
+		       @selector(dockViewDidReceivePaths:atIndex:)])
+	{
+	  [_delegate dockViewDidReceivePaths:paths atIndex:toIndex];
+	}
+      else
+	{
+	  [_delegate dockViewDidReceivePaths:paths];
+	}
       _performedDragOperation = YES;
       _dropIndex = NSNotFound;
       return YES;
     }
-    return NO;
-  }
-
-  if ([paths count] && [_delegate respondsToSelector:@selector(dockViewDidReceivePaths:)]) {
-    NSUInteger toIndex = [self pinnedInsertionIndexAtPoint:location];
-
-    if ([_delegate respondsToSelector:
-          @selector(dockViewDidReceivePaths:atIndex:)]) {
-      [_delegate dockViewDidReceivePaths:paths atIndex:toIndex];
-    } else {
-      [_delegate dockViewDidReceivePaths:paths];
-    }
-    _performedDragOperation = YES;
-    _dropIndex = NSNotFound;
-    return YES;
-  }
   return NO;
 }
 
 - (void) concludeDragOperation: (id <NSDraggingInfo>)sender
 {
-  if (!_performedDragOperation) {
-    NSArray *paths = [self pathsFromPasteboard:[sender draggingPasteboard]];
-    NSPoint location = [self convertPoint:[sender draggingLocation] fromView:nil];
-    if (![self pasteboardHasReorderType:[sender draggingPasteboard]] &&
-        [paths count]) {
-      NSUInteger toIndex = [self pinnedInsertionIndexAtPoint:location];
+  if (!_performedDragOperation)
+    {
+      NSArray *paths = [self pathsFromPasteboard:[sender draggingPasteboard]];
+      NSPoint location = [self convertPoint:[sender draggingLocation] fromView:nil];
+      if (![self pasteboardHasReorderType:[sender draggingPasteboard]] &&
+	  [paths count])
+	{
+	  NSUInteger toIndex = [self pinnedInsertionIndexAtPoint:location];
 
-      if ([self recyclerContainsPoint:location] &&
-          [_delegate respondsToSelector:
-            @selector(dockViewDidReceivePathsInRecycler:)]) {
-        [_delegate dockViewDidReceivePathsInRecycler:paths];
-      } else if (![self recyclerContainsPoint:location] &&
-                 [_delegate respondsToSelector:
-            @selector(dockViewDidReceivePaths:atIndex:)]) {
-        [_delegate dockViewDidReceivePaths:paths atIndex:toIndex];
-      } else if (![self recyclerContainsPoint:location] &&
-                 [_delegate respondsToSelector:
-                   @selector(dockViewDidReceivePaths:)]) {
-        [_delegate dockViewDidReceivePaths:paths];
-      }
+	  if ([self recyclerContainsPoint:location] &&
+	      [_delegate respondsToSelector:
+			   @selector(dockViewDidReceivePathsInRecycler:)])
+	    {
+	      [_delegate dockViewDidReceivePathsInRecycler:paths];
+	    }
+	  else if (![self recyclerContainsPoint:location] &&
+		   [_delegate respondsToSelector:
+				@selector(dockViewDidReceivePaths:atIndex:)])
+	    {
+	      [_delegate dockViewDidReceivePaths:paths atIndex:toIndex];
+	    }
+	  else if (![self recyclerContainsPoint:location] &&
+		   [_delegate respondsToSelector:
+				@selector(dockViewDidReceivePaths:)])
+	    {
+	      [_delegate dockViewDidReceivePaths:paths];
+	    }
+	}
     }
-  }
 
   _draggingPaths = NO;
   _performedDragOperation = NO;
@@ -1524,36 +1685,47 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   _mouseDownPoint = location;
   _mouseDownItemIndex = index;
 
-  if (eventTime <= 0.0) {
-    eventTime = [NSDate timeIntervalSinceReferenceDate];
-  }
-
-  if (topIconClicked) {
-    clickedIndex = DockTopIconClickIndex;
-  }
-
-  if (clickedIndex != NSNotFound) {
-    if ([event clickCount] >= 2) {
-      isDoubleClick = YES;
-    } else if (clickedIndex == _lastMouseDownIndex &&
-               _lastMouseDownTime > 0.0 &&
-               eventTime - _lastMouseDownTime <= doubleClickInterval) {
-      isDoubleClick = YES;
+  if (eventTime <= 0.0)
+    {
+      eventTime = [NSDate timeIntervalSinceReferenceDate];
     }
-  }
 
-  if (isDoubleClick) {
-    if (topIconClicked) {
-      if ([_delegate respondsToSelector:@selector(dockViewDidActivateTopIcon)]) {
-        [_delegate dockViewDidActivateTopIcon];
-      }
-    } else if ([_delegate respondsToSelector:@selector(dockViewDidActivateItem:)]) {
-      [_delegate dockViewDidActivateItem:[_items objectAtIndex:index]];
+  if (topIconClicked)
+    {
+      clickedIndex = DockTopIconClickIndex;
     }
-    _lastMouseDownIndex = NSNotFound;
-    _lastMouseDownTime = 0.0;
-    return;
-  }
+
+  if (clickedIndex != NSNotFound)
+    {
+      if ([event clickCount] >= 2)
+	{
+	  isDoubleClick = YES;
+	}
+      else if (clickedIndex == _lastMouseDownIndex &&
+	       _lastMouseDownTime > 0.0 &&
+	       eventTime - _lastMouseDownTime <= doubleClickInterval)
+	{
+	  isDoubleClick = YES;
+	}
+    }
+
+  if (isDoubleClick)
+    {
+      if (topIconClicked)
+	{
+	  if ([_delegate respondsToSelector:@selector(dockViewDidActivateTopIcon)])
+	    {
+	      [_delegate dockViewDidActivateTopIcon];
+	    }
+	}
+      else if ([_delegate respondsToSelector:@selector(dockViewDidActivateItem:)])
+	{
+	  [_delegate dockViewDidActivateItem:[_items objectAtIndex:index]];
+	}
+      _lastMouseDownIndex = NSNotFound;
+      _lastMouseDownTime = 0.0;
+      return;
+    }
 
   _lastMouseDownIndex = clickedIndex;
   _lastMouseDownTime = eventTime;

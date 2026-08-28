@@ -20,17 +20,17 @@
 #import <AppKit/AppKit.h>
 
 typedef enum
-{
-  DockItemApplication,
-  DockItemX11Window
-} DockItemKind;
+  {
+    DockItemApplication,
+    DockItemX11Window
+  } DockItemKind;
 
 typedef enum
-{
-  DockItemNotRunning,
-  DockItemRunning,
-  DockItemHidden
-} DockItemState;
+  {
+    DockItemNotRunning,
+    DockItemRunning,
+    DockItemHidden
+  } DockItemState;
 
 @interface DockItem : NSObject
 {

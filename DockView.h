@@ -22,15 +22,15 @@
 @class DockItem;
 
 typedef enum
-{
-  DockBackgroundBlack = 0,
-  DockBackgroundSimulatedTransparency
-} DockBackgroundMode;
+  {
+    DockBackgroundBlack = 0,
+    DockBackgroundSimulatedTransparency
+  } DockBackgroundMode;
 
 @protocol DockViewDelegate
 - (void) dockViewDidReceivePaths: (NSArray *)paths;
 - (void) dockViewDidReceivePaths: (NSArray *)paths
-                          atIndex: (NSUInteger)index;
+			 atIndex: (NSUInteger)index;
 - (void) dockViewDidReceivePathsInRecycler: (NSArray *)paths;
 - (void) dockViewDidActivateItem: (DockItem *)item;
 - (void) dockViewDidActivateTopIcon;

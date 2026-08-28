@@ -40,18 +40,20 @@
 
 - (void) setIcon: (NSImage *)icon
 {
-  if (_icon != icon) {
-    ASSIGN(_icon, icon);
-    [self setNeedsDisplay:YES];
-  }
+  if (_icon != icon)
+    {
+      ASSIGN(_icon, icon);
+      [self setNeedsDisplay:YES];
+    }
 }
 
 - (void) setTitle: (NSString *)title
 {
-  if (_title != title) {
-    ASSIGNCOPY(_title, title);
-    [self setNeedsDisplay:YES];
-  }
+  if (_title != title)
+    {
+      ASSIGNCOPY(_title, title);
+      [self setNeedsDisplay:YES];
+    }
 }
 
 - (BOOL) drawImage: (NSImage *)image inRect: (NSRect)rect
@@ -60,22 +62,26 @@
   NSImageRep *rep;
   NSRect sourceRect;
 
-  if (!image || (![[image representations] count] && ![image isValid])) {
-    return NO;
-  }
+  if (!image || (![[image representations] count] && ![image isValid]))
+    {
+      return NO;
+    }
 
   imageSize = [image size];
-  if (imageSize.width <= 0.0 || imageSize.height <= 0.0) {
-    rep = [[image representations] count] ? [[image representations] objectAtIndex:0] : nil;
-    if (rep) {
-      imageSize = NSMakeSize([rep pixelsWide], [rep pixelsHigh]);
-      [image setSize:imageSize];
+  if (imageSize.width <= 0.0 || imageSize.height <= 0.0)
+    {
+      rep = [[image representations] count] ? [[image representations] objectAtIndex:0] : nil;
+      if (rep)
+	{
+	  imageSize = NSMakeSize([rep pixelsWide], [rep pixelsHigh]);
+	  [image setSize:imageSize];
+	}
     }
-  }
 
-  if (imageSize.width <= 0.0 || imageSize.height <= 0.0) {
-    return NO;
-  }
+  if (imageSize.width <= 0.0 || imageSize.height <= 0.0)
+    {
+      return NO;
+    }
 
   sourceRect = NSMakeRect(0, 0, imageSize.width, imageSize.height);
   [image drawInRect:rect
@@ -90,9 +96,9 @@
   NSString *title = [_title length] ? _title : @"?";
   NSString *label = [[title substringToIndex:MIN((NSUInteger)2, [title length])] uppercaseString];
   NSDictionary *attrs = [NSDictionary dictionaryWithObjectsAndKeys:
-    [NSFont boldSystemFontOfSize:18], NSFontAttributeName,
-    [NSColor colorWithCalibratedWhite:0.95 alpha:1.0], NSForegroundColorAttributeName,
-    nil];
+				      [NSFont boldSystemFontOfSize:18], NSFontAttributeName,
+				 [NSColor colorWithCalibratedWhite:0.95 alpha:1.0], NSForegroundColorAttributeName,
+				      nil];
   NSSize size = [label sizeWithAttributes:attrs];
 
   [label drawAtPoint:NSMakePoint(NSMidX(rect) - size.width / 2.0,
@@ -109,9 +115,10 @@
                                size,
                                size);
 
-  if (![self drawImage:_icon inRect:iconRect]) {
-    [self drawFallbackInRect:bounds];
-  }
+  if (![self drawImage:_icon inRect:iconRect])
+    {
+      [self drawFallbackInRect:bounds];
+    }
 }
 
 @end
@@ -128,9 +135,10 @@
 {
   NSImage *image;
 
-  if (![path length]) {
-    return nil;
-  }
+  if (![path length])
+    {
+      return nil;
+    }
 
   image = AUTORELEASE([[NSImage alloc] initWithContentsOfFile:path]);
   return [self imageIsDrawable:image] ? image : nil;
@@ -143,28 +151,32 @@
   NSArray *extensions;
   NSUInteger i, j;
 
-  if (![name length]) {
-    return nil;
-  }
+  if (![name length])
+    {
+      return nil;
+    }
 
   basePaths = [NSArray arrayWithObjects:
-    [resources stringByAppendingPathComponent:name],
-    [path stringByAppendingPathComponent:name],
-    name,
-    nil];
+			 [resources stringByAppendingPathComponent:name],
+		       [path stringByAppendingPathComponent:name],
+		       name,
+		       nil];
   extensions = [NSArray arrayWithObjects:@"", @"tiff", @"tif", @"png", @"xpm", @"icns", nil];
 
-  for (i = 0; i < [basePaths count]; i++) {
-    NSString *base = [basePaths objectAtIndex:i];
-    for (j = 0; j < [extensions count]; j++) {
-      NSString *extension = [extensions objectAtIndex:j];
-      NSString *candidate = [extension length] ? [base stringByAppendingPathExtension:extension] : base;
-      NSImage *image = [self imageAtPath:candidate];
-      if (image) {
-        return image;
-      }
+  for (i = 0; i < [basePaths count]; i++)
+    {
+      NSString *base = [basePaths objectAtIndex:i];
+      for (j = 0; j < [extensions count]; j++)
+	{
+	  NSString *extension = [extensions objectAtIndex:j];
+	  NSString *candidate = [extension length] ? [base stringByAppendingPathExtension:extension] : base;
+	  NSImage *image = [self imageAtPath:candidate];
+	  if (image)
+	    {
+	      return image;
+	    }
+	}
     }
-  }
 
   return nil;
 }
@@ -174,14 +186,16 @@
   NSString *candidate = path;
   BOOL isDir = NO;
 
-  while ([candidate length] && ![candidate isEqualToString:@"/"]) {
-    if ([[[candidate pathExtension] lowercaseString] isEqualToString:@"app"] &&
-        [[NSFileManager defaultManager] fileExistsAtPath:candidate isDirectory:&isDir] &&
-        isDir) {
-      return candidate;
+  while ([candidate length] && ![candidate isEqualToString:@"/"])
+    {
+      if ([[[candidate pathExtension] lowercaseString] isEqualToString:@"app"] &&
+	  [[NSFileManager defaultManager] fileExistsAtPath:candidate isDirectory:&isDir] &&
+	  isDir)
+	{
+	  return candidate;
+	}
+      candidate = [candidate stringByDeletingLastPathComponent];
     }
-    candidate = [candidate stringByDeletingLastPathComponent];
-  }
 
   return nil;
 }
@@ -189,52 +203,59 @@
 + (NSImage *) iconForApplicationPath: (NSString *)path
 {
   NSArray *infoPaths = [NSArray arrayWithObjects:
-    [[path stringByAppendingPathComponent:@"Resources"] stringByAppendingPathComponent:@"Info-gnustep.plist"],
-    [path stringByAppendingPathComponent:@"Info-gnustep.plist"],
-    [path stringByAppendingPathComponent:@"Info.plist"],
-    nil];
+				  [[path stringByAppendingPathComponent:@"Resources"] stringByAppendingPathComponent:@"Info-gnustep.plist"],
+				[path stringByAppendingPathComponent:@"Info-gnustep.plist"],
+				[path stringByAppendingPathComponent:@"Info.plist"],
+				nil];
   NSArray *iconKeys = [NSArray arrayWithObjects:
-    @"NSIcon", @"ApplicationIcon", @"CFBundleIconFile", nil];
+				 @"NSIcon", @"ApplicationIcon", @"CFBundleIconFile", nil];
   NSUInteger i, j;
 
-  for (i = 0; i < [infoPaths count]; i++) {
-    NSDictionary *info = [NSDictionary dictionaryWithContentsOfFile:[infoPaths objectAtIndex:i]];
-    if (!info) {
-      continue;
+  for (i = 0; i < [infoPaths count]; i++)
+    {
+      NSDictionary *info = [NSDictionary dictionaryWithContentsOfFile:[infoPaths objectAtIndex:i]];
+      if (!info)
+	{
+	  continue;
+	}
+
+      for (j = 0; j < [iconKeys count]; j++)
+	{
+	  id iconName = [info objectForKey:[iconKeys objectAtIndex:j]];
+	  NSImage *image;
+
+	  if (![iconName isKindOfClass:[NSString class]])
+	    {
+	      continue;
+	    }
+
+	  image = [self imageNamed:iconName inApplicationPath:path];
+	  if (image)
+	    {
+	      return image;
+	    }
+	}
     }
-
-    for (j = 0; j < [iconKeys count]; j++) {
-      id iconName = [info objectForKey:[iconKeys objectAtIndex:j]];
-      NSImage *image;
-
-      if (![iconName isKindOfClass:[NSString class]]) {
-        continue;
-      }
-
-      image = [self imageNamed:iconName inApplicationPath:path];
-      if (image) {
-        return image;
-      }
-    }
-  }
 
   return [self imageNamed:[[path lastPathComponent] stringByDeletingPathExtension]
-        inApplicationPath:path];
+	       inApplicationPath:path];
 }
 
 + (NSString *) desktopFileValueForKey: (NSString *)key
-                               lines: (NSArray *)lines
+				lines: (NSArray *)lines
 {
   NSString *prefix = [key stringByAppendingString:@"="];
   NSUInteger i;
 
-  for (i = 0; i < [lines count]; i++) {
-    NSString *line = [lines objectAtIndex:i];
+  for (i = 0; i < [lines count]; i++)
+    {
+      NSString *line = [lines objectAtIndex:i];
 
-    if ([line hasPrefix:prefix]) {
-      return [line substringFromIndex:[prefix length]];
+      if ([line hasPrefix:prefix])
+	{
+	  return [line substringFromIndex:[prefix length]];
+	}
     }
-  }
 
   return nil;
 }
@@ -246,27 +267,39 @@
   BOOL quoted = NO;
   unichar quote = 0;
 
-  for (i = 0; i < [string length]; i++) {
-    unichar ch = [string characterAtIndex:i];
+  for (i = 0; i < [string length]; i++)
+    {
+      unichar ch = [string characterAtIndex:i];
 
-    if (quoted) {
-      if (ch == quote) {
-        quoted = NO;
-      } else {
-        [token appendFormat:@"%C", ch];
-      }
-    } else if (ch == '"' || ch == '\'') {
-      quoted = YES;
-      quote = ch;
-    } else if ([[NSCharacterSet whitespaceAndNewlineCharacterSet]
-                  characterIsMember:ch]) {
-      if ([token length]) {
-        break;
-      }
-    } else {
-      [token appendFormat:@"%C", ch];
+      if (quoted)
+	{
+	  if (ch == quote)
+	    {
+	      quoted = NO;
+	    }
+	  else
+	    {
+	      [token appendFormat:@"%C", ch];
+	    }
+	}
+      else if (ch == '"' || ch == '\'')
+	{
+	  quoted = YES;
+	  quote = ch;
+	}
+      else if ([[NSCharacterSet whitespaceAndNewlineCharacterSet]
+		     characterIsMember:ch])
+	{
+	  if ([token length])
+	    {
+	      break;
+	    }
+	}
+      else
+	{
+	  [token appendFormat:@"%C", ch];
+	}
     }
-  }
 
   return [token length] ? token : nil;
 }
@@ -277,27 +310,31 @@
   NSArray *pathComponents;
   NSUInteger i;
 
-  if (![command length]) {
-    return nil;
-  }
+  if (![command length])
+    {
+      return nil;
+    }
 
-  if ([command isAbsolutePath]) {
-    return command;
-  }
+  if ([command isAbsolutePath])
+    {
+      return command;
+    }
 
   pathEnvironment = [[[NSProcessInfo processInfo] environment]
-    objectForKey:@"PATH"];
+		      objectForKey:@"PATH"];
   pathComponents = [pathEnvironment length]
     ? [pathEnvironment componentsSeparatedByString:@":"]
     : [NSArray array];
 
-  for (i = 0; i < [pathComponents count]; i++) {
-    NSString *candidate = [[pathComponents objectAtIndex:i]
-      stringByAppendingPathComponent:command];
-    if ([[NSFileManager defaultManager] isExecutableFileAtPath:candidate]) {
-      return [candidate stringByResolvingSymlinksInPath];
+  for (i = 0; i < [pathComponents count]; i++)
+    {
+      NSString *candidate = [[pathComponents objectAtIndex:i]
+				 stringByAppendingPathComponent:command];
+      if ([[NSFileManager defaultManager] isExecutableFileAtPath:candidate])
+	{
+	  return [candidate stringByResolvingSymlinksInPath];
+	}
     }
-  }
 
   return nil;
 }
@@ -308,38 +345,43 @@
   NSString *baseName;
   NSUInteger i;
 
-  if (![name length]) {
-    return nil;
-  }
+  if (![name length])
+    {
+      return nil;
+    }
 
   baseName = [[[name lastPathComponent] pathExtension] length]
     ? [[name lastPathComponent] stringByDeletingPathExtension]
     : [name lastPathComponent];
 
-  for (i = 0; i < [directories count]; i++) {
-    NSString *directory = [directories objectAtIndex:i];
-    NSArray *candidates = [NSArray arrayWithObjects:
-      [directory stringByAppendingPathComponent:
-        [baseName stringByAppendingPathExtension:@"app"]],
-      [directory stringByAppendingPathComponent:[name lastPathComponent]],
-      nil];
-    NSUInteger j;
+  for (i = 0; i < [directories count]; i++)
+    {
+      NSString *directory = [directories objectAtIndex:i];
+      NSArray *candidates = [NSArray arrayWithObjects:
+				       [directory stringByAppendingPathComponent:
+						    [baseName stringByAppendingPathExtension:@"app"]],
+				     [directory stringByAppendingPathComponent:[name lastPathComponent]],
+				     nil];
+      NSUInteger j;
 
-    for (j = 0; j < [candidates count]; j++) {
-      NSString *candidate = [candidates objectAtIndex:j];
-      BOOL isDir = NO;
+      for (j = 0; j < [candidates count]; j++)
+	{
+	  NSString *candidate = [candidates objectAtIndex:j];
+	  BOOL isDir = NO;
 
-      if ([[NSFileManager defaultManager] fileExistsAtPath:candidate
-                                               isDirectory:&isDir] &&
-          isDir &&
-          [[[candidate pathExtension] lowercaseString] isEqualToString:@"app"]) {
-        NSImage *image = [self iconForApplicationPath:candidate];
-        if (image) {
-          return image;
-        }
-      }
+	  if ([[NSFileManager defaultManager] fileExistsAtPath:candidate
+						   isDirectory:&isDir] &&
+	      isDir &&
+	      [[[candidate pathExtension] lowercaseString] isEqualToString:@"app"])
+	    {
+	      NSImage *image = [self iconForApplicationPath:candidate];
+	      if (image)
+		{
+		  return image;
+		}
+	    }
+	}
     }
-  }
 
   return nil;
 }
@@ -351,12 +393,13 @@
   NSArray *libraryDirectories;
   NSUInteger i;
 
-  if ([[path stringByDeletingLastPathComponent] length]) {
-    [directories addObject:
-      [[path stringByDeletingLastPathComponent]
-        stringByAppendingPathComponent:@"Resources"]];
-    [directories addObject:[path stringByDeletingLastPathComponent]];
-  }
+  if ([[path stringByDeletingLastPathComponent] length])
+    {
+      [directories addObject:
+		     [[path stringByDeletingLastPathComponent]
+			  stringByAppendingPathComponent:@"Resources"]];
+      [directories addObject:[path stringByDeletingLastPathComponent]];
+    }
 
   applicationDirectories =
     NSSearchPathForDirectoriesInDomains(NSApplicationDirectory,
@@ -368,10 +411,11 @@
     NSSearchPathForDirectoriesInDomains(NSLibraryDirectory,
                                         NSAllDomainsMask,
                                         YES);
-  for (i = 0; i < [libraryDirectories count]; i++) {
-    [directories addObject:[[libraryDirectories objectAtIndex:i]
-      stringByAppendingPathComponent:@"WindowMaker/Icons"]];
-  }
+  for (i = 0; i < [libraryDirectories count]; i++)
+    {
+      [directories addObject:[[libraryDirectories objectAtIndex:i]
+				  stringByAppendingPathComponent:@"WindowMaker/Icons"]];
+    }
 
   return directories;
 }
@@ -380,54 +424,63 @@
 {
   NSString *contents = [NSString stringWithContentsOfFile:path];
   NSArray *lines = [contents componentsSeparatedByCharactersInSet:
-    [NSCharacterSet newlineCharacterSet]];
+			       [NSCharacterSet newlineCharacterSet]];
   NSArray *searchPaths = [self desktopIconSearchDirectoriesForDesktopFile:path];
   NSString *bundlePath = [self applicationBundlePathForPath:path];
   NSString *exec = [self desktopFileValueForKey:@"Exec" lines:lines];
   NSString *execPath = [self pathForExecutableCommand:
-    [self firstCommandTokenFromString:
-      [[exec componentsSeparatedByString:@"%"] objectAtIndex:0]]];
+			       [self firstCommandTokenFromString:
+				       [[exec componentsSeparatedByString:@"%"] objectAtIndex:0]]];
   NSString *iconName = [self desktopFileValueForKey:@"Icon" lines:lines];
   NSImage *image;
   NSUInteger i;
 
-  if ([bundlePath length]) {
-    image = [self iconForApplicationPath:bundlePath];
-    if (image) {
-      return image;
+  if ([bundlePath length])
+    {
+      image = [self iconForApplicationPath:bundlePath];
+      if (image)
+	{
+	  return image;
+	}
     }
-  }
 
   bundlePath = [self applicationBundlePathForPath:execPath];
-  if ([bundlePath length]) {
-    image = [self iconForApplicationPath:bundlePath];
-    if (image) {
-      return image;
+  if ([bundlePath length])
+    {
+      image = [self iconForApplicationPath:bundlePath];
+      if (image)
+	{
+	  return image;
+	}
     }
-  }
 
-  if ([iconName isAbsolutePath]) {
-    image = [self imageAtPath:iconName];
-    if (image) {
-      return image;
+  if ([iconName isAbsolutePath])
+    {
+      image = [self imageAtPath:iconName];
+      if (image)
+	{
+	  return image;
+	}
     }
-  }
 
   image = [self iconForApplicationNamed:iconName
                           inDirectories:
-    NSSearchPathForDirectoriesInDomains(NSApplicationDirectory,
-                                        NSAllDomainsMask,
-                                        YES)];
-  if (image) {
-    return image;
-  }
-
-  for (i = 0; i < [searchPaths count]; i++) {
-    image = [self imageNamed:iconName inApplicationPath:[searchPaths objectAtIndex:i]];
-    if (image) {
+		  NSSearchPathForDirectoriesInDomains(NSApplicationDirectory,
+						      NSAllDomainsMask,
+						      YES)];
+  if (image)
+    {
       return image;
     }
-  }
+
+  for (i = 0; i < [searchPaths count]; i++)
+    {
+      image = [self imageNamed:iconName inApplicationPath:[searchPaths objectAtIndex:i]];
+      if (image)
+	{
+	  return image;
+	}
+    }
 
   return nil;
 }
@@ -445,33 +498,42 @@
   NSString *bundlePath = [self applicationBundlePathForPath:path];
   NSString *iconPath = bundlePath ? bundlePath : path;
 
-  if (bundlePath) {
-    icon = [self iconForApplicationPath:bundlePath];
-  }
-  if (!icon && [[[path pathExtension] lowercaseString] isEqualToString:@"desktop"]) {
-    icon = [self iconForDesktopFile:path];
-  }
-  if (!icon) {
-    icon = [[NSWorkspace sharedWorkspace] iconForFile:path];
-    if (![self imageIsDrawable:icon]) {
-      icon = nil;
+  if (bundlePath)
+    {
+      icon = [self iconForApplicationPath:bundlePath];
     }
-  }
-  if (!icon) {
-    icon = [[NSWorkspace sharedWorkspace] iconForFileType:[path pathExtension]];
-    if (![self imageIsDrawable:icon]) {
-      icon = nil;
+  if (!icon && [[[path pathExtension] lowercaseString] isEqualToString:@"desktop"])
+    {
+      icon = [self iconForDesktopFile:path];
     }
-  }
-  if (!icon) {
-    icon = [[NSWorkspace sharedWorkspace] iconForFileType:@"app"];
-    if (![self imageIsDrawable:icon]) {
-      icon = nil;
+  if (!icon)
+    {
+      icon = [[NSWorkspace sharedWorkspace] iconForFile:path];
+      if (![self imageIsDrawable:icon])
+	{
+	  icon = nil;
+	}
     }
-  }
-  if (!icon) {
-    icon = [self fallbackApplicationIcon];
-  }
+  if (!icon)
+    {
+      icon = [[NSWorkspace sharedWorkspace] iconForFileType:[path pathExtension]];
+      if (![self imageIsDrawable:icon])
+	{
+	  icon = nil;
+	}
+    }
+  if (!icon)
+    {
+      icon = [[NSWorkspace sharedWorkspace] iconForFileType:@"app"];
+      if (![self imageIsDrawable:icon])
+	{
+	  icon = nil;
+	}
+    }
+  if (!icon)
+    {
+      icon = [self fallbackApplicationIcon];
+    }
 
   item->_kind = DockItemApplication;
   item->_state = DockItemNotRunning;
@@ -484,7 +546,7 @@
   [item->_dockTile setOwner:item];
   {
     DockTileIconView *iconView = AUTORELEASE([[DockTileIconView alloc]
-      initWithFrame:NSMakeRect(0, 0, 46, 46)]);
+					       initWithFrame:NSMakeRect(0, 0, 46, 46)]);
     [iconView setIcon:icon];
     [iconView setTitle:item->_title];
     [item->_dockTile setContentView:iconView];
@@ -508,7 +570,7 @@
   [item->_dockTile setOwner:item];
   {
     DockTileIconView *iconView = AUTORELEASE([[DockTileIconView alloc]
-      initWithFrame:NSMakeRect(0, 0, 46, 46)]);
+					       initWithFrame:NSMakeRect(0, 0, 46, 46)]);
     [iconView setIcon:icon];
     [iconView setTitle:item->_title];
     [item->_dockTile setContentView:iconView];
@@ -526,24 +588,53 @@
   DEALLOC;
 }
 
-- (DockItemKind) kind { return _kind; }
-- (DockItemState) state { return _state; }
-- (void) setState: (DockItemState)state { _state = state; }
-- (NSString *) title { return _title; }
-- (NSString *) path { return _path; }
-- (NSString *) iconPath { return _iconPath; }
-- (NSImage *) icon { return _icon; }
+- (DockItemKind) kind
+{
+  return _kind;
+}
+
+- (DockItemState) state
+{
+  return _state;
+}
+
+- (void) setState: (DockItemState)state
+{
+  _state = state;
+}
+
+- (NSString *) title
+{
+  return _title;
+}
+
+- (NSString *) path
+{
+  return _path;
+}
+
+- (NSString *) iconPath
+{
+  return _iconPath;
+}
+
+- (NSImage *) icon
+{
+  return _icon;
+}
 - (BOOL) iconMatchesImage: (NSImage *)image
 {
   NSData *currentData;
   NSData *newData;
 
-  if (_icon == image) {
-    return YES;
-  }
-  if (!_icon || !image) {
-    return NO;
-  }
+  if (_icon == image)
+    {
+      return YES;
+    }
+  if (!_icon || !image)
+    {
+      return NO;
+    }
 
   currentData = [_icon TIFFRepresentation];
   newData = [image TIFFRepresentation];
@@ -552,18 +643,39 @@
 
 - (void) setIcon: (NSImage *)icon
 {
-  if (![self iconMatchesImage:icon]) {
-    ASSIGN(_icon, icon);
-    if ([[_dockTile contentView] respondsToSelector:@selector(setIcon:)]) {
-      [(DockTileIconView *)[_dockTile contentView] setIcon:icon];
+  if (![self iconMatchesImage:icon])
+    {
+      ASSIGN(_icon, icon);
+      if ([[_dockTile contentView] respondsToSelector:@selector(setIcon:)])
+	{
+	  [(DockTileIconView *)[_dockTile contentView] setIcon:icon];
+	}
+      [_dockTile display];
     }
-    [_dockTile display];
-  }
 }
-- (NSDockTile *) dockTile { return _dockTile; }
-- (unsigned long) xWindow { return _xWindow; }
-- (void) setXWindow: (unsigned long)xWindow { _xWindow = xWindow; }
-- (BOOL) isPinned { return _pinned; }
-- (void) setPinned: (BOOL)pinned { _pinned = pinned; }
+- (NSDockTile *) dockTile
+{
+  return _dockTile;
+}
+
+- (unsigned long) xWindow
+{
+  return _xWindow;
+}
+
+- (void) setXWindow: (unsigned long)xWindow
+{
+  _xWindow = xWindow;
+}
+
+- (BOOL) isPinned
+{
+  return _pinned;
+}
+
+- (void) setPinned: (BOOL)pinned
+{
+  _pinned = pinned;
+}
 
 @end

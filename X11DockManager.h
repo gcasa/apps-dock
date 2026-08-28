@@ -23,14 +23,14 @@
 @class DockItem;
 
 typedef enum
-{
-  DockPlacementLeftTop = 0,
-  DockPlacementLeftCenter,
-  DockPlacementRightTop,
-  DockPlacementRightCenter,
-  DockPlacementTopCenter,
-  DockPlacementBottomCenter
-} DockPlacement;
+  {
+    DockPlacementLeftTop = 0,
+    DockPlacementLeftCenter,
+    DockPlacementRightTop,
+    DockPlacementRightCenter,
+    DockPlacementTopCenter,
+    DockPlacementBottomCenter
+  } DockPlacement;
 
 @protocol X11DockManagerDelegate
 - (void) x11DockManagerDidDiscoverWindowWithTitle: (NSString *)title
