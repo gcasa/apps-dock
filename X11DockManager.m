@@ -29,9 +29,7 @@
 #import <unistd.h>
 
 #define DockGSWindowStyleAttr (1UL << 0)
-#define DockGSExtraFlagsAttr (1UL << 7)
 #define DockNSIconWindowMask 64UL
-#define DockGSNoApplicationIconFlag (1UL << 5)
 
 static int X11DockManagerLastErrorCode = 0;
 static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
@@ -443,7 +441,6 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 
   if (sawRelevantEvent)
     {
-      [self suppressWindowManagerIconShells];
       XFlush(display);
     }
 }
@@ -461,8 +458,6 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   for (i = 0; i < 12; i++)
     {
       [self processPendingEvents];
-      [self suppressOwnApplicationIconWindows];
-      [self suppressWindowManagerIconShells];
       XSync(display, False);
       usleep(1000);
     }
@@ -969,56 +964,9 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   return result;
 }
 
-- (void) suppressApplicationIconForWindow: (Window)window
-{
-  Display *display = (Display *)_display;
-  Atom property = XInternAtom(display, "_GNUSTEP_WM_ATTR", False);
-  Atom actualType;
-  int actualFormat;
-  unsigned long itemCount;
-  unsigned long bytesAfter;
-  unsigned char *data = NULL;
-  unsigned long attrs[9];
-  BOOL hadAttributes = NO;
-
-  memset(attrs, 0, sizeof(attrs));
-
-  [self clearX11Error];
-  if (XGetWindowProperty(display, window, property, 0, 9,
-                         False, property, &actualType, &actualFormat,
-                         &itemCount, &bytesAfter, &data) == Success && data)
-    {
-      if (![self x11ErrorOccurred] && actualFormat == 32)
-	{
-	  unsigned long copyCount = MIN(itemCount, (unsigned long)9);
-	  unsigned long i;
-
-	  for (i = 0; i < copyCount; i++)
-	    {
-	      attrs[i] = ((unsigned long *)data)[i];
-	    }
-	  hadAttributes = YES;
-	}
-      XFree(data);
-    }
-
-  if (hadAttributes &&
-      (attrs[0] & DockGSExtraFlagsAttr) &&
-      (attrs[8] & DockGSNoApplicationIconFlag))
-    {
-      return;
-    }
-
-  attrs[0] |= DockGSExtraFlagsAttr;
-  attrs[8] |= DockGSNoApplicationIconFlag;
-  XChangeProperty(display, window, property, property, 32, PropModeReplace,
-                  (unsigned char *)attrs, 9);
-}
-
 - (void) handlePossiblyNewWindow: (Window)window
 {
   Display *display = (Display *)_display;
-  XWindowAttributes attr;
 
   if (!display || window == (Window)_hostWindow)
     {
@@ -1030,60 +978,13 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
                         processIdentifier:[self processIdentifierForWindow:window]
                                     title:[self classNameForWindow:window]])
     {
-      [self suppressWindow:(unsigned long)window];
       return;
     }
-
-  [self clearX11Error];
-  if (!XGetWindowAttributes(display, window, &attr) ||
-      [self x11ErrorOccurred])
-    {
-      return;
-    }
-
-  if (attr.width <= 96 && attr.height <= 96)
-    {
-      [self suppressWindowManagerIconShells];
-      return;
-    }
-
-  [self suppressApplicationIconForWindow:window];
 }
 
 - (BOOL) windowLooksLikeDockApp: (Window)window
 {
-  Display *display = (Display *)_display;
-  XWindowAttributes attr;
-  XWMHints *hints;
-  BOOL result = NO;
-
-  [self clearX11Error];
-  if (!XGetWindowAttributes(display, window, &attr))
-    {
-      return NO;
-    }
-  if ([self x11ErrorOccurred])
-    {
-      return NO;
-    }
-
-  [self clearX11Error];
-  hints = XGetWMHints(display, window);
-  if ([self x11ErrorOccurred])
-    {
-      return NO;
-    }
-  if (hints)
-    {
-      XFree(hints);
-    }
-
-  if (attr.width <= 96 && attr.height <= 96)
-    {
-      result = YES;
-    }
-
-  return result;
+  return [self windowIsRegisteredIconWindow:window];
 }
 
 - (BOOL) windowLooksManageable: (Window)window
@@ -1387,13 +1288,18 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
       return NO;
     }
 
+  windowKey = [NSNumber numberWithUnsignedLong:(unsigned long)window];
+  if (!attr.override_redirect &&
+      [[self clientListWindows] containsObject:windowKey])
+    {
+      return NO;
+    }
+
   if (attr.width <= 0 || attr.height <= 0 ||
       attr.width > 128 || attr.height > 128)
     {
       return NO;
     }
-
-  windowKey = [NSNumber numberWithUnsignedLong:(unsigned long)window];
 
   if ([_iconWindowsByProcessID objectForKey:identifier] &&
       ![[_iconWindowsByProcessID objectForKey:identifier] isEqual:windowKey])
@@ -1405,9 +1311,6 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   [_knownWindows removeObject:windowKey];
 
   icon = [self imageFromWindowContents:window];
-  XMoveWindow((Display *)_display, window, -10000, -10000);
-  XUnmapWindow((Display *)_display, window);
-  [self suppressWindowManagerIconShells];
 
   if (processIdentifier == getpid())
     {
@@ -1535,7 +1438,6 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 
 - (void) scanClientWindow: (Window)window
 {
-  Display *display = (Display *)_display;
   NSNumber *key = [NSNumber numberWithUnsignedLong:(unsigned long)window];
   BOOL dockApp;
   BOOL hidden;
@@ -1564,23 +1466,6 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
     {
       if (dockApp)
 	{
-	  NSString *lowerPath = [path lowercaseString];
-	  NSString *lowerName = [[path lastPathComponent] lowercaseString];
-	  NSString *lowerTitle = [title lowercaseString];
-
-	  if (([lowerPath length] &&
-	       ([lowerPath rangeOfString:@"/dockwm.app/"].location != NSNotFound ||
-		[lowerPath rangeOfString:@"/gworkspace.app/"].location != NSNotFound)) ||
-	      [lowerName isEqualToString:@"dockwm"] ||
-	      [lowerName isEqualToString:@"gworkspace"] ||
-	      [lowerTitle isEqualToString:@"dockwm"] ||
-	      [lowerTitle isEqualToString:@"gworkspace"])
-	    {
-	      XMoveWindow(display, window, -10000, -10000);
-	      XMapWindow(display, window);
-	      XFlush(display);
-	    }
-
 	  [_knownWindows addObject:key];
 	  if ([_delegate respondsToSelector:
 			   @selector(x11DockManagerDidDiscoverWindowWithTitle:window:hidden:icon:path:dockApp:)])
@@ -1617,8 +1502,6 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   NSArray *clientWindows;
 
   if (!display) return;
-  [self suppressOwnApplicationIconWindows];
-  [self suppressWindowManagerIconShells];
   [self scanApplicationIconWindows];
   [self scanKnownWindows];
 
@@ -1654,7 +1537,7 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 
   if (aWindowNumber == 0 || aProcessId <= 0)
     {
-      return NSMakeRect(-10000, -10000, 64, 64);
+      return NSMakeRect(0, 0, 64, 64);
     }
 
   processKey = [NSNumber numberWithInt:aProcessId];
@@ -1662,20 +1545,13 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   if ([_iconWindowsByProcessID objectForKey:processKey] &&
       ![[_iconWindowsByProcessID objectForKey:processKey] isEqual:windowKey])
     {
-      return NSMakeRect(-10000, -10000, 64, 64);
+      return NSMakeRect(0, 0, 64, 64);
     }
 
   [_iconWindowsByProcessID setObject:windowKey forKey:processKey];
   [_knownWindows removeObject:windowKey];
-  if (_display)
-    {
-      XMoveWindow((Display *)_display, (Window)aWindowNumber, -10000, -10000);
-      XUnmapWindow((Display *)_display, (Window)aWindowNumber);
-      [self suppressWindowManagerIconShells];
-      XFlush((Display *)_display);
-    }
 
-  return NSMakeRect(-10000, -10000, 64, 64);
+  return NSMakeRect(0, 0, 64, 64);
 }
 
 - (void) removeWindow: (unsigned int)aWindowNumber
@@ -1741,149 +1617,6 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   XFlush(display);
 }
 
-- (void) suppressWindow: (unsigned long)xWindow
-{
-  Display *display = (Display *)_display;
-
-  if (!display) return;
-  XMoveWindow(display, (Window)xWindow, -10000, -10000);
-  XUnmapWindow(display, (Window)xWindow);
-  [self suppressWindowManagerIconShells];
-  XFlush(display);
-}
-
-- (void) suppressOwnApplicationIconWindows
-{
-  Display *display = (Display *)_display;
-  Window root, parent, *children = NULL;
-  unsigned int count = 0, i;
-  int pid = getpid();
-
-  if (!display)
-    {
-      return;
-    }
-
-  root = RootWindow(display, DefaultScreen(display));
-  if (!XQueryTree(display, root, &root, &parent, &children, &count))
-    {
-      return;
-    }
-
-  for (i = 0; i < count; i++)
-    {
-      XWindowAttributes attr;
-      NSString *className;
-      NSString *title;
-      BOOL iconStyle;
-
-      if (children[i] == (Window)_hostWindow)
-	{
-	  continue;
-	}
-      if ([self processIdentifierForWindow:children[i]] != pid)
-	{
-	  continue;
-	}
-
-      className = [self classNameForWindow:children[i]];
-      if (!className ||
-	  ![[className lowercaseString] isEqualToString:@"dockwm"])
-	{
-	  continue;
-	}
-
-      [self clearX11Error];
-      if (!XGetWindowAttributes(display, children[i], &attr) ||
-	  [self x11ErrorOccurred])
-	{
-	  continue;
-	}
-      if (attr.width <= 0 || attr.height <= 0 || attr.width > 512 ||
-	  attr.height > 512 || attr.x != 0 ||
-	  attr.y < DisplayHeight(display, DefaultScreen(display)) - attr.height - 128)
-	{
-	  continue;
-	}
-
-      iconStyle = [self windowHasGNUstepIconStyle:children[i]];
-      title = [self titleForWindow:children[i]];
-      if (!iconStyle &&
-	  (!title || ![title isEqualToString:@"Window"]))
-	{
-	  continue;
-	}
-
-      [_knownWindows removeObject:
-		       [NSNumber numberWithUnsignedLong:(unsigned long)children[i]]];
-      XUnmapWindow(display, children[i]);
-      XMoveWindow(display, children[i], -10000, -10000);
-    }
-
-  if (children)
-    {
-      XFree(children);
-    }
-  XFlush(display);
-}
-
-- (void) suppressWindowManagerIconShells
-{
-  Display *display = (Display *)_display;
-  Window root, parent, *children = NULL;
-  unsigned int count = 0, i;
-  int screen;
-
-  if (!display)
-    {
-      return;
-    }
-
-  screen = DefaultScreen(display);
-  root = RootWindow(display, screen);
-  if (!XQueryTree(display, root, &root, &parent, &children, &count))
-    {
-      return;
-    }
-
-  for (i = 0; i < count; i++)
-    {
-      XWindowAttributes attr;
-
-      if (children[i] == (Window)_hostWindow)
-	{
-	  continue;
-	}
-
-      [self clearX11Error];
-      if (!XGetWindowAttributes(display, children[i], &attr) ||
-	  [self x11ErrorOccurred])
-	{
-	  continue;
-	}
-
-      if (!attr.override_redirect ||
-	  attr.width != 64 ||
-	  attr.height != 64)
-	{
-	  continue;
-	}
-
-      XMoveWindow(display, children[i], -10000, -10000);
-      XUnmapWindow(display, children[i]);
-    }
-
-  if (children)
-    {
-      XFree(children);
-    }
-}
-
-- (void) suppressWindow: (unsigned long)xWindow atIndex: (NSUInteger)index
-{
-  [self suppressWindow:xWindow];
-}
-
 - (void) activateWindow: (unsigned long)xWindow
 {
   Display *display = (Display *)_display;
@@ -1892,11 +1625,8 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   XEvent event;
 
   if (!display) return;
-  [self suppressWindowManagerIconShells];
-  if ([self windowIsRegisteredIconWindow:(Window)xWindow] ||
-      [self windowHasGNUstepIconStyle:(Window)xWindow])
+  if ([self windowIsRegisteredIconWindow:(Window)xWindow])
     {
-      [self suppressWindow:xWindow];
       return;
     }
 
@@ -1914,7 +1644,6 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 
   XMapRaised(display, (Window)xWindow);
   XSetInputFocus(display, (Window)xWindow, RevertToParent, CurrentTime);
-  [self suppressWindowManagerIconShells];
   XFlush(display);
 }
 
@@ -1942,8 +1671,7 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
       XWindowAttributes attr;
       int processIdentifier;
 
-      if ([self windowIsRegisteredIconWindow:window] ||
-	  [self windowHasGNUstepIconStyle:window])
+      if ([self windowIsRegisteredIconWindow:window])
 	{
 	  continue;
 	}
@@ -2003,7 +1731,6 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
       return NO;
     }
 
-  [self suppressApplicationIconForWindow:window];
   [self activateWindow:(unsigned long)window];
   return YES;
 }

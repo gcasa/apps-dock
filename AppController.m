@@ -86,7 +86,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
   _items = [NSMutableArray new];
   _launchedApplicationPaths = [NSMutableSet new];
-  _suppressedWindowItems = [NSMutableDictionary new];
+  _applicationIconWindowItems = [NSMutableDictionary new];
   [self loadPersistedApplications];
   _dockPlacement = [self savedDockPlacement];
   _backgroundMode = [self savedBackgroundMode];
@@ -122,7 +122,6 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   if ([_x11 start])
     {
       [_x11 setDockPlacement:_dockPlacement];
-      [_x11 suppressWindowManagerIconShells];
       [self updateDockBackgroundHidingWindow:NO];
       [_window makeKeyAndOrderFront:nil];
       [_window orderFrontRegardless];
@@ -177,7 +176,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   DESTROY(_x11);
   DESTROY(_dockView);
   DESTROY(_window);
-  DESTROY(_suppressedWindowItems);
+  DESTROY(_applicationIconWindowItems);
   DESTROY(_launchedApplicationPaths);
   DESTROY(_backgroundColor);
   DESTROY(_items);
@@ -919,7 +918,6 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 	{
 	  [NSTask launchedTaskWithLaunchPath:executablePath
 				   arguments:[NSArray arrayWithObjects:
-							@"-GSSuppressAppIcon", @"YES",
 						      @"-GSUseIconManager", @"YES",
 						      nil]];
 	  return YES;
@@ -1815,21 +1813,21 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   return nil;
 }
 
-- (DockItem *) itemForSuppressedXWindow: (unsigned long)xWindow
+- (DockItem *) itemForApplicationIconWindow: (unsigned long)xWindow
 {
-  return [_suppressedWindowItems objectForKey:
-				   [NSNumber numberWithUnsignedLong:xWindow]];
+  return [_applicationIconWindowItems objectForKey:
+				       [NSNumber numberWithUnsignedLong:xWindow]];
 }
 
-- (void) setSuppressedXWindow: (unsigned long)xWindow forItem: (DockItem *)item
+- (void) setApplicationIconWindow: (unsigned long)xWindow forItem: (DockItem *)item
 {
   if (!item || !xWindow)
     {
       return;
     }
 
-  [_suppressedWindowItems setObject:item
-                             forKey:[NSNumber numberWithUnsignedLong:xWindow]];
+  [_applicationIconWindowItems setObject:item
+				  forKey:[NSNumber numberWithUnsignedLong:xWindow]];
 }
 
 - (NSUInteger) indexForItem: (DockItem *)targetItem
@@ -2118,10 +2116,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
       if ([processIds count])
 	{
 	  [_x11 drainTransientIconEvents];
-	  if (![_x11 activateApplicationWithProcessIdentifiers:processIds])
-	    {
-	      [_x11 suppressWindowManagerIconShells];
-	    }
+	  [_x11 activateApplicationWithProcessIdentifiers:processIds];
 	  [_x11 drainTransientIconEvents];
 	  [item setState:DockItemRunning];
 	  [self refreshDock];
@@ -2211,7 +2206,6 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 					  dockApp: (BOOL)dockApp
 {
   DockItem *item = [self applicationItemMatchingExecutablePath:path];
-  NSUInteger itemIndex;
   BOOL matchedApplication;
 
   if (!item)
@@ -2226,9 +2220,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     {
       if (item)
 	{
-	  itemIndex = [self indexForItem:item];
-	  [self setSuppressedXWindow:xWindow forItem:item];
-	  [_x11 suppressWindow:xWindow];
+	  [self setApplicationIconWindow:xWindow forItem:item];
 	  [item setState:DockItemRunning];
 	  if (icon)
 	    {
@@ -2279,13 +2271,11 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     {
       if ([item kind] == DockItemApplication)
 	{
-	  itemIndex = [self indexForItem:item];
-	  [self setSuppressedXWindow:xWindow forItem:item];
-	  [_x11 suppressWindow:xWindow];
+	  [self setApplicationIconWindow:xWindow forItem:item];
 	}
       else
 	{
-	  itemIndex = [self indexForItem:item];
+	  NSUInteger itemIndex = [self indexForItem:item];
 	  if (itemIndex != NSNotFound)
 	    {
 	      [_x11 dockWindow:xWindow atIndex:itemIndex];
@@ -2299,32 +2289,17 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
                                   icon: (NSImage *)icon
 {
   DockItem *item = [self itemForXWindow:xWindow];
-  BOOL suppressedWindow = NO;
 
   if (!item)
     {
-      item = [self itemForSuppressedXWindow:xWindow];
-      suppressedWindow = item != nil;
+      item = [self itemForApplicationIconWindow:xWindow];
     }
   if (item)
     {
-      NSUInteger itemIndex = [self indexForItem:item];
-
       [item setState: (hidden ? DockItemHidden : DockItemRunning)];
       if (icon)
 	{
 	  [item setIcon:icon];
-	}
-      if (itemIndex != NSNotFound)
-	{
-	  if (suppressedWindow)
-	    {
-	      [_x11 suppressWindow:xWindow];
-	    }
-	  else
-	    {
-	      [_x11 moveDockedWindow:xWindow toIndex:itemIndex];
-	    }
 	}
       [self refreshDock];
     }
