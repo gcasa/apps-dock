@@ -222,42 +222,210 @@
         inApplicationPath:path];
 }
 
++ (NSString *) desktopFileValueForKey: (NSString *)key
+                               lines: (NSArray *)lines
+{
+  NSString *prefix = [key stringByAppendingString:@"="];
+  NSUInteger i;
+
+  for (i = 0; i < [lines count]; i++) {
+    NSString *line = [lines objectAtIndex:i];
+
+    if ([line hasPrefix:prefix]) {
+      return [line substringFromIndex:[prefix length]];
+    }
+  }
+
+  return nil;
+}
+
++ (NSString *) firstCommandTokenFromString: (NSString *)string
+{
+  NSMutableString *token = [NSMutableString string];
+  NSUInteger i;
+  BOOL quoted = NO;
+  unichar quote = 0;
+
+  for (i = 0; i < [string length]; i++) {
+    unichar ch = [string characterAtIndex:i];
+
+    if (quoted) {
+      if (ch == quote) {
+        quoted = NO;
+      } else {
+        [token appendFormat:@"%C", ch];
+      }
+    } else if (ch == '"' || ch == '\'') {
+      quoted = YES;
+      quote = ch;
+    } else if ([[NSCharacterSet whitespaceAndNewlineCharacterSet]
+                  characterIsMember:ch]) {
+      if ([token length]) {
+        break;
+      }
+    } else {
+      [token appendFormat:@"%C", ch];
+    }
+  }
+
+  return [token length] ? token : nil;
+}
+
++ (NSString *) pathForExecutableCommand: (NSString *)command
+{
+  NSString *pathEnvironment;
+  NSArray *pathComponents;
+  NSUInteger i;
+
+  if (![command length]) {
+    return nil;
+  }
+
+  if ([command isAbsolutePath]) {
+    return command;
+  }
+
+  pathEnvironment = [[[NSProcessInfo processInfo] environment]
+    objectForKey:@"PATH"];
+  pathComponents = [pathEnvironment length]
+    ? [pathEnvironment componentsSeparatedByString:@":"]
+    : [NSArray array];
+
+  for (i = 0; i < [pathComponents count]; i++) {
+    NSString *candidate = [[pathComponents objectAtIndex:i]
+      stringByAppendingPathComponent:command];
+    if ([[NSFileManager defaultManager] isExecutableFileAtPath:candidate]) {
+      return [candidate stringByResolvingSymlinksInPath];
+    }
+  }
+
+  return nil;
+}
+
++ (NSImage *) iconForApplicationNamed: (NSString *)name
+                        inDirectories: (NSArray *)directories
+{
+  NSString *baseName;
+  NSUInteger i;
+
+  if (![name length]) {
+    return nil;
+  }
+
+  baseName = [[[name lastPathComponent] pathExtension] length]
+    ? [[name lastPathComponent] stringByDeletingPathExtension]
+    : [name lastPathComponent];
+
+  for (i = 0; i < [directories count]; i++) {
+    NSString *directory = [directories objectAtIndex:i];
+    NSArray *candidates = [NSArray arrayWithObjects:
+      [directory stringByAppendingPathComponent:
+        [baseName stringByAppendingPathExtension:@"app"]],
+      [directory stringByAppendingPathComponent:[name lastPathComponent]],
+      nil];
+    NSUInteger j;
+
+    for (j = 0; j < [candidates count]; j++) {
+      NSString *candidate = [candidates objectAtIndex:j];
+      BOOL isDir = NO;
+
+      if ([[NSFileManager defaultManager] fileExistsAtPath:candidate
+                                               isDirectory:&isDir] &&
+          isDir &&
+          [[[candidate pathExtension] lowercaseString] isEqualToString:@"app"]) {
+        NSImage *image = [self iconForApplicationPath:candidate];
+        if (image) {
+          return image;
+        }
+      }
+    }
+  }
+
+  return nil;
+}
+
++ (NSArray *) desktopIconSearchDirectoriesForDesktopFile: (NSString *)path
+{
+  NSMutableArray *directories = [NSMutableArray array];
+  NSArray *applicationDirectories;
+  NSArray *libraryDirectories;
+  NSUInteger i;
+
+  if ([[path stringByDeletingLastPathComponent] length]) {
+    [directories addObject:
+      [[path stringByDeletingLastPathComponent]
+        stringByAppendingPathComponent:@"Resources"]];
+    [directories addObject:[path stringByDeletingLastPathComponent]];
+  }
+
+  applicationDirectories =
+    NSSearchPathForDirectoriesInDomains(NSApplicationDirectory,
+                                        NSAllDomainsMask,
+                                        YES);
+  [directories addObjectsFromArray:applicationDirectories];
+
+  libraryDirectories =
+    NSSearchPathForDirectoriesInDomains(NSLibraryDirectory,
+                                        NSAllDomainsMask,
+                                        YES);
+  for (i = 0; i < [libraryDirectories count]; i++) {
+    [directories addObject:[[libraryDirectories objectAtIndex:i]
+      stringByAppendingPathComponent:@"WindowMaker/Icons"]];
+  }
+
+  return directories;
+}
+
 + (NSImage *) iconForDesktopFile: (NSString *)path
 {
   NSString *contents = [NSString stringWithContentsOfFile:path];
   NSArray *lines = [contents componentsSeparatedByCharactersInSet:
     [NSCharacterSet newlineCharacterSet]];
-  NSArray *searchPaths = [NSArray arrayWithObjects:
-    [[path stringByDeletingLastPathComponent] stringByAppendingPathComponent:@"Resources"],
-    [path stringByDeletingLastPathComponent],
-    @"/usr/GNUstep/Local/Applications",
-    @"/usr/GNUstep/System/Applications",
-    @"/usr/GNUstep/Local/Library/WindowMaker/Icons",
-    @"/usr/GNUstep/System/Library/WindowMaker/Icons",
-    nil];
-  NSUInteger i, j;
+  NSArray *searchPaths = [self desktopIconSearchDirectoriesForDesktopFile:path];
+  NSString *bundlePath = [self applicationBundlePathForPath:path];
+  NSString *exec = [self desktopFileValueForKey:@"Exec" lines:lines];
+  NSString *execPath = [self pathForExecutableCommand:
+    [self firstCommandTokenFromString:
+      [[exec componentsSeparatedByString:@"%"] objectAtIndex:0]]];
+  NSString *iconName = [self desktopFileValueForKey:@"Icon" lines:lines];
+  NSImage *image;
+  NSUInteger i;
 
-  for (i = 0; i < [lines count]; i++) {
-    NSString *line = [lines objectAtIndex:i];
-    NSString *iconName;
-
-    if (![line hasPrefix:@"Icon="]) {
-      continue;
+  if ([bundlePath length]) {
+    image = [self iconForApplicationPath:bundlePath];
+    if (image) {
+      return image;
     }
+  }
 
-    iconName = [line substringFromIndex:5];
-    if ([iconName isAbsolutePath]) {
-      NSImage *image = [self imageAtPath:iconName];
-      if (image) {
-        return image;
-      }
+  bundlePath = [self applicationBundlePathForPath:execPath];
+  if ([bundlePath length]) {
+    image = [self iconForApplicationPath:bundlePath];
+    if (image) {
+      return image;
     }
+  }
 
-    for (j = 0; j < [searchPaths count]; j++) {
-      NSImage *image = [self imageNamed:iconName inApplicationPath:[searchPaths objectAtIndex:j]];
-      if (image) {
-        return image;
-      }
+  if ([iconName isAbsolutePath]) {
+    image = [self imageAtPath:iconName];
+    if (image) {
+      return image;
+    }
+  }
+
+  image = [self iconForApplicationNamed:iconName
+                          inDirectories:
+    NSSearchPathForDirectoriesInDomains(NSApplicationDirectory,
+                                        NSAllDomainsMask,
+                                        YES)];
+  if (image) {
+    return image;
+  }
+
+  for (i = 0; i < [searchPaths count]; i++) {
+    image = [self imageNamed:iconName inApplicationPath:[searchPaths objectAtIndex:i]];
+    if (image) {
+      return image;
     }
   }
 
@@ -266,20 +434,6 @@
 
 + (NSImage *) fallbackApplicationIcon
 {
-  NSArray *paths = [NSArray arrayWithObjects:
-    @"/home/heron/Development/gs-wmaker/WindowMaker/Icons/GNUstep.tiff",
-    @"/usr/GNUstep/Local/Library/WindowMaker/Icons/GNUstep.tiff",
-    @"/usr/GNUstep/System/Library/WindowMaker/Icons/GNUstep.tiff",
-    nil];
-  NSUInteger i;
-
-  for (i = 0; i < [paths count]; i++) {
-    NSImage *image = [self imageAtPath:[paths objectAtIndex:i]];
-    if (image) {
-      return image;
-    }
-  }
-
   return [self imageIsDrawable:[NSImage imageNamed:@"NSApplicationIcon"]]
     ? [NSImage imageNamed:@"NSApplicationIcon"] : nil;
 }

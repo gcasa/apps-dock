@@ -21,9 +21,15 @@
 #import "DockView.h"
 #import "X11DockManager.h"
 
-@interface AppController : NSObject <DockViewDelegate, X11DockManagerDelegate>
+@interface AppController : NSObject <DockViewDelegate, X11DockManagerDelegate, NSWindowDelegate>
 {
   NSWindow *_window;
+  NSPanel *_settingsPanel;
+  NSPopUpButton *_settingsPlacementPopup;
+  NSColorWell *_settingsBackgroundColorWell;
+  NSButton *_settingsBlackBackgroundButton;
+  NSButton *_settingsTransparentBackgroundButton;
+  NSButton *_settingsEmptyRecyclerButton;
   DockView *_dockView;
   NSMutableArray *_items;
   NSMutableSet *_launchedApplicationPaths;
@@ -40,6 +46,7 @@
   NSMenuItem *_emptyRecyclerMenuItem;
   DockPlacement _dockPlacement;
   DockBackgroundMode _backgroundMode;
+  NSColor *_backgroundColor;
   BOOL _updatingDockBackground;
 }
 

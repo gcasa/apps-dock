@@ -56,6 +56,7 @@ static NSInteger DockHoverRecycler = -3;
     _dropIndex = NSNotFound;
     _pinnedItemCount = 0;
     _backgroundMode = DockBackgroundBlack;
+    _backgroundColor = RETAIN([NSColor blackColor]);
     _gnustepIcon = RETAIN([self loadGNUstepIcon]);
     _recyclerIcon = RETAIN([self loadRecyclerIcon]);
     [self registerForDraggedTypes:
@@ -86,6 +87,7 @@ static NSInteger DockHoverRecycler = -3;
     [self removeTrackingRect:_trackingRectTag];
   }
   DESTROY(_backgroundImage);
+  DESTROY(_backgroundColor);
   DESTROY(_gnustepIcon);
   DESTROY(_recyclerIcon);
   DESTROY(_items);
@@ -94,21 +96,17 @@ static NSInteger DockHoverRecycler = -3;
 
 - (NSImage *) loadGNUstepIcon
 {
-  NSString *path = [[NSBundle mainBundle] pathForResource:@"GNUstep"
-                                                   ofType:@"tiff"];
+  NSString *path = [[NSBundle mainBundle] pathForResource:@"GNUstep_circle"
+                                                   ofType:@"png"];
   NSImage *image;
 
   if (![path length]) {
-    path = [[@"Resources" stringByAppendingPathComponent:@"GNUstep"]
-      stringByAppendingPathExtension:@"tiff"];
+    path = [[@"Resources" stringByAppendingPathComponent:@"GNUstep_circle"]
+      stringByAppendingPathExtension:@"png"];
   }
 
   image = AUTORELEASE([[NSImage alloc] initWithContentsOfFile:path]);
-  if (image) {
-    return image;
-  }
-
-  return [NSImage imageNamed:@"GNUstep"];
+  return image;
 }
 
 - (NSImage *) loadRecyclerIcon
@@ -266,6 +264,18 @@ static NSInteger DockHoverRecycler = -3;
 {
   if (_backgroundImage != image) {
     ASSIGN(_backgroundImage, image);
+    [self setNeedsDisplay:YES];
+  }
+}
+
+- (void) setBackgroundColor: (NSColor *)color
+{
+  if (!color) {
+    color = [NSColor blackColor];
+  }
+
+  if (_backgroundColor != color) {
+    ASSIGN(_backgroundColor, color);
     [self setNeedsDisplay:YES];
   }
 }
@@ -1119,7 +1129,7 @@ static NSInteger DockHoverRecycler = -3;
                         operation:NSCompositeSourceOver
                          fraction:1.0];
   } else if (_backgroundMode == DockBackgroundBlack) {
-    [[NSColor blackColor] set];
+    [_backgroundColor set];
     NSRectFill([self bounds]);
   }
 

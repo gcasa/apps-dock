@@ -53,6 +53,7 @@ typedef enum
   NSImage *_gnustepIcon;
   NSImage *_recyclerIcon;
   NSImage *_backgroundImage;
+  NSColor *_backgroundColor;
   DockBackgroundMode _backgroundMode;
   BOOL _recyclerHasContents;
   BOOL _horizontal;
@@ -78,6 +79,7 @@ typedef enum
 - (void) setItems: (NSArray *)items;
 - (void) setPinnedItemCount: (NSUInteger)count;
 - (void) setBackgroundImage: (NSImage *)image;
+- (void) setBackgroundColor: (NSColor *)color;
 - (void) setBackgroundMode: (DockBackgroundMode)mode;
 - (void) setRecyclerHasContents: (BOOL)hasContents;
 - (void) startWiggleForItem: (DockItem *)item;
