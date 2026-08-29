@@ -759,7 +759,6 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 
 - (NSImage *) iconForWindow: (Window)window
 {
-#if 0
   Display *display = (Display *)_display;
   Atom property = XInternAtom(display, "_NET_WM_ICON", False);
   Atom actualType;
@@ -768,7 +767,7 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   unsigned char *data = NULL;
   NSImage *netWmIcon = nil;
   NSImage *hintIcon = nil;
-  NSImage *icon = [[NSWorkspace sharedWorkspace] iconForFileType:@"app"];
+  NSImage *icon = nil;
   XWMHints *hints;
   NSImage *managedIcon;
   int pid;
@@ -820,7 +819,7 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
       if ([self x11ErrorOccurred])
 	{
 	  if (data) XFree(data);
-	  return icon ? icon : [NSImage imageNamed:@"NSApplicationIcon"];
+	  return icon;
 	}
       if (actualFormat == 32 && itemCount >= 3)
 	{
@@ -897,13 +896,7 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
     {
       return hintIcon;
     }
-  if (!icon)
-    {
-      icon = [NSImage imageNamed:@"NSApplicationIcon"];
-    }
   return icon;
-#endif
-  return nil;
 }
 
 - (NSString *) executablePathForWindow: (Window)window
@@ -1619,7 +1612,6 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 
 - (void) scanApplicationIconWindows
 {
-#if 0
   NSArray *iconKeys = [_iconWindowsByProcessID allKeys];
   NSUInteger i;
 
@@ -1670,7 +1662,6 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 	    }
 	}
     }
-#endif
 }
 
 - (void) scanClientWindow: (Window)window
