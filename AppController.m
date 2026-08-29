@@ -921,7 +921,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   if (item && [self shouldApplyX11Icon:icon toItem:item])
     {
       [item setIcon:icon];
-      [self refreshDock];
+      [_dockView setNeedsDisplay:YES];
     }
 }
 
@@ -948,7 +948,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 		    objectForKey:processIdentifierNumber]
 				       toItem:item])
 	{
-	  [self refreshDock];
+	  [_dockView setNeedsDisplay:YES];
 	}
     }
 }
@@ -2526,7 +2526,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 	{
 	  [item setIcon:icon];
 	}
-      [self refreshDock];
+      [_dockView setNeedsDisplay:YES];
     }
 }
 

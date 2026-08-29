@@ -24,7 +24,6 @@
 #import <X11/Xlib.h>
 #import <X11/Xatom.h>
 #import <X11/Xutil.h>
-#import <X11/extensions/Xdamage.h>
 #import <limits.h>
 #import <string.h>
 #import <unistd.h>
@@ -52,28 +51,12 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
       _dockView = view;
       _knownWindows = [NSMutableSet new];
       _iconWindowsByProcessID = [NSMutableDictionary new];
-      _iconImageDataByProcessID = [NSMutableDictionary new];
-      _iconDamagesByWindow = [NSMutableDictionary new];
-      _dirtyIconWindows = [NSMutableSet new];
     }
   return self;
 }
 
 - (void) dealloc
 {
-  if (_display)
-    {
-      NSArray *damageKeys = [_iconDamagesByWindow allKeys];
-      NSUInteger i;
-
-      for (i = 0; i < [damageKeys count]; i++)
-	{
-	  NSNumber *damageKey = [_iconDamagesByWindow
-				  objectForKey:[damageKeys objectAtIndex:i]];
-	  XDamageDestroy((Display *)_display,
-			 (Damage)[damageKey unsignedLongValue]);
-	}
-    }
   if (_iconConnection)
     {
       [_iconConnection invalidate];
@@ -86,10 +69,7 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
     {
       XCloseDisplay((Display *)_display);
     }
-  DESTROY(_iconImageDataByProcessID);
   DESTROY(_iconWindowsByProcessID);
-  DESTROY(_iconDamagesByWindow);
-  DESTROY(_dirtyIconWindows);
   DESTROY(_iconConnection);
   DESTROY(_knownWindows);
   DEALLOC;
@@ -127,30 +107,8 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   _display = display;
   XSetErrorHandler(X11DockManagerHandleError);
   XSelectInput(display, root, SubstructureNotifyMask | PropertyChangeMask);
-  [self initializeDamageTracking];
   [self registerIconManager];
   return YES;
-}
-
-- (void) initializeDamageTracking
-{
-  Display *display = (Display *)_display;
-  int damageErrorBase;
-  int major = 1;
-  int minor = 1;
-
-  _damageAvailable = NO;
-  _damageEventBase = 0;
-  if (!display)
-    {
-      return;
-    }
-
-  if (XDamageQueryExtension(display, &_damageEventBase, &damageErrorBase) &&
-      XDamageQueryVersion(display, &major, &minor))
-    {
-      _damageAvailable = YES;
-    }
 }
 
 - (void) registerIconManager
@@ -445,7 +403,6 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 {
   Display *display = (Display *)_display;
   BOOL sawRelevantEvent = NO;
-  BOOL sawIconDamage = NO;
 
   if (!display)
     {
@@ -458,17 +415,6 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
       Window window = None;
 
       XNextEvent(display, &event);
-      if (_damageAvailable && event.type == _damageEventBase + XDamageNotify)
-	{
-	  XDamageNotifyEvent *damageEvent = (XDamageNotifyEvent *)&event;
-
-	  [self markIconWindowDamaged:damageEvent->drawable
-			       damage:damageEvent->damage];
-	  sawRelevantEvent = YES;
-	  sawIconDamage = YES;
-	  continue;
-	}
-
       switch (event.type)
 	{
 	case CreateNotify:
@@ -496,10 +442,6 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 
   if (sawRelevantEvent)
     {
-      if (sawIconDamage)
-	{
-	  [self scanApplicationIconWindows];
-	}
       XFlush(display);
     }
 }
@@ -831,54 +773,6 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   return [self imageFromDrawable:pixmap mask:mask width:width height:height];
 }
 
-- (NSData *) imageDataFromWindowContents: (Window)window
-                                   width: (unsigned int *)width
-                                  height: (unsigned int *)height
-{
-  Display *display = (Display *)_display;
-  XWindowAttributes attr;
-
-  [self clearX11Error];
-  if (!XGetWindowAttributes(display, window, &attr))
-    {
-      return nil;
-    }
-  if ([self x11ErrorOccurred])
-    {
-      return nil;
-    }
-  if (attr.width <= 0 || attr.height <= 0 ||
-      attr.width > 128 || attr.height > 128)
-    {
-      return nil;
-    }
-
-  if (width)
-    {
-      *width = (unsigned int)attr.width;
-    }
-  if (height)
-    {
-      *height = (unsigned int)attr.height;
-    }
-
-  return [self imageDataFromDrawable:window
-				mask:None
-			       width: (unsigned int)attr.width
-			      height: (unsigned int)attr.height];
-}
-
-- (NSImage *) imageFromWindowContents: (Window)window
-{
-  unsigned int width = 0;
-  unsigned int height = 0;
-  NSData *imageData = [self imageDataFromWindowContents:window
-						  width:&width
-						 height:&height];
-
-  return [self imageFromData:imageData width:width height:height];
-}
-
 - (NSImage *) iconForWindow: (Window)window
 {
   Display *display = (Display *)_display;
@@ -891,30 +785,12 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   NSImage *hintIcon = nil;
   NSImage *icon = nil;
   XWMHints *hints;
-  NSImage *managedIcon;
-  int pid;
-  NSString *className;
-
-  pid = [self processIdentifierForWindow:window];
-  className = [self classNameForWindow:window];
-  managedIcon = [self iconForIdentifier:
-			[self iconIdentifierForProcessIdentifier:pid title:className]];
-  if (managedIcon)
-    {
-      return managedIcon;
-    }
 
   [self clearX11Error];
   hints = XGetWMHints(display, window);
   if (![self x11ErrorOccurred] && hints)
     {
-      if ((hints->flags & IconWindowHint) && hints->icon_window != None)
-	{
-	  hintIcon = [self imageFromWindowContents:hints->icon_window];
-	}
-
-      if (!hintIcon &&
-	  (hints->flags & IconPixmapHint) &&
+      if ((hints->flags & IconPixmapHint) &&
 	  hints->icon_pixmap != None)
 	{
 	  Pixmap mask = None;
@@ -1539,7 +1415,7 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 	{
 	  [_delegate x11DockManagerDidUpdateWindow: (unsigned long)window
 					    hidden:[self windowIsHidden:window]
-					      icon:[self iconForWindow:window]];
+					      icon:nil];
 	}
     }
 }
@@ -1574,119 +1450,14 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   return [name length] ? name : nil;
 }
 
-- (id) iconIdentifierForProcessIdentifier: (int)processIdentifier
-                                    title: (NSString *)title
-{
-  if (processIdentifier > 0)
-    {
-      return [NSNumber numberWithInt:processIdentifier];
-    }
-  if ([title length])
-    {
-      return [title lowercaseString];
-    }
-  return nil;
-}
-
-- (NSImage *) iconForIdentifier: (id)identifier
-{
-  NSNumber *windowKey;
-
-  if (!identifier)
-    {
-      return nil;
-    }
-
-  windowKey = [_iconWindowsByProcessID objectForKey:identifier];
-  if (!windowKey)
-    {
-      return nil;
-    }
-
-  return [self imageFromWindowContents:(Window)[windowKey unsignedLongValue]];
-}
-
-- (void) removeDamageForIconWindowKey: (NSNumber *)windowKey
-{
-  NSNumber *damageKey;
-
-  if (!windowKey)
-    {
-      return;
-    }
-
-  damageKey = [_iconDamagesByWindow objectForKey:windowKey];
-  if (damageKey && _display)
-    {
-      [self clearX11Error];
-      XDamageDestroy((Display *)_display, (Damage)[damageKey unsignedLongValue]);
-      [self x11ErrorOccurred];
-    }
-
-  [_iconDamagesByWindow removeObjectForKey:windowKey];
-  [_dirtyIconWindows removeObject:windowKey];
-}
-
-- (void) trackDamageForIconWindow: (Window)window
-{
-  NSNumber *windowKey;
-  Damage damage;
-
-  if (!_damageAvailable || !_display || window == None)
-    {
-      return;
-    }
-
-  windowKey = [NSNumber numberWithUnsignedLong:(unsigned long)window];
-  if ([_iconDamagesByWindow objectForKey:windowKey])
-    {
-      [_dirtyIconWindows addObject:windowKey];
-      return;
-    }
-
-  [self clearX11Error];
-  damage = XDamageCreate((Display *)_display, window, XDamageReportNonEmpty);
-  if ([self x11ErrorOccurred] || damage == None)
-    {
-      return;
-    }
-
-  [_iconDamagesByWindow setObject:[NSNumber numberWithUnsignedLong:(unsigned long)damage]
-			   forKey:windowKey];
-  [_dirtyIconWindows addObject:windowKey];
-}
-
-- (void) markIconWindowDamaged: (Window)window damage: (Damage)damage
-{
-  NSNumber *windowKey = [NSNumber numberWithUnsignedLong:(unsigned long)window];
-
-  if (![_iconDamagesByWindow objectForKey:windowKey])
-    {
-      return;
-    }
-
-  [_dirtyIconWindows addObject:windowKey];
-  [self clearX11Error];
-  XDamageSubtract((Display *)_display, damage, None, None);
-  [self x11ErrorOccurred];
-}
-
 - (BOOL) rememberApplicationIconWindow: (Window)window
                      processIdentifier: (int)processIdentifier
                                  title: (NSString *)title
 {
-  id identifier;
   NSNumber *windowKey;
   XWindowAttributes attr;
-  NSImage *icon;
 
   if (window == (Window)_hostWindow)
-    {
-      return NO;
-    }
-  identifier = [self iconIdentifierForProcessIdentifier:processIdentifier
-                                                  title:title];
-  if (!identifier)
     {
       return NO;
     }
@@ -1715,31 +1486,25 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
       return NO;
     }
 
-  if ([_iconWindowsByProcessID objectForKey:identifier] &&
-      ![[_iconWindowsByProcessID objectForKey:identifier] isEqual:windowKey])
+  if (processIdentifier > 0)
     {
-      return NO;
+      NSNumber *processKey = [NSNumber numberWithInt:processIdentifier];
+
+      if ([_iconWindowsByProcessID objectForKey:processKey] &&
+	  ![[_iconWindowsByProcessID objectForKey:processKey] isEqual:windowKey])
+	{
+	  return NO;
+	}
+      [_iconWindowsByProcessID setObject:windowKey forKey:processKey];
     }
-
-  [_iconWindowsByProcessID setObject:windowKey forKey:identifier];
   [_knownWindows removeObject:windowKey];
-  [self trackDamageForIconWindow:window];
 
-  icon = [self imageFromWindowContents:window];
   [self moveIconWindowOffscreen:window];
 
   if (processIdentifier == getpid())
     {
       XFlush((Display *)_display);
       return YES;
-    }
-
-  if (icon && [_delegate respondsToSelector:
-			   @selector(x11DockManagerDidUpdateApplicationIcon:processIdentifier:title:)])
-    {
-      [_delegate x11DockManagerDidUpdateApplicationIcon:icon
-				      processIdentifier:processIdentifier
-						  title:title];
     }
 
   return YES;
@@ -1787,86 +1552,13 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 	  if ((hints->flags & IconWindowHint) && hints->icon_window != None)
 	    {
 	      int pid = [self processIdentifierForWindow:children[i]];
-	      NSString *title = [self classNameForWindow:children[i]];
 
 	      [self rememberApplicationIconWindow:hints->icon_window
 				processIdentifier:pid
-					    title:title];
+					    title:nil];
 	    }
 	  XFree(hints);
 	}
-    }
-}
-
-- (void) scanApplicationIconWindows
-{
-  NSArray *iconKeys = [_iconWindowsByProcessID allKeys];
-  NSUInteger i;
-
-  for (i = 0; i < [iconKeys count]; i++)
-    {
-      id iconKey = [iconKeys objectAtIndex:i];
-      NSNumber *windowKey = [_iconWindowsByProcessID objectForKey:iconKey];
-      Window window = (Window)[windowKey unsignedLongValue];
-      XWindowAttributes attr;
-      NSImage *icon;
-      NSData *iconData;
-      unsigned int iconWidth = 0;
-      unsigned int iconHeight = 0;
-      int processIdentifier = 0;
-      NSString *title = nil;
-
-      [self clearX11Error];
-      if (!XGetWindowAttributes((Display *)_display, window, &attr) ||
-	  [self x11ErrorOccurred])
-	{
-	  [self removeDamageForIconWindowKey:windowKey];
-	  [_iconWindowsByProcessID removeObjectForKey:iconKey];
-	  [_iconImageDataByProcessID removeObjectForKey:iconKey];
-	  continue;
-	}
-
-      if (_damageAvailable && ![_dirtyIconWindows containsObject:windowKey])
-	{
-	  continue;
-	}
-
-      iconData = [self imageDataFromWindowContents:window
-					     width:&iconWidth
-					    height:&iconHeight];
-      if (!iconData)
-	{
-	  continue;
-	}
-
-      if (![iconData isEqual:[_iconImageDataByProcessID objectForKey:iconKey]])
-	{
-	  icon = [self imageFromData:iconData
-			       width:iconWidth
-			      height:iconHeight];
-	  if (!icon)
-	    {
-	      continue;
-	    }
-	  [_iconImageDataByProcessID setObject:iconData forKey:iconKey];
-	  if ([iconKey isKindOfClass:[NSNumber class]])
-	    {
-	      processIdentifier = [iconKey intValue];
-	    }
-	  else if ([iconKey isKindOfClass:[NSString class]])
-	    {
-	      title = iconKey;
-	    }
-	  if ([_delegate respondsToSelector:
-			   @selector(x11DockManagerDidUpdateApplicationIcon:processIdentifier:title:)])
-	    {
-	      [_delegate x11DockManagerDidUpdateApplicationIcon:icon
-					      processIdentifier:processIdentifier
-							  title:title];
-	    }
-	}
-
-      [_dirtyIconWindows removeObject:windowKey];
     }
 }
 
@@ -1936,7 +1628,6 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   NSArray *clientWindows;
 
   if (!display) return;
-  [self scanApplicationIconWindows];
   [self scanKnownWindows];
 
   clientWindows = [self clientListWindows];
@@ -1953,7 +1644,6 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
     }
 
   [self discoverApplicationIconWindows:children count:count];
-  [self scanApplicationIconWindows];
 
   for (i = 0; i < count; i++)
     {
@@ -1983,33 +1673,6 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
       return [self hiddenIconWindowFrame];
     }
 
-#if 0
-  NSNumber *processKey;
-  NSNumber *windowKey;
-  NSImage *icon;
-
-  processKey = [NSNumber numberWithInt:aProcessId];
-  windowKey = [NSNumber numberWithUnsignedLong:(unsigned long)aWindowNumber];
-  if ([_iconWindowsByProcessID objectForKey:processKey] &&
-      ![[_iconWindowsByProcessID objectForKey:processKey] isEqual:windowKey])
-    {
-      return NSMakeRect(0, 0, 64, 64);
-    }
-
-  [_iconWindowsByProcessID setObject:windowKey forKey:processKey];
-  [_knownWindows removeObject:windowKey];
-
-  icon = [self imageFromWindowContents:(Window)aWindowNumber];
-  if (icon && [_delegate respondsToSelector:
-			   @selector(x11DockManagerDidUpdateApplicationIcon:processIdentifier:title:)])
-    {
-      [_delegate x11DockManagerDidUpdateApplicationIcon:icon
-				      processIdentifier:aProcessId
-						  title:nil];
-    }
-
-  return NSMakeRect(0, 0, 64, 64);
-#endif
   return NSZeroRect;
 }
 
@@ -2053,7 +1716,6 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 	    isEqual:windowKey])
 	{
 	  [_iconWindowsByProcessID removeObjectForKey:processKey];
-	  [_iconImageDataByProcessID removeObjectForKey:processKey];
 	  break;
 	}
     }

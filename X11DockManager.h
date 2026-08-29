@@ -59,11 +59,6 @@ typedef enum
   NSMutableSet *_knownWindows;
   NSConnection *_iconConnection;
   NSMutableDictionary *_iconWindowsByProcessID;
-  NSMutableDictionary *_iconImageDataByProcessID;
-  NSMutableDictionary *_iconDamagesByWindow;
-  NSMutableSet *_dirtyIconWindows;
-  int _damageEventBase;
-  BOOL _damageAvailable;
 }
 
 - (id) initWithDockView: (DockView *)view;
