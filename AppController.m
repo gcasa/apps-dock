@@ -838,6 +838,23 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   return changed;
 }
 
+- (BOOL) shouldApplyX11Icon: (NSImage *)icon toItem: (DockItem *)item
+{
+  NSString *bundlePath;
+
+  if (!icon || !item)
+    {
+      return NO;
+    }
+  if ([item kind] != DockItemApplication)
+    {
+      return YES;
+    }
+
+  bundlePath = [DockItem applicationBundlePathForPath:[item path]];
+  return ![bundlePath length];
+}
+
 - (void) pruneApplicationIconUpdatesForExitedProcesses
 {
   NSArray *processIdentifiers = [_applicationIconUpdatesByProcessID allKeys];
@@ -872,7 +889,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
       item = [self applicationItemMatchingTitle:title];
     }
 
-  if (item && icon && [item kind] != DockItemApplication)
+  if (item && [self shouldApplyX11Icon:icon toItem:item])
     {
       [item setIcon:icon];
       [self refreshDock];
@@ -2385,7 +2402,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 	{
 	  [self setApplicationIconWindow:xWindow forItem:item];
 	  [item setState:DockItemRunning];
-	  if (icon && [item kind] != DockItemApplication)
+	  if ([self shouldApplyX11Icon:icon toItem:item])
 	    {
 	      [item setIcon:icon];
 	    }
@@ -2402,7 +2419,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 	{
 	  [item setXWindow:xWindow];
 	}
-      if (icon && [item kind] != DockItemApplication)
+      if ([self shouldApplyX11Icon:icon toItem:item])
 	{
 	  [item setIcon:icon];
 	}
@@ -2422,7 +2439,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 	  [item setPinned:NO];
 	  [item setState: (hidden ? DockItemHidden : DockItemRunning)];
 	  [item setXWindow:xWindow];
-	  if (icon && [item kind] != DockItemApplication)
+	  if ([self shouldApplyX11Icon:icon toItem:item])
 	    {
 	      [item setIcon:icon];
 	    }
@@ -2466,7 +2483,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   if (item)
     {
       [item setState: (hidden ? DockItemHidden : DockItemRunning)];
-      if (icon && [item kind] != DockItemApplication)
+      if ([self shouldApplyX11Icon:icon toItem:item])
 	{
 	  [item setIcon:icon];
 	}
