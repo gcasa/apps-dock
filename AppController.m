@@ -87,6 +87,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   _items = [NSMutableArray new];
   _launchedApplicationPaths = [NSMutableSet new];
   _applicationIconWindowItems = [NSMutableDictionary new];
+  _applicationIconUpdatesByProcessID = [NSMutableDictionary new];
   [self loadPersistedApplications];
   _dockPlacement = [self savedDockPlacement];
   _backgroundMode = [self savedBackgroundMode];
@@ -177,6 +178,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   DESTROY(_dockView);
   DESTROY(_window);
   DESTROY(_applicationIconWindowItems);
+  DESTROY(_applicationIconUpdatesByProcessID);
   DESTROY(_launchedApplicationPaths);
   DESTROY(_backgroundColor);
   DESTROY(_items);
@@ -748,6 +750,112 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   return nil;
 }
 
+- (BOOL) item: (DockItem *)item iconMatchesImage: (NSImage *)image
+{
+  NSData *currentData;
+  NSData *newData;
+
+  if ([item icon] == image)
+    {
+      return YES;
+    }
+  if (![item icon] || !image)
+    {
+      return NO;
+    }
+
+  currentData = [[item icon] TIFFRepresentation];
+  newData = [image TIFFRepresentation];
+  return currentData && newData && [currentData isEqualToData:newData];
+}
+
+- (void) rememberApplicationIcon: (NSImage *)icon
+		       badgeLabel: (NSString *)badgeLabel
+	processIdentifier: (NSNumber *)processIdentifier
+{
+  NSMutableDictionary *update;
+
+  if (![processIdentifier isKindOfClass:[NSNumber class]])
+    {
+      return;
+    }
+
+  update = [NSMutableDictionary dictionary];
+  if (icon)
+    {
+      [update setObject:icon forKey:@"icon"];
+    }
+  [update setObject:([badgeLabel length] ? badgeLabel : (id)[NSNull null])
+	     forKey:@"badgeLabel"];
+  [_applicationIconUpdatesByProcessID setObject:update
+					 forKey:processIdentifier];
+}
+
+- (BOOL) applyApplicationIconUpdate: (NSDictionary *)update
+			     toItem: (DockItem *)item
+{
+  id icon = [update objectForKey:@"icon"];
+  id badgeObject = [update objectForKey:@"badgeLabel"];
+  NSString *badgeLabel = badgeObject == [NSNull null] ? nil : badgeObject;
+  BOOL changed = NO;
+
+  if ([icon isKindOfClass:[NSImage class]] &&
+      ![self item:item iconMatchesImage:icon])
+    {
+      [item setIcon:icon];
+      changed = YES;
+    }
+
+  if (([badgeLabel length] || [[item badgeLabel] length]) &&
+      !(([item badgeLabel] == badgeLabel) ||
+	([item badgeLabel] && badgeLabel &&
+	 [[item badgeLabel] isEqualToString:badgeLabel])))
+    {
+      [item setBadgeLabel:badgeLabel];
+      changed = YES;
+    }
+
+  return changed;
+}
+
+- (BOOL) applyStoredApplicationIconUpdateForItem: (DockItem *)item
+{
+  NSArray *processIdentifiers = [self runningProcessIdentifiersForApplicationItem:item];
+  BOOL changed = NO;
+  NSUInteger i;
+
+  for (i = 0; i < [processIdentifiers count]; i++)
+    {
+      NSDictionary *update = [_applicationIconUpdatesByProcessID
+			       objectForKey:[processIdentifiers objectAtIndex:i]];
+
+      if (update)
+	{
+	  changed = [self applyApplicationIconUpdate:update toItem:item] || changed;
+	}
+    }
+
+  return changed;
+}
+
+- (void) pruneApplicationIconUpdatesForExitedProcesses
+{
+  NSArray *processIdentifiers = [_applicationIconUpdatesByProcessID allKeys];
+  NSUInteger i;
+
+  for (i = 0; i < [processIdentifiers count]; i++)
+    {
+      NSNumber *processIdentifier = [processIdentifiers objectAtIndex:i];
+      NSString *processPath = [@"/proc" stringByAppendingPathComponent:
+					[processIdentifier stringValue]];
+
+      if (![[NSFileManager defaultManager] fileExistsAtPath:processPath])
+	{
+	  [_applicationIconUpdatesByProcessID removeObjectForKey:processIdentifier];
+	}
+    }
+}
+
 - (void) x11DockManagerDidUpdateApplicationIcon: (NSImage *)icon
                               processIdentifier: (int)processIdentifier
                                           title: (NSString *)title
@@ -776,21 +884,26 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
                               processIdentifier: (int)processIdentifier
 {
   DockItem *item = nil;
+  NSNumber *processIdentifierNumber = nil;
 
   if (processIdentifier > 0)
     {
-      item = [self applicationItemMatchingProcessIdentifier:
-				    [NSNumber numberWithInt:processIdentifier]];
+      processIdentifierNumber = [NSNumber numberWithInt:processIdentifier];
+      [self rememberApplicationIcon:icon
+			  badgeLabel:badgeLabel
+		   processIdentifier:processIdentifierNumber];
+      item = [self applicationItemMatchingProcessIdentifier:processIdentifierNumber];
     }
 
   if (item)
     {
-      if (icon)
+      if ([self applyApplicationIconUpdate:
+		  [_applicationIconUpdatesByProcessID
+		    objectForKey:processIdentifierNumber]
+				       toItem:item])
 	{
-	  [item setIcon:icon];
+	  [self refreshDock];
 	}
-      [item setBadgeLabel:badgeLabel];
-      [self refreshDock];
     }
 }
 
@@ -1014,6 +1127,8 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   BOOL changed = NO;
   NSUInteger i;
 
+  [self pruneApplicationIconUpdatesForExitedProcesses];
+
   for (i = 0; i < [_items count]; i++)
     {
       DockItem *item = [_items objectAtIndex:i];
@@ -1050,6 +1165,10 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 	  [item setState:newState];
 	  changed = YES;
 	}
+      if (running)
+	{
+	  changed = [self applyStoredApplicationIconUpdateForItem:item] || changed;
+	}
     }
 
   for (i = 0; i < [processPaths count]; i++)
@@ -1069,6 +1188,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
       item = [DockItem applicationItemWithPath:bundlePath];
       [item setPinned:NO];
       [item setState:DockItemRunning];
+      [self applyStoredApplicationIconUpdateForItem:item];
       [_items addObject:item];
       changed = YES;
     }
@@ -2281,6 +2401,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 	    {
 	      [item setIcon:icon];
 	    }
+	  [self applyStoredApplicationIconUpdateForItem:item];
 	  [self refreshDock];
 	}
       return;
@@ -2296,6 +2417,10 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
       if (icon)
 	{
 	  [item setIcon:icon];
+	}
+      if ([item kind] == DockItemApplication)
+	{
+	  [self applyStoredApplicationIconUpdateForItem:item];
 	}
     }
   else
@@ -2313,6 +2438,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 	    {
 	      [item setIcon:icon];
 	    }
+	  [self applyStoredApplicationIconUpdateForItem:item];
 	}
       else
 	{

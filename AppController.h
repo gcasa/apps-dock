@@ -37,6 +37,7 @@
   NSMutableArray *_items;
   NSMutableSet *_launchedApplicationPaths;
   NSMutableDictionary *_applicationIconWindowItems;
+  NSMutableDictionary *_applicationIconUpdatesByProcessID;
   X11DockManager *_x11;
   NSTimer *_x11EventTimer;
   NSTimer *_scanTimer;
