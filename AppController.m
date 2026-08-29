@@ -21,6 +21,7 @@
 #import "DockItem.h"
 #import <GNUstepBase/GNUstep.h>
 #import <ctype.h>
+#import <dirent.h>
 #import <limits.h>
 #import <signal.h>
 #import <unistd.h>
@@ -122,23 +123,8 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   if ([_x11 start])
     {
       [_x11 setDockPlacement:_dockPlacement];
-      _x11EventTimer = [NSTimer scheduledTimerWithTimeInterval:0.5
-							target:_x11
-						      selector:@selector(processPendingEvents)
-						      userInfo:nil
-						       repeats:YES];
-      _scanTimer = [NSTimer scheduledTimerWithTimeInterval:5.0
-						    target:_x11
-						  selector:@selector(scanForDockApps)
-						  userInfo:nil
-						   repeats:YES];
     }
 
-  _processScanTimer = [NSTimer scheduledTimerWithTimeInterval:1.0
-                                                       target:self
-                                                     selector:@selector(scanRunningApplications)
-                                                     userInfo:nil
-                                                      repeats:YES];
   [self performSelector:@selector(performInitialApplicationScans)
 	     withObject:nil
 	     afterDelay:0.5];
@@ -266,6 +252,9 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   for (i = 0; i < [paths count]; i++)
     {
       id path = [paths objectAtIndex:i];
+      NSString *bundlePath;
+      NSString *applicationPath;
+      DockItem *transientItem;
       BOOL isDir = NO;
 
       if (![path isKindOfClass:[NSString class]])
@@ -273,11 +262,20 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 	  continue;
 	}
 
-      if ([[NSFileManager defaultManager] fileExistsAtPath:path
+      bundlePath = [DockItem applicationBundlePathForPath:path];
+      applicationPath = [bundlePath length] ? bundlePath : path;
+
+      if ([[NSFileManager defaultManager] fileExistsAtPath:applicationPath
 					       isDirectory:&isDir] &&
-	  ![self dockHasApplicationPath:path])
+	  ![self dockHasApplicationPath:applicationPath])
 	{
-	  [_items addObject:[DockItem applicationItemWithPath:path]];
+	  transientItem =
+	    [self transientApplicationItemMatchingBundlePath:applicationPath];
+	  if (transientItem)
+	    {
+	      [_items removeObject:transientItem];
+	    }
+	  [_items addObject:[DockItem applicationItemWithPath:applicationPath]];
 	}
     }
 }
@@ -532,6 +530,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   NSArray *entries = [[NSFileManager defaultManager]
 		       directoryContentsAtPath:@"/proc"];
   NSMutableArray *paths = [NSMutableArray array];
+  NSMutableSet *seenPaths = [NSMutableSet set];
   NSUInteger i;
 
   for (i = 0; i < [entries count]; i++)
@@ -560,14 +559,41 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
       {
 	NSString *path = [self normalizedPath:
 				 [NSString stringWithUTF8String:target]];
-	if ([path length] && ![paths containsObject:path])
+	if ([path length] && ![seenPaths containsObject:path])
 	  {
+	    [seenPaths addObject:path];
 	    [paths addObject:path];
 	  }
       }
     }
 
   return paths;
+}
+
+- (NSString *) executablePathForProcessIdentifier: (NSNumber *)processIdentifier
+{
+  NSString *linkPath;
+  char target[PATH_MAX];
+  ssize_t length;
+
+  if (![processIdentifier isKindOfClass:[NSNumber class]])
+    {
+      return nil;
+    }
+
+  linkPath = [[@"/proc" stringByAppendingPathComponent:
+		 [processIdentifier stringValue]]
+	       stringByAppendingPathComponent:@"exe"];
+  length = readlink([linkPath fileSystemRepresentation],
+		    target,
+		    sizeof(target) - 1);
+  if (length <= 0)
+    {
+      return nil;
+    }
+
+  target[length] = '\0';
+  return [self normalizedPath:[NSString stringWithUTF8String:target]];
 }
 
 - (NSArray *) runningProcessIdentifiersForApplicationItem: (DockItem *)item
@@ -693,9 +719,16 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
 - (DockItem *) applicationItemMatchingProcessIdentifier: (NSNumber *)processIdentifier
 {
+  NSString *processPath;
   NSUInteger i;
 
   if (![processIdentifier isKindOfClass:[NSNumber class]])
+    {
+      return nil;
+    }
+
+  processPath = [self executablePathForProcessIdentifier:processIdentifier];
+  if (![processPath length])
     {
       return nil;
     }
@@ -705,8 +738,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
       DockItem *item = [_items objectAtIndex:i];
 
       if ([item kind] == DockItemApplication &&
-	  [[self runningProcessIdentifiersForApplicationItem:item]
-	    containsObject:processIdentifier])
+	  [self applicationItem:item matchesRunningProcessPath:processPath])
 	{
 	  return item;
 	}
@@ -1124,6 +1156,30 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   if (_x11)
     {
       [_x11 scanForDockApps];
+      if (!_x11EventTimer)
+	{
+	  _x11EventTimer = [NSTimer scheduledTimerWithTimeInterval:0.5
+							    target:_x11
+							  selector:@selector(processPendingEvents)
+							  userInfo:nil
+							   repeats:YES];
+	}
+      if (!_scanTimer)
+	{
+	  _scanTimer = [NSTimer scheduledTimerWithTimeInterval:5.0
+							target:_x11
+						      selector:@selector(scanForDockApps)
+						      userInfo:nil
+						       repeats:YES];
+	}
+    }
+  if (!_processScanTimer)
+    {
+      _processScanTimer = [NSTimer scheduledTimerWithTimeInterval:5.0
+							   target:self
+							 selector:@selector(scanRunningApplications)
+							 userInfo:nil
+							  repeats:YES];
     }
   [self launchOpenAtLoginApplications];
 }
@@ -1171,10 +1227,6 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 	{
 	  [item setState:newState];
 	  changed = YES;
-	}
-      if (running)
-	{
-	  changed = [self applyStoredApplicationIconUpdateForItem:item] || changed;
 	}
     }
 
@@ -1233,23 +1285,34 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
 - (BOOL) directoryHasVisibleContentsAtPath: (NSString *)path
 {
-  NSArray *entries = [[NSFileManager defaultManager] directoryContentsAtPath:path];
-  NSUInteger i;
+  DIR *directory;
+  struct dirent *entry;
 
-  for (i = 0; i < [entries count]; i++)
+  if (![path length])
     {
-      NSString *entry = [entries objectAtIndex:i];
+      return NO;
+    }
 
-      if ([entry isEqualToString:@"."] ||
-	  [entry isEqualToString:@".."] ||
-	  [entry isEqualToString:@".gwdir"])
+  directory = opendir([path fileSystemRepresentation]);
+  if (!directory)
+    {
+      return NO;
+    }
+
+  while ((entry = readdir(directory)) != NULL)
+    {
+      if (strcmp(entry->d_name, ".") == 0 ||
+	  strcmp(entry->d_name, "..") == 0 ||
+	  strcmp(entry->d_name, ".gwdir") == 0)
 	{
 	  continue;
 	}
 
+      closedir(directory);
       return YES;
     }
 
+  closedir(directory);
   return NO;
 }
 
