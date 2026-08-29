@@ -72,7 +72,6 @@ typedef enum
 - (void) scanForDockApps;
 - (void) dockWindow: (unsigned long)xWindow atIndex: (NSUInteger)index;
 - (void) moveDockedWindow: (unsigned long)xWindow toIndex: (NSUInteger)index;
-- (void) hideWindow: (unsigned long)xWindow;
 - (void) activateWindow: (unsigned long)xWindow;
 - (BOOL) windowExists: (unsigned long)xWindow;
 - (BOOL) activateApplicationWithProcessIdentifiers: (NSArray *)processIdentifiers;

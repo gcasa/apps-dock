@@ -123,7 +123,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   if ([_x11 start])
     {
       [_x11 setDockPlacement:_dockPlacement];
-      [self updateDockBackgroundHidingWindow:NO];
+      [self updateDockBackground];
       [_window makeKeyAndOrderFront:nil];
       [_window orderFrontRegardless];
       _x11EventTimer = [NSTimer scheduledTimerWithTimeInterval:0.005
@@ -1053,11 +1053,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
       if ([[NSFileManager defaultManager] isExecutableFileAtPath:executablePath])
 	{
 	  [NSTask launchedTaskWithLaunchPath:executablePath
-				   arguments:[NSArray arrayWithObjects:
-						      @"-GSUseIconManager", @"YES",
-						      @"-GSAppOwnsMiniwindow", @"NO",
-						      @"-GSSuppressAppIcon", @"YES",
-						      nil]];
+				   arguments:[NSArray array]];
 	  return YES;
 	}
       if ([[NSWorkspace sharedWorkspace] launchApplication:path])
@@ -1849,7 +1845,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   _backgroundMode = (DockBackgroundMode)[sender tag];
   [defaults setInteger:_backgroundMode forKey:DockBackgroundModeDefaultsKey];
   [defaults synchronize];
-  [self updateDockBackgroundHidingWindow:YES];
+  [self updateDockBackground];
   [self updateDockMenu];
 }
 
@@ -1880,7 +1876,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
                                  NSWidth([_window frame]),
                                  NSHeight([_window frame]))];
   [_x11 setDockPlacement:_dockPlacement];
-  [self updateDockBackgroundHidingWindow:YES];
+  [self updateDockBackground];
   [self updateDockMenu];
 }
 
@@ -1888,11 +1884,11 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 {
   if (_backgroundMode == DockBackgroundSimulatedTransparency)
     {
-      [self updateDockBackgroundHidingWindow:NO];
+      [self updateDockBackground];
     }
 }
 
-- (void) updateDockBackgroundHidingWindow: (BOOL)hideWindow
+- (void) updateDockBackground
 {
   NSImage *image;
   BOOL wasVisible;
@@ -1918,12 +1914,6 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
   _updatingDockBackground = YES;
   wasVisible = [_window isVisible];
-  if (hideWindow && wasVisible)
-    {
-      [_window orderOut:nil];
-      [[NSRunLoop currentRunLoop] runUntilDate:
-				    [NSDate dateWithTimeIntervalSinceNow:0.02]];
-    }
 
   image = [_x11 backgroundImageForDockFrame:[_window frame]];
   if (image)
@@ -1935,10 +1925,6 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
       [_dockView setBackgroundImage:nil];
     }
 
-  if (hideWindow && wasVisible)
-    {
-      [_window orderFrontRegardless];
-    }
   _updatingDockBackground = NO;
 }
 

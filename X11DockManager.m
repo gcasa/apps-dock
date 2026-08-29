@@ -1051,6 +1051,10 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
     {
       return NO;
     }
+  if ([self wmStateForWindow:window state:&state] && state == WithdrawnState)
+    {
+      return NO;
+    }
   if (attr.override_redirect)
     {
       return NO;
@@ -1158,6 +1162,7 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 {
   Display *display = (Display *)_display;
   XWindowAttributes attr;
+  long state = NormalState;
 
   if (window == (Window)_hostWindow)
     {
@@ -1174,6 +1179,10 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
       return NO;
     }
   if ([self x11ErrorOccurred])
+    {
+      return NO;
+    }
+  if ([self wmStateForWindow:window state:&state] && state == WithdrawnState)
     {
       return NO;
     }
@@ -1307,16 +1316,6 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
                      processIdentifier: (int)processIdentifier
                                  title: (NSString *)title
 {
-  if (window == (Window)_hostWindow)
-    {
-      return NO;
-    }
-  if ([self windowHasGNUstepIconStyle:window] &&
-      [self windowIsIconSized:window])
-    {
-      return YES;
-    }
-
   id identifier;
   NSNumber *windowKey;
   XWindowAttributes attr;
@@ -1600,6 +1599,13 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
       return NSZeroRect;
     }
 
+  if ([self rememberApplicationIconWindow:(Window)aWindowNumber
+                        processIdentifier:aProcessId
+                                    title:nil])
+    {
+      return NSMakeRect(0, 0, 64, 64);
+    }
+
 #if 0
   NSNumber *processKey;
   NSNumber *windowKey;
@@ -1627,7 +1633,7 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 
   return NSMakeRect(0, 0, 64, 64);
 #endif
-  return NSMakeRect(0, 0, 64, 64);
+  return NSZeroRect;
 }
 
 - (void) setApplicationIconData: (NSData *)data
@@ -1713,11 +1719,6 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   XFlush(display);
 }
 
-- (void) hideWindow: (unsigned long)xWindow
-{
-  return;
-}
-
 - (void) activateWindow: (unsigned long)xWindow
 {
   Display *display = (Display *)_display;
@@ -1774,6 +1775,8 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
     {
       Window window = children[i - 1];
       XWindowAttributes attr;
+      long state = NormalState;
+      BOOL hasState;
       int processIdentifier;
 
       if ([self windowIsRegisteredIconWindow:window])
@@ -1793,6 +1796,14 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 	}
 
       if (attr.override_redirect && attr.width <= 96 && attr.height <= 96)
+	{
+	  continue;
+	}
+
+      hasState = [self wmStateForWindow:window state:&state];
+      if ((hasState && state == WithdrawnState) ||
+	  (attr.map_state != IsViewable &&
+	   (!hasState || state != IconicState)))
 	{
 	  continue;
 	}
