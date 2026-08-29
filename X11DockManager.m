@@ -35,6 +35,7 @@
 #define DockHiddenIconWindowOffset 256
 
 static int X11DockManagerLastErrorCode = 0;
+static const NSTimeInterval X11DockManagerEventScanInterval = 1.0;
 static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 {
   X11DockManagerLastErrorCode = event->error_code;
@@ -256,6 +257,7 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   BOOL sawRelevantEvent = NO;
   unsigned int processedEvents = 0;
   const unsigned int maxEventsPerTick = 64;
+  NSTimeInterval now;
 
   if (!display)
     {
@@ -265,30 +267,29 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   while (processedEvents < maxEventsPerTick && XPending(display) > 0)
     {
       XEvent event;
-      Window window = None;
 
       XNextEvent(display, &event);
       processedEvents++;
       switch (event.type)
 	{
 	case CreateNotify:
-	  window = event.xcreatewindow.window;
-	  break;
 	case MapNotify:
-	  window = event.xmap.window;
-	  break;
 	case MapRequest:
-	  window = event.xmaprequest.window;
+	  _scanPending = YES;
+	  sawRelevantEvent = YES;
 	  break;
 	default:
 	  break;
 	}
+    }
 
-      if (window != None)
-	{
-	  [self handlePossiblyNewWindow:window];
-	  sawRelevantEvent = YES;
-	}
+  now = [NSDate timeIntervalSinceReferenceDate];
+  if (_scanPending &&
+      now - _lastEventScanTime >= X11DockManagerEventScanInterval)
+    {
+      _scanPending = NO;
+      _lastEventScanTime = now;
+      [self scanForDockApps];
     }
 
   if (sawRelevantEvent)
@@ -1479,6 +1480,8 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   NSArray *clientWindows;
 
   if (!display) return;
+  _scanPending = NO;
+  _lastEventScanTime = [NSDate timeIntervalSinceReferenceDate];
   [self scanKnownWindows];
 
   clientWindows = [self clientListWindows];

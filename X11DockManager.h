@@ -59,6 +59,8 @@ typedef enum
   NSMutableSet *_knownWindows;
   NSConnection *_iconConnection;
   NSMutableDictionary *_iconWindowsByProcessID;
+  BOOL _scanPending;
+  NSTimeInterval _lastEventScanTime;
 }
 
 - (id) initWithDockView: (DockView *)view;
