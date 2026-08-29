@@ -975,6 +975,21 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
                                   window:window];
 }
 
+- (BOOL) windowIsIconSized: (Window)window
+{
+  XWindowAttributes attr;
+
+  [self clearX11Error];
+  if (!XGetWindowAttributes((Display *)_display, window, &attr) ||
+      [self x11ErrorOccurred])
+    {
+      return NO;
+    }
+
+  return attr.width > 0 && attr.height > 0 &&
+    attr.width <= 128 && attr.height <= 128;
+}
+
 - (BOOL) windowHasGNUstepMiniWindowStyle: (Window)window
 {
   return [self windowHasGNUstepStyleMask:DockNSMiniWindowMask
@@ -1272,7 +1287,6 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 
 - (NSImage *) iconForIdentifier: (id)identifier
 {
-#if 0
   NSNumber *windowKey;
 
   if (!identifier)
@@ -1287,8 +1301,6 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
     }
 
   return [self imageFromWindowContents:(Window)[windowKey unsignedLongValue]];
-#endif
-  return nil;
 }
 
 - (BOOL) rememberApplicationIconWindow: (Window)window
@@ -1299,12 +1311,12 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
     {
       return NO;
     }
-  if ([self windowHasGNUstepIconStyle:window])
+  if ([self windowHasGNUstepIconStyle:window] &&
+      [self windowIsIconSized:window])
     {
       return YES;
     }
 
-#if 0
   id identifier;
   NSNumber *windowKey;
   XWindowAttributes attr;
@@ -1371,8 +1383,6 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
     }
 
   return YES;
-#endif
-  return NO;
 }
 
 - (void) discoverApplicationIconWindows: (Window *)children
@@ -1580,19 +1590,20 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 - (NSRect) setWindow: (unsigned int)aWindowNumber
         appProcessId: (int)aProcessId
 {
+  if (aWindowNumber == 0 || aProcessId <= 0)
+    {
+      return NSZeroRect;
+    }
+  if (![self windowHasGNUstepIconStyle:(Window)aWindowNumber] ||
+      ![self windowIsIconSized:(Window)aWindowNumber])
+    {
+      return NSZeroRect;
+    }
+
 #if 0
   NSNumber *processKey;
   NSNumber *windowKey;
   NSImage *icon;
-
-  if (aWindowNumber == 0 || aProcessId <= 0)
-    {
-      return NSMakeRect(0, 0, 64, 64);
-    }
-  if (![self windowHasGNUstepIconStyle:(Window)aWindowNumber])
-    {
-      return NSMakeRect(0, 0, 64, 64);
-    }
 
   processKey = [NSNumber numberWithInt:aProcessId];
   windowKey = [NSNumber numberWithUnsignedLong:(unsigned long)aWindowNumber];

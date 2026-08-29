@@ -1055,6 +1055,8 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 	  [NSTask launchedTaskWithLaunchPath:executablePath
 				   arguments:[NSArray arrayWithObjects:
 						      @"-GSUseIconManager", @"YES",
+						      @"-GSAppOwnsMiniwindow", @"NO",
+						      @"-GSSuppressAppIcon", @"YES",
 						      nil]];
 	  return YES;
 	}
