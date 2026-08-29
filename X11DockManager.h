@@ -59,8 +59,6 @@ typedef enum
   NSMutableSet *_knownWindows;
   NSConnection *_iconConnection;
   NSMutableDictionary *_iconWindowsByProcessID;
-  NSMutableDictionary *_applicationIconDataByProcessID;
-  NSMutableDictionary *_applicationIconBadgeByProcessID;
 }
 
 - (id) initWithDockView: (DockView *)view;

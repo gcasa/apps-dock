@@ -694,7 +694,6 @@
 	{
 	  [(DockTileIconView *)[_dockTile contentView] setBadgeLabel:label];
 	}
-      [_dockTile display];
     }
 }
 
@@ -712,7 +711,6 @@
 	{
 	  [(DockTileIconView *)[_dockTile contentView] setIcon:icon];
 	}
-      [_dockTile display];
     }
 }
 

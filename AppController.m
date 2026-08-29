@@ -87,7 +87,6 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   _launchedApplicationPaths = [NSMutableSet new];
   _applicationIconWindowItems = [NSMutableDictionary new];
   _applicationIconUpdatesByProcessID = [NSMutableDictionary new];
-  [self loadPersistedApplications];
   _dockPlacement = [self savedDockPlacement];
   _backgroundColor = RETAIN([self savedBackgroundColor]);
   frame = [self dockWindowFrameForPlacement:_dockPlacement];
@@ -113,16 +112,16 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [_dockView setMenu:[self dockMenu]];
   [_window setContentView:_dockView];
 
-  [self scanRunningApplications];
+  [self updateDockBackground];
+  [_window makeKeyAndOrderFront:nil];
+  [_window orderFrontRegardless];
+  [_window display];
 
   _x11 = [[X11DockManager alloc] initWithDockView:_dockView];
   [_x11 setDelegate:self];
   if ([_x11 start])
     {
       [_x11 setDockPlacement:_dockPlacement];
-      [self updateDockBackground];
-      [_window makeKeyAndOrderFront:nil];
-      [_window orderFrontRegardless];
       _x11EventTimer = [NSTimer scheduledTimerWithTimeInterval:0.5
 							target:_x11
 						      selector:@selector(processPendingEvents)
@@ -133,12 +132,6 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 						  selector:@selector(scanForDockApps)
 						  userInfo:nil
 						   repeats:YES];
-      [_x11 scanForDockApps];
-      [_x11 drainTransientIconEvents];
-    }
-  else
-    {
-      [_window makeKeyAndOrderFront:nil];
     }
 
   _processScanTimer = [NSTimer scheduledTimerWithTimeInterval:1.0
@@ -146,7 +139,9 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
                                                      selector:@selector(scanRunningApplications)
                                                      userInfo:nil
                                                       repeats:YES];
-  [self launchOpenAtLoginApplications];
+  [self performSelector:@selector(performInitialApplicationScans)
+	     withObject:nil
+	     afterDelay:0.5];
 }
 
 - (void) dealloc
@@ -1119,6 +1114,18 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
       [self launchApplicationAtPath:path];
       [_x11 drainTransientIconEvents];
     }
+}
+
+- (void) performInitialApplicationScans
+{
+  [self loadPersistedApplications];
+  [self refreshDock];
+  [self scanRunningApplications];
+  if (_x11)
+    {
+      [_x11 scanForDockApps];
+    }
+  [self launchOpenAtLoginApplications];
 }
 
 - (void) scanRunningApplications

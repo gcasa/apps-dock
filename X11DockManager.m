@@ -51,8 +51,6 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
       _dockView = view;
       _knownWindows = [NSMutableSet new];
       _iconWindowsByProcessID = [NSMutableDictionary new];
-      _applicationIconDataByProcessID = [NSMutableDictionary new];
-      _applicationIconBadgeByProcessID = [NSMutableDictionary new];
     }
   return self;
 }
@@ -72,8 +70,6 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
       XCloseDisplay((Display *)_display);
     }
   DESTROY(_iconWindowsByProcessID);
-  DESTROY(_applicationIconDataByProcessID);
-  DESTROY(_applicationIconBadgeByProcessID);
   DESTROY(_iconConnection);
   DESTROY(_knownWindows);
   DEALLOC;
@@ -258,18 +254,21 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 {
   Display *display = (Display *)_display;
   BOOL sawRelevantEvent = NO;
+  unsigned int processedEvents = 0;
+  const unsigned int maxEventsPerTick = 64;
 
   if (!display)
     {
       return;
     }
 
-  while (XPending(display) > 0)
+  while (processedEvents < maxEventsPerTick && XPending(display) > 0)
     {
       XEvent event;
       Window window = None;
 
       XNextEvent(display, &event);
+      processedEvents++;
       switch (event.type)
 	{
 	case CreateNotify:
@@ -280,9 +279,6 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 	  break;
 	case MapRequest:
 	  window = event.xmaprequest.window;
-	  break;
-	case PropertyNotify:
-	  window = event.xproperty.window;
 	  break;
 	default:
 	  break;
@@ -1275,38 +1271,6 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
     }
 }
 
-- (void) pruneApplicationIconStateForExitedProcesses
-{
-  NSMutableSet *processKeys = [NSMutableSet setWithArray:
-					      [_applicationIconDataByProcessID allKeys]];
-  NSUInteger i;
-  NSArray *keys;
-
-  [processKeys addObjectsFromArray:[_applicationIconBadgeByProcessID allKeys]];
-  [processKeys addObjectsFromArray:[_iconWindowsByProcessID allKeys]];
-  keys = [processKeys allObjects];
-
-  for (i = 0; i < [keys count]; i++)
-    {
-      NSNumber *processKey = [keys objectAtIndex:i];
-      NSString *processPath;
-
-      if (![processKey isKindOfClass:[NSNumber class]])
-	{
-	  continue;
-	}
-
-      processPath = [@"/proc" stringByAppendingPathComponent:
-			 [processKey stringValue]];
-      if (![[NSFileManager defaultManager] fileExistsAtPath:processPath])
-	{
-	  [_applicationIconDataByProcessID removeObjectForKey:processKey];
-	  [_applicationIconBadgeByProcessID removeObjectForKey:processKey];
-	  [_iconWindowsByProcessID removeObjectForKey:processKey];
-	}
-    }
-}
-
 - (NSString *) classNameForWindow: (Window)window
 {
   Display *display = (Display *)_display;
@@ -1515,7 +1479,6 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   NSArray *clientWindows;
 
   if (!display) return;
-  [self pruneApplicationIconStateForExitedProcesses];
   [self scanKnownWindows];
 
   clientWindows = [self clientListWindows];
@@ -1569,39 +1532,11 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
                    appProcessId: (int)aProcessId
 {
   NSImage *icon = nil;
-  NSNumber *processKey;
-  id currentBadge;
-  id nextBadge;
-  NSData *currentData;
 
   if (aProcessId <= 0)
     {
       return;
     }
-
-  processKey = [NSNumber numberWithInt:aProcessId];
-  currentData = [_applicationIconDataByProcessID objectForKey:processKey];
-  currentBadge = [_applicationIconBadgeByProcessID objectForKey:processKey];
-  nextBadge = [badgeText length] ? (id)badgeText : (id)[NSNull null];
-
-  if (((![data length] && ![currentData length]) ||
-       ([data length] && [currentData isEqualToData:data])) &&
-      ((currentBadge == nextBadge) ||
-       (currentBadge && [currentBadge isEqual:nextBadge])))
-    {
-      return;
-    }
-
-  if ([data length])
-    {
-      [_applicationIconDataByProcessID setObject:AUTORELEASE([data copy])
-					  forKey:processKey];
-    }
-  else
-    {
-      [_applicationIconDataByProcessID removeObjectForKey:processKey];
-    }
-  [_applicationIconBadgeByProcessID setObject:nextBadge forKey:processKey];
 
   if ([data length])
     {
