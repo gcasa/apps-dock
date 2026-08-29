@@ -31,6 +31,8 @@
 #define DockGSWindowStyleAttr (1UL << 0)
 #define DockNSIconWindowMask 64UL
 #define DockNSMiniWindowMask 128UL
+#define DockSmallIconWindowMaximumSize 70
+#define DockHiddenIconWindowOffset 256
 
 static int X11DockManagerLastErrorCode = 0;
 static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
@@ -969,6 +971,37 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   return result;
 }
 
+- (BOOL) windowHasGNUstepWindowAttributes: (Window)window
+{
+  Display *display = (Display *)_display;
+  Atom property = XInternAtom(display, "_GNUSTEP_WM_ATTR", False);
+  Atom actualType;
+  int actualFormat;
+  unsigned long itemCount;
+  unsigned long bytesAfter;
+  unsigned char *data = NULL;
+  BOOL result = NO;
+
+  [self clearX11Error];
+  if (XGetWindowProperty(display, window, property, 0,
+                         2,
+                         False, property, &actualType, &actualFormat,
+                         &itemCount, &bytesAfter, &data) == Success && data)
+    {
+      if (![self x11ErrorOccurred] &&
+	  actualFormat == 32 &&
+	  itemCount >= 2)
+	{
+	  unsigned long *attrs = (unsigned long *)data;
+
+	  result = (attrs[0] & DockGSWindowStyleAttr) ? YES : NO;
+	}
+      XFree(data);
+    }
+
+  return result;
+}
+
 - (BOOL) windowHasGNUstepIconStyle: (Window)window
 {
   return [self windowHasGNUstepStyleMask:DockNSIconWindowMask
@@ -990,10 +1023,152 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
     attr.width <= 128 && attr.height <= 128;
 }
 
+- (BOOL) windowIsSmallIconSized: (Window)window
+{
+  XWindowAttributes attr;
+
+  [self clearX11Error];
+  if (!XGetWindowAttributes((Display *)_display, window, &attr) ||
+      [self x11ErrorOccurred])
+    {
+      return NO;
+    }
+
+  return attr.width > 0 && attr.height > 0 &&
+    attr.width <= DockSmallIconWindowMaximumSize &&
+    attr.height <= DockSmallIconWindowMaximumSize;
+}
+
 - (BOOL) windowHasGNUstepMiniWindowStyle: (Window)window
 {
   return [self windowHasGNUstepStyleMask:DockNSMiniWindowMask
                                   window:window];
+}
+
+- (BOOL) windowIsSmallGNUstepIconOrMiniWindow: (Window)window
+{
+  long state = NormalState;
+
+  if (![self windowIsSmallIconSized:window])
+    {
+      return NO;
+    }
+
+  if ([self windowHasGNUstepIconStyle:window] ||
+      [self windowHasGNUstepMiniWindowStyle:window])
+    {
+      return YES;
+    }
+
+  return [self windowIsSmallIconSized:window] &&
+    ![self wmStateForWindow:window state:&state] &&
+    [self windowHasGNUstepWindowAttributes:window];
+}
+
+- (BOOL) windowIsSmallRootOverrideRedirectWindow: (Window)window
+{
+  Display *display = (Display *)_display;
+  int screen;
+  Window root;
+  Window parent;
+  Window *children = NULL;
+  unsigned int childCount = 0;
+  XWindowAttributes attr;
+  BOOL result = NO;
+
+  if (!display || window == (Window)_hostWindow ||
+      ![self windowIsSmallIconSized:window])
+    {
+      return NO;
+    }
+
+  screen = DefaultScreen(display);
+  root = RootWindow(display, screen);
+
+  [self clearX11Error];
+  if (!XGetWindowAttributes(display, window, &attr) ||
+      [self x11ErrorOccurred])
+    {
+      return NO;
+    }
+
+  [self clearX11Error];
+  if (XQueryTree(display, window, &root, &parent, &children, &childCount) &&
+      ![self x11ErrorOccurred])
+    {
+      result = attr.override_redirect && parent == RootWindow(display, screen);
+    }
+  if (children)
+    {
+      XFree(children);
+    }
+
+  return result;
+}
+
+- (void) moveIconWindowOffscreen: (Window)window
+{
+  Display *display = (Display *)_display;
+  int screen;
+  Window root;
+  Window parent;
+  Window *children = NULL;
+  unsigned int childCount = 0;
+  Window moveWindow;
+
+  if (!display || window == (Window)_hostWindow)
+    {
+      return;
+    }
+
+  screen = DefaultScreen(display);
+  root = RootWindow(display, screen);
+  moveWindow = window;
+
+  [self clearX11Error];
+  if (XQueryTree(display, window, &root, &parent, &children, &childCount) &&
+      ![self x11ErrorOccurred])
+    {
+      while (parent != None &&
+	     parent != root &&
+	     parent != (Window)_hostWindow)
+	{
+	  Window grandparent;
+	  Window *siblings = NULL;
+	  unsigned int siblingCount = 0;
+
+	  moveWindow = parent;
+	  if (!XQueryTree(display, moveWindow, &root, &grandparent,
+			  &siblings, &siblingCount) ||
+	      [self x11ErrorOccurred])
+	    {
+	      if (siblings)
+		{
+		  XFree(siblings);
+		}
+	      break;
+	    }
+	  if (siblings)
+	    {
+	      XFree(siblings);
+	    }
+	  parent = grandparent;
+	}
+    }
+  if (children)
+    {
+      XFree(children);
+    }
+
+  if (moveWindow == (Window)_hostWindow)
+    {
+      return;
+    }
+
+  XMoveWindow(display, moveWindow,
+	      DisplayWidth(display, screen) + DockHiddenIconWindowOffset,
+	      DisplayHeight(display, screen) + DockHiddenIconWindowOffset);
+  XFlush(display);
 }
 
 - (void) handlePossiblyNewWindow: (Window)window
@@ -1005,8 +1180,10 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
       return;
     }
 
-  if ([self windowHasGNUstepMiniWindowStyle:window])
+  if ([self windowIsSmallGNUstepIconOrMiniWindow:window] ||
+      [self windowIsSmallRootOverrideRedirectWindow:window])
     {
+      [self moveIconWindowOffscreen:window];
       return;
     }
 
@@ -1038,8 +1215,10 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
     {
       return NO;
     }
-  if ([self windowHasGNUstepMiniWindowStyle:window])
+  if ([self windowIsSmallGNUstepIconOrMiniWindow:window] ||
+      [self windowIsSmallRootOverrideRedirectWindow:window])
     {
+      [self moveIconWindowOffscreen:window];
       return NO;
     }
   [self clearX11Error];
@@ -1366,6 +1545,7 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   [_knownWindows removeObject:windowKey];
 
   icon = [self imageFromWindowContents:window];
+  [self moveIconWindowOffscreen:window];
 
   if (processIdentifier == getpid())
     {
