@@ -24,6 +24,7 @@
 #import <X11/Xlib.h>
 #import <X11/Xatom.h>
 #import <X11/Xutil.h>
+#import <X11/extensions/Xdamage.h>
 #import <limits.h>
 #import <string.h>
 #import <unistd.h>
@@ -52,12 +53,27 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
       _knownWindows = [NSMutableSet new];
       _iconWindowsByProcessID = [NSMutableDictionary new];
       _iconImageDataByProcessID = [NSMutableDictionary new];
+      _iconDamagesByWindow = [NSMutableDictionary new];
+      _dirtyIconWindows = [NSMutableSet new];
     }
   return self;
 }
 
 - (void) dealloc
 {
+  if (_display)
+    {
+      NSArray *damageKeys = [_iconDamagesByWindow allKeys];
+      NSUInteger i;
+
+      for (i = 0; i < [damageKeys count]; i++)
+	{
+	  NSNumber *damageKey = [_iconDamagesByWindow
+				  objectForKey:[damageKeys objectAtIndex:i]];
+	  XDamageDestroy((Display *)_display,
+			 (Damage)[damageKey unsignedLongValue]);
+	}
+    }
   if (_iconConnection)
     {
       [_iconConnection invalidate];
@@ -72,6 +88,8 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
     }
   DESTROY(_iconImageDataByProcessID);
   DESTROY(_iconWindowsByProcessID);
+  DESTROY(_iconDamagesByWindow);
+  DESTROY(_dirtyIconWindows);
   DESTROY(_iconConnection);
   DESTROY(_knownWindows);
   DEALLOC;
@@ -109,8 +127,30 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   _display = display;
   XSetErrorHandler(X11DockManagerHandleError);
   XSelectInput(display, root, SubstructureNotifyMask | PropertyChangeMask);
+  [self initializeDamageTracking];
   [self registerIconManager];
   return YES;
+}
+
+- (void) initializeDamageTracking
+{
+  Display *display = (Display *)_display;
+  int damageErrorBase;
+  int major = 1;
+  int minor = 1;
+
+  _damageAvailable = NO;
+  _damageEventBase = 0;
+  if (!display)
+    {
+      return;
+    }
+
+  if (XDamageQueryExtension(display, &_damageEventBase, &damageErrorBase) &&
+      XDamageQueryVersion(display, &major, &minor))
+    {
+      _damageAvailable = YES;
+    }
 }
 
 - (void) registerIconManager
@@ -405,6 +445,7 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 {
   Display *display = (Display *)_display;
   BOOL sawRelevantEvent = NO;
+  BOOL sawIconDamage = NO;
 
   if (!display)
     {
@@ -417,6 +458,17 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
       Window window = None;
 
       XNextEvent(display, &event);
+      if (_damageAvailable && event.type == _damageEventBase + XDamageNotify)
+	{
+	  XDamageNotifyEvent *damageEvent = (XDamageNotifyEvent *)&event;
+
+	  [self markIconWindowDamaged:damageEvent->drawable
+			       damage:damageEvent->damage];
+	  sawRelevantEvent = YES;
+	  sawIconDamage = YES;
+	  continue;
+	}
+
       switch (event.type)
 	{
 	case CreateNotify:
@@ -444,6 +496,10 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 
   if (sawRelevantEvent)
     {
+      if (sawIconDamage)
+	{
+	  [self scanApplicationIconWindows];
+	}
       XFlush(display);
     }
 }
@@ -589,16 +645,15 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   return NO;
 }
 
-- (NSImage *) imageFromDrawable: (Drawable)drawable
-                           mask: (Pixmap)mask
-                          width: (unsigned int)width
-                         height: (unsigned int)height
+- (NSData *) imageDataFromDrawable: (Drawable)drawable
+                              mask: (Pixmap)mask
+                             width: (unsigned int)width
+                            height: (unsigned int)height
 {
   Display *display = (Display *)_display;
   XImage *ximage;
   XImage *maskImage = NULL;
-  NSBitmapImageRep *rep;
-  NSImage *image;
+  NSMutableData *imageData;
   unsigned char *bitmapData;
   NSInteger bytesPerRow;
   NSInteger x;
@@ -639,19 +694,9 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 	}
     }
 
-  rep = [[NSBitmapImageRep alloc]
-	  initWithBitmapDataPlanes:NULL
-			pixelsWide: (NSInteger)width
-			pixelsHigh: (NSInteger)height
-		     bitsPerSample:8
-		   samplesPerPixel:4
-			  hasAlpha:YES
-			  isPlanar:NO
-		    colorSpaceName:NSDeviceRGBColorSpace
-		       bytesPerRow:0
-		      bitsPerPixel:32];
-  rep = AUTORELEASE(rep);
-  if (!rep)
+  bytesPerRow = (NSInteger)width * 4;
+  imageData = [NSMutableData dataWithLength:bytesPerRow * (NSInteger)height];
+  if (!imageData)
     {
       XDestroyImage(ximage);
       if (maskImage)
@@ -661,8 +706,7 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
       return nil;
     }
 
-  bitmapData = [rep bitmapData];
-  bytesPerRow = [rep bytesPerRow];
+  bitmapData = [imageData mutableBytes];
   for (y = 0; y < (NSInteger)height; y++)
     {
       for (x = 0; x < (NSInteger)width; x++)
@@ -698,10 +742,66 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
       return nil;
     }
 
+  return imageData;
+}
+
+- (NSImage *) imageFromData: (NSData *)imageData
+                      width: (unsigned int)width
+                     height: (unsigned int)height
+{
+  NSBitmapImageRep *rep;
+  NSImage *image;
+  unsigned char *bitmapData;
+  NSInteger bytesPerRow;
+
+  if (![imageData length] || width == 0 || height == 0)
+    {
+      return nil;
+    }
+
+  bytesPerRow = (NSInteger)width * 4;
+  if ([imageData length] < bytesPerRow * (NSInteger)height)
+    {
+      return nil;
+    }
+
+  rep = [[NSBitmapImageRep alloc]
+	  initWithBitmapDataPlanes:NULL
+			pixelsWide: (NSInteger)width
+			pixelsHigh: (NSInteger)height
+		     bitsPerSample:8
+		   samplesPerPixel:4
+			  hasAlpha:YES
+			  isPlanar:NO
+		    colorSpaceName:NSDeviceRGBColorSpace
+		       bytesPerRow:bytesPerRow
+		      bitsPerPixel:32];
+  rep = AUTORELEASE(rep);
+  if (!rep)
+    {
+      return nil;
+    }
+
+  bitmapData = [rep bitmapData];
+  memcpy(bitmapData, [imageData bytes], bytesPerRow * (NSInteger)height);
+
   image = AUTORELEASE([[NSImage alloc]
 			initWithSize:NSMakeSize(width, height)]);
   [image addRepresentation:rep];
   return image;
+}
+
+- (NSImage *) imageFromDrawable: (Drawable)drawable
+                           mask: (Pixmap)mask
+                          width: (unsigned int)width
+                         height: (unsigned int)height
+{
+  NSData *imageData = [self imageDataFromDrawable:drawable
+					     mask:mask
+					    width:width
+					   height:height];
+
+  return [self imageFromData:imageData width:width height:height];
 }
 
 - (NSImage *) imageFromPixmap: (Pixmap)pixmap mask: (Pixmap)mask
@@ -731,7 +831,9 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   return [self imageFromDrawable:pixmap mask:mask width:width height:height];
 }
 
-- (NSImage *) imageFromWindowContents: (Window)window
+- (NSData *) imageDataFromWindowContents: (Window)window
+                                   width: (unsigned int *)width
+                                  height: (unsigned int *)height
 {
   Display *display = (Display *)_display;
   XWindowAttributes attr;
@@ -751,10 +853,30 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
       return nil;
     }
 
-  return [self imageFromDrawable:window
-                            mask:None
-                           width: (unsigned int)attr.width
-                          height: (unsigned int)attr.height];
+  if (width)
+    {
+      *width = (unsigned int)attr.width;
+    }
+  if (height)
+    {
+      *height = (unsigned int)attr.height;
+    }
+
+  return [self imageDataFromDrawable:window
+				mask:None
+			       width: (unsigned int)attr.width
+			      height: (unsigned int)attr.height];
+}
+
+- (NSImage *) imageFromWindowContents: (Window)window
+{
+  unsigned int width = 0;
+  unsigned int height = 0;
+  NSData *imageData = [self imageDataFromWindowContents:window
+						  width:&width
+						 height:&height];
+
+  return [self imageFromData:imageData width:width height:height];
 }
 
 - (NSImage *) iconForWindow: (Window)window
@@ -1484,6 +1606,71 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   return [self imageFromWindowContents:(Window)[windowKey unsignedLongValue]];
 }
 
+- (void) removeDamageForIconWindowKey: (NSNumber *)windowKey
+{
+  NSNumber *damageKey;
+
+  if (!windowKey)
+    {
+      return;
+    }
+
+  damageKey = [_iconDamagesByWindow objectForKey:windowKey];
+  if (damageKey && _display)
+    {
+      [self clearX11Error];
+      XDamageDestroy((Display *)_display, (Damage)[damageKey unsignedLongValue]);
+      [self x11ErrorOccurred];
+    }
+
+  [_iconDamagesByWindow removeObjectForKey:windowKey];
+  [_dirtyIconWindows removeObject:windowKey];
+}
+
+- (void) trackDamageForIconWindow: (Window)window
+{
+  NSNumber *windowKey;
+  Damage damage;
+
+  if (!_damageAvailable || !_display || window == None)
+    {
+      return;
+    }
+
+  windowKey = [NSNumber numberWithUnsignedLong:(unsigned long)window];
+  if ([_iconDamagesByWindow objectForKey:windowKey])
+    {
+      [_dirtyIconWindows addObject:windowKey];
+      return;
+    }
+
+  [self clearX11Error];
+  damage = XDamageCreate((Display *)_display, window, XDamageReportNonEmpty);
+  if ([self x11ErrorOccurred] || damage == None)
+    {
+      return;
+    }
+
+  [_iconDamagesByWindow setObject:[NSNumber numberWithUnsignedLong:(unsigned long)damage]
+			   forKey:windowKey];
+  [_dirtyIconWindows addObject:windowKey];
+}
+
+- (void) markIconWindowDamaged: (Window)window damage: (Damage)damage
+{
+  NSNumber *windowKey = [NSNumber numberWithUnsignedLong:(unsigned long)window];
+
+  if (![_iconDamagesByWindow objectForKey:windowKey])
+    {
+      return;
+    }
+
+  [_dirtyIconWindows addObject:windowKey];
+  [self clearX11Error];
+  XDamageSubtract((Display *)_display, damage, None, None);
+  [self x11ErrorOccurred];
+}
+
 - (BOOL) rememberApplicationIconWindow: (Window)window
                      processIdentifier: (int)processIdentifier
                                  title: (NSString *)title
@@ -1536,6 +1723,7 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 
   [_iconWindowsByProcessID setObject:windowKey forKey:identifier];
   [_knownWindows removeObject:windowKey];
+  [self trackDamageForIconWindow:window];
 
   icon = [self imageFromWindowContents:window];
   [self moveIconWindowOffscreen:window];
@@ -1623,6 +1811,8 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
       XWindowAttributes attr;
       NSImage *icon;
       NSData *iconData;
+      unsigned int iconWidth = 0;
+      unsigned int iconHeight = 0;
       int processIdentifier = 0;
       NSString *title = nil;
 
@@ -1630,20 +1820,34 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
       if (!XGetWindowAttributes((Display *)_display, window, &attr) ||
 	  [self x11ErrorOccurred])
 	{
+	  [self removeDamageForIconWindowKey:windowKey];
 	  [_iconWindowsByProcessID removeObjectForKey:iconKey];
 	  [_iconImageDataByProcessID removeObjectForKey:iconKey];
 	  continue;
 	}
 
-      icon = [self imageFromWindowContents:window];
-      iconData = [icon TIFFRepresentation];
-      if (!icon || !iconData)
+      if (_damageAvailable && ![_dirtyIconWindows containsObject:windowKey])
+	{
+	  continue;
+	}
+
+      iconData = [self imageDataFromWindowContents:window
+					     width:&iconWidth
+					    height:&iconHeight];
+      if (!iconData)
 	{
 	  continue;
 	}
 
       if (![iconData isEqual:[_iconImageDataByProcessID objectForKey:iconKey]])
 	{
+	  icon = [self imageFromData:iconData
+			       width:iconWidth
+			      height:iconHeight];
+	  if (!icon)
+	    {
+	      continue;
+	    }
 	  [_iconImageDataByProcessID setObject:iconData forKey:iconKey];
 	  if ([iconKey isKindOfClass:[NSNumber class]])
 	    {
@@ -1661,6 +1865,8 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 							  title:title];
 	    }
 	}
+
+      [_dirtyIconWindows removeObject:windowKey];
     }
 }
 

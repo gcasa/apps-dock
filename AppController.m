@@ -126,12 +126,12 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
       [self updateDockBackground];
       [_window makeKeyAndOrderFront:nil];
       [_window orderFrontRegardless];
-      _x11EventTimer = [NSTimer scheduledTimerWithTimeInterval:0.005
+      _x11EventTimer = [NSTimer scheduledTimerWithTimeInterval:0.5
 							target:_x11
 						      selector:@selector(processPendingEvents)
 						      userInfo:nil
 						       repeats:YES];
-      _scanTimer = [NSTimer scheduledTimerWithTimeInterval:1.0
+      _scanTimer = [NSTimer scheduledTimerWithTimeInterval:5.0
 						    target:_x11
 						  selector:@selector(scanForDockApps)
 						  userInfo:nil
