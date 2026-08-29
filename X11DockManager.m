@@ -949,10 +949,9 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   return result;
 }
 
-- (void) moveIconWindowOffscreen: (Window)window
+- (void) unmapIconWindow: (Window)window
 {
   Display *display = (Display *)_display;
-  int screen;
   Window root;
   Window parent;
   Window *children = NULL;
@@ -964,8 +963,7 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
       return;
     }
 
-  screen = DefaultScreen(display);
-  root = RootWindow(display, screen);
+  root = RootWindow(display, DefaultScreen(display));
   moveWindow = window;
 
   [self clearX11Error];
@@ -1008,9 +1006,7 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
       return;
     }
 
-  XMoveWindow(display, moveWindow,
-	      DisplayWidth(display, screen) + DockHiddenIconWindowOffset,
-	      DisplayHeight(display, screen) + DockHiddenIconWindowOffset);
+  XUnmapWindow(display, moveWindow);
   XFlush(display);
 }
 
@@ -1026,7 +1022,7 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   if ([self windowIsSmallGNUstepIconOrMiniWindow:window] ||
       [self windowIsSmallRootOverrideRedirectWindow:window])
     {
-      [self moveIconWindowOffscreen:window];
+      [self unmapIconWindow:window];
       return;
     }
 
@@ -1061,7 +1057,7 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   if ([self windowIsSmallGNUstepIconOrMiniWindow:window] ||
       [self windowIsSmallRootOverrideRedirectWindow:window])
     {
-      [self moveIconWindowOffscreen:window];
+      [self unmapIconWindow:window];
       return NO;
     }
   [self clearX11Error];
@@ -1351,7 +1347,7 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
     }
   [_knownWindows removeObject:windowKey];
 
-  [self moveIconWindowOffscreen:window];
+  [self unmapIconWindow:window];
 
   if (processIdentifier == getpid())
     {
