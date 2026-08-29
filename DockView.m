@@ -95,7 +95,6 @@ DockViewCalibratedBackgroundColor (NSColor *color)
       _draggedItemIndex = NSNotFound;
       _dropIndex = NSNotFound;
       _pinnedItemCount = 0;
-      _backgroundMode = DockBackgroundBlack;
       _backgroundColor = RETAIN([NSColor blackColor]);
       _gnustepIcon = RETAIN([self loadGNUstepIcon]);
       _recyclerIcon = RETAIN([self loadRecyclerIcon]);
@@ -127,7 +126,6 @@ DockViewCalibratedBackgroundColor (NSColor *color)
     {
       [self removeTrackingRect:_trackingRectTag];
     }
-  DESTROY(_backgroundImage);
   DESTROY(_backgroundColor);
   DESTROY(_gnustepIcon);
   DESTROY(_recyclerIcon);
@@ -311,15 +309,6 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   [self setNeedsDisplay:YES];
 }
 
-- (void) setBackgroundImage: (NSImage *)image
-{
-  if (_backgroundImage != image)
-    {
-      ASSIGN(_backgroundImage, image);
-      [self setNeedsDisplay:YES];
-    }
-}
-
 - (void) setBackgroundColor: (NSColor *)color
 {
   color = DockViewCalibratedBackgroundColor(color);
@@ -327,15 +316,6 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   if (_backgroundColor != color)
     {
       ASSIGN(_backgroundColor, color);
-      [self setNeedsDisplay:YES];
-    }
-}
-
-- (void) setBackgroundMode: (DockBackgroundMode)mode
-{
-  if (_backgroundMode != mode)
-    {
-      _backgroundMode = mode;
       [self setNeedsDisplay:YES];
     }
 }
@@ -1333,21 +1313,8 @@ DockViewCalibratedBackgroundColor (NSColor *color)
 {
   NSUInteger i;
 
-  if (_backgroundMode == DockBackgroundSimulatedTransparency &&
-      _backgroundImage)
-    {
-      [_backgroundImage drawInRect:[self bounds]
-			  fromRect:NSMakeRect(0, 0,
-					      [_backgroundImage size].width,
-					      [_backgroundImage size].height)
-			 operation:NSCompositeSourceOver
-			  fraction:1.0];
-    }
-  else if (_backgroundMode == DockBackgroundBlack)
-    {
-      [_backgroundColor set];
-      NSRectFill([self bounds]);
-    }
+  [_backgroundColor set];
+  NSRectFill([self bounds]);
 
   [self drawTopTile];
   [self drawDockSeparators];

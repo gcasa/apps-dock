@@ -51,6 +51,8 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
       _dockView = view;
       _knownWindows = [NSMutableSet new];
       _iconWindowsByProcessID = [NSMutableDictionary new];
+      _applicationIconDataByProcessID = [NSMutableDictionary new];
+      _applicationIconBadgeByProcessID = [NSMutableDictionary new];
     }
   return self;
 }
@@ -70,6 +72,8 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
       XCloseDisplay((Display *)_display);
     }
   DESTROY(_iconWindowsByProcessID);
+  DESTROY(_applicationIconDataByProcessID);
+  DESTROY(_applicationIconBadgeByProcessID);
   DESTROY(_iconConnection);
   DESTROY(_knownWindows);
   DEALLOC;
@@ -248,155 +252,6 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
     }
 
   return (unsigned char)((value * 255UL) / ((1UL << bits) - 1UL));
-}
-
-- (NSRect) x11FrameForAppKitFrame: (NSRect)dockFrame
-{
-  Display *display = (Display *)_display;
-  int screen;
-  int screenWidth;
-  int screenHeight;
-  int x;
-  int y;
-  int width;
-  int height;
-
-  if (!display)
-    {
-      return NSZeroRect;
-    }
-
-  screen = DefaultScreen(display);
-  screenWidth = DisplayWidth(display, screen);
-  screenHeight = DisplayHeight(display, screen);
-  x = (int)floor(NSMinX(dockFrame));
-  width = (int)ceil(NSWidth(dockFrame));
-  height = (int)ceil(NSHeight(dockFrame));
-  y = screenHeight - (int)ceil(NSMaxY(dockFrame));
-
-  if (x < 0)
-    {
-      width += x;
-      x = 0;
-    }
-  if (y < 0)
-    {
-      height += y;
-      y = 0;
-    }
-  if (x + width > screenWidth)
-    {
-      width = screenWidth - x;
-    }
-  if (y + height > screenHeight)
-    {
-      height = screenHeight - y;
-    }
-  if (width < 0)
-    {
-      width = 0;
-    }
-  if (height < 0)
-    {
-      height = 0;
-    }
-
-  return NSMakeRect(x, y, width, height);
-}
-
-- (NSImage *) backgroundImageForDockFrame: (NSRect)dockFrame
-{
-  Display *display = (Display *)_display;
-  int screen;
-  Window root;
-  NSRect frame;
-  XImage *ximage;
-  NSBitmapImageRep *rep;
-  NSImage *image;
-  NSInteger width;
-  NSInteger height;
-  NSInteger x;
-  NSInteger y;
-  unsigned char *bitmapData;
-  NSInteger bytesPerRow;
-  BOOL sawNonBlackPixel = NO;
-
-  if (!display)
-    {
-      return nil;
-    }
-
-  frame = [self x11FrameForAppKitFrame:dockFrame];
-  width = (NSInteger)NSWidth(frame);
-  height = (NSInteger)NSHeight(frame);
-  if (width <= 0 || height <= 0)
-    {
-      return nil;
-    }
-
-  screen = DefaultScreen(display);
-  root = RootWindow(display, screen);
-  XSync(display, False);
-  ximage = XGetImage(display, root,
-                     (int)NSMinX(frame),
-                     (int)NSMinY(frame),
-                     (unsigned int)width,
-                     (unsigned int)height,
-                     AllPlanes,
-                     ZPixmap);
-  if (!ximage)
-    {
-      return nil;
-    }
-
-  rep = [[NSBitmapImageRep alloc]
-	  initWithBitmapDataPlanes:NULL
-			pixelsWide:width
-			pixelsHigh:height
-		     bitsPerSample:8
-		   samplesPerPixel:4
-			  hasAlpha:YES
-			  isPlanar:NO
-		    colorSpaceName:NSDeviceRGBColorSpace
-		       bytesPerRow:0
-		      bitsPerPixel:32];
-  rep = AUTORELEASE(rep);
-  if (!rep)
-    {
-      XDestroyImage(ximage);
-      return nil;
-    }
-
-  bitmapData = [rep bitmapData];
-  bytesPerRow = [rep bytesPerRow];
-  for (y = 0; y < height; y++)
-    {
-      for (x = 0; x < width; x++)
-	{
-	  unsigned long pixel = XGetPixel(ximage, (int)x, (int)y);
-	  unsigned char *dst = bitmapData + y * bytesPerRow + x * 4;
-
-	  dst[0] = [self componentFromPixel:pixel mask:ximage->red_mask];
-	  dst[1] = [self componentFromPixel:pixel mask:ximage->green_mask];
-	  dst[2] = [self componentFromPixel:pixel mask:ximage->blue_mask];
-	  dst[3] = 255;
-	  if (dst[0] || dst[1] || dst[2])
-	    {
-	      sawNonBlackPixel = YES;
-	    }
-	}
-    }
-
-  XDestroyImage(ximage);
-
-  if (!sawNonBlackPixel)
-    {
-      return nil;
-    }
-
-  image = AUTORELEASE([[NSImage alloc] initWithSize:NSMakeSize(width, height)]);
-  [image addRepresentation:rep];
-  return image;
 }
 
 - (void) processPendingEvents
@@ -1420,6 +1275,38 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
     }
 }
 
+- (void) pruneApplicationIconStateForExitedProcesses
+{
+  NSMutableSet *processKeys = [NSMutableSet setWithArray:
+					      [_applicationIconDataByProcessID allKeys]];
+  NSUInteger i;
+  NSArray *keys;
+
+  [processKeys addObjectsFromArray:[_applicationIconBadgeByProcessID allKeys]];
+  [processKeys addObjectsFromArray:[_iconWindowsByProcessID allKeys]];
+  keys = [processKeys allObjects];
+
+  for (i = 0; i < [keys count]; i++)
+    {
+      NSNumber *processKey = [keys objectAtIndex:i];
+      NSString *processPath;
+
+      if (![processKey isKindOfClass:[NSNumber class]])
+	{
+	  continue;
+	}
+
+      processPath = [@"/proc" stringByAppendingPathComponent:
+			 [processKey stringValue]];
+      if (![[NSFileManager defaultManager] fileExistsAtPath:processPath])
+	{
+	  [_applicationIconDataByProcessID removeObjectForKey:processKey];
+	  [_applicationIconBadgeByProcessID removeObjectForKey:processKey];
+	  [_iconWindowsByProcessID removeObjectForKey:processKey];
+	}
+    }
+}
+
 - (NSString *) classNameForWindow: (Window)window
 {
   Display *display = (Display *)_display;
@@ -1628,6 +1515,7 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   NSArray *clientWindows;
 
   if (!display) return;
+  [self pruneApplicationIconStateForExitedProcesses];
   [self scanKnownWindows];
 
   clientWindows = [self clientListWindows];
@@ -1681,11 +1569,39 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
                    appProcessId: (int)aProcessId
 {
   NSImage *icon = nil;
+  NSNumber *processKey;
+  id currentBadge;
+  id nextBadge;
+  NSData *currentData;
 
   if (aProcessId <= 0)
     {
       return;
     }
+
+  processKey = [NSNumber numberWithInt:aProcessId];
+  currentData = [_applicationIconDataByProcessID objectForKey:processKey];
+  currentBadge = [_applicationIconBadgeByProcessID objectForKey:processKey];
+  nextBadge = [badgeText length] ? (id)badgeText : (id)[NSNull null];
+
+  if (((![data length] && ![currentData length]) ||
+       ([data length] && [currentData isEqualToData:data])) &&
+      ((currentBadge == nextBadge) ||
+       (currentBadge && [currentBadge isEqual:nextBadge])))
+    {
+      return;
+    }
+
+  if ([data length])
+    {
+      [_applicationIconDataByProcessID setObject:AUTORELEASE([data copy])
+					  forKey:processKey];
+    }
+  else
+    {
+      [_applicationIconDataByProcessID removeObjectForKey:processKey];
+    }
+  [_applicationIconBadgeByProcessID setObject:nextBadge forKey:processKey];
 
   if ([data length])
     {

@@ -21,12 +21,6 @@
 
 @class DockItem;
 
-typedef enum
-  {
-    DockBackgroundBlack = 0,
-    DockBackgroundSimulatedTransparency
-  } DockBackgroundMode;
-
 @protocol DockViewDelegate
 - (void) dockViewDidReceivePaths: (NSArray *)paths;
 - (void) dockViewDidReceivePaths: (NSArray *)paths
@@ -52,9 +46,7 @@ typedef enum
   BOOL _performedDragOperation;
   NSImage *_gnustepIcon;
   NSImage *_recyclerIcon;
-  NSImage *_backgroundImage;
   NSColor *_backgroundColor;
-  DockBackgroundMode _backgroundMode;
   BOOL _recyclerHasContents;
   BOOL _horizontal;
   NSTimer *_tooltipTimer;
@@ -78,9 +70,7 @@ typedef enum
 - (void) setDelegate: (id)delegate;
 - (void) setItems: (NSArray *)items;
 - (void) setPinnedItemCount: (NSUInteger)count;
-- (void) setBackgroundImage: (NSImage *)image;
 - (void) setBackgroundColor: (NSColor *)color;
-- (void) setBackgroundMode: (DockBackgroundMode)mode;
 - (void) setRecyclerHasContents: (BOOL)hasContents;
 - (void) startWiggleForItem: (DockItem *)item;
 - (void) startRecyclerWiggle;

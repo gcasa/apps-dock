@@ -700,21 +700,7 @@
 
 - (BOOL) iconMatchesImage: (NSImage *)image
 {
-  NSData *currentData;
-  NSData *newData;
-
-  if (_icon == image)
-    {
-      return YES;
-    }
-  if (!_icon || !image)
-    {
-      return NO;
-    }
-
-  currentData = [_icon TIFFRepresentation];
-  newData = [image TIFFRepresentation];
-  return currentData && newData && [currentData isEqualToData:newData];
+  return _icon == image;
 }
 
 - (void) setIcon: (NSImage *)icon

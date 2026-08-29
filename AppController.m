@@ -31,7 +31,6 @@ static CGFloat DockGap = 2.0;
 static CGFloat DockPad = 10.0;
 static NSString *DockApplicationsDefaultsKey = @"DockApplications";
 static NSString *DockOpenAtLoginApplicationsDefaultsKey = @"DockOpenAtLoginApplications";
-static NSString *DockBackgroundModeDefaultsKey = @"DockBackgroundMode";
 static NSString *DockBackgroundColorDefaultsKey = @"DockBackgroundColor";
 
 static NSColor *
@@ -90,7 +89,6 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   _applicationIconUpdatesByProcessID = [NSMutableDictionary new];
   [self loadPersistedApplications];
   _dockPlacement = [self savedDockPlacement];
-  _backgroundMode = [self savedBackgroundMode];
   _backgroundColor = RETAIN([self savedBackgroundColor]);
   frame = [self dockWindowFrameForPlacement:_dockPlacement];
 
@@ -110,7 +108,6 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [_dockView setDelegate:self];
   [_dockView setHorizontal:DockPlacementIsHorizontal(_dockPlacement)];
   [_dockView setBackgroundColor:_backgroundColor];
-  [_dockView setBackgroundMode:_backgroundMode];
   [_dockView setItems:_items];
   [_dockView setPinnedItemCount:[self pinnedApplicationCount]];
   [_dockView setMenu:[self dockMenu]];
@@ -149,12 +146,6 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
                                                      selector:@selector(scanRunningApplications)
                                                      userInfo:nil
                                                       repeats:YES];
-  _backgroundRefreshTimer =
-    [NSTimer scheduledTimerWithTimeInterval:0.25
-                                     target:self
-                                   selector:@selector(refreshDockBackground:)
-                                   userInfo:nil
-                                    repeats:YES];
   [self launchOpenAtLoginApplications];
 }
 
@@ -163,10 +154,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [_x11EventTimer invalidate];
   [_scanTimer invalidate];
   [_processScanTimer invalidate];
-  [_backgroundRefreshTimer invalidate];
   DESTROY(_settingsEmptyRecyclerButton);
-  DESTROY(_settingsTransparentBackgroundButton);
-  DESTROY(_settingsBlackBackgroundButton);
   DESTROY(_settingsBlueSlider);
   DESTROY(_settingsGreenSlider);
   DESTROY(_settingsRedSlider);
@@ -216,24 +204,6 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     }
 
   return [defaults boolForKey:@"DockCentered"] ? DockPlacementLeftCenter : DockPlacementLeftTop;
-}
-
-- (DockBackgroundMode) savedBackgroundMode
-{
-  NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-  id savedMode = [defaults objectForKey:DockBackgroundModeDefaultsKey];
-
-  if (savedMode)
-    {
-      NSInteger mode = [defaults integerForKey:DockBackgroundModeDefaultsKey];
-      if (mode >= DockBackgroundBlack &&
-	  mode <= DockBackgroundSimulatedTransparency)
-	{
-	  return (DockBackgroundMode)mode;
-	}
-    }
-
-  return DockBackgroundBlack;
 }
 
 - (NSColor *) savedBackgroundColor
@@ -752,21 +722,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
 - (BOOL) item: (DockItem *)item iconMatchesImage: (NSImage *)image
 {
-  NSData *currentData;
-  NSData *newData;
-
-  if ([item icon] == image)
-    {
-      return YES;
-    }
-  if (![item icon] || !image)
-    {
-      return NO;
-    }
-
-  currentData = [[item icon] TIFFRepresentation];
-  newData = [image TIFFRepresentation];
-  return currentData && newData && [currentData isEqualToData:newData];
+  return [item icon] == image;
 }
 
 - (void) rememberApplicationIcon: (NSImage *)icon
@@ -1779,26 +1735,6 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     [self settingsColorSliderWithFrame:NSMakeRect(92, 130, 210, 24)];
   [contentView addSubview:_settingsBlueSlider];
 
-  label = [self settingsLabelWithTitle:@"Background"
-                                 frame:NSMakeRect(18, 88, 110, 20)];
-  [contentView addSubview:label];
-
-  _settingsBlackBackgroundButton =
-    [self settingsButtonWithTitle:@"Solid Background"
-                            frame:NSMakeRect(132, 86, 170, 22)
-                       buttonType:NSRadioButton
-                           action:@selector(settingsBackgroundChanged:)];
-  [_settingsBlackBackgroundButton setTag:DockBackgroundBlack];
-  [contentView addSubview:_settingsBlackBackgroundButton];
-
-  _settingsTransparentBackgroundButton =
-    [self settingsButtonWithTitle:@"Simulated Transparency"
-                            frame:NSMakeRect(132, 60, 170, 22)
-                       buttonType:NSRadioButton
-                           action:@selector(settingsBackgroundChanged:)];
-  [_settingsTransparentBackgroundButton setTag:DockBackgroundSimulatedTransparency];
-  [contentView addSubview:_settingsTransparentBackgroundButton];
-
   _settingsEmptyRecyclerButton =
     [self settingsButtonWithTitle:@"Empty Recycler"
                             frame:NSMakeRect(18, 24, 120, 28)
@@ -1841,10 +1777,6 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
       [_settingsGreenSlider setDoubleValue:green * 255.0];
       [_settingsBlueSlider setDoubleValue:blue * 255.0];
     }
-  [_settingsBlackBackgroundButton setState:
-				    (_backgroundMode == DockBackgroundBlack ? NSOnState : NSOffState)];
-  [_settingsTransparentBackgroundButton setState:
-					  (_backgroundMode == DockBackgroundSimulatedTransparency ? NSOnState : NSOffState)];
   [_settingsEmptyRecyclerButton setEnabled:[self recyclerHasContents]];
 }
 
@@ -1884,17 +1816,6 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [self applyDockPlacement];
 }
 
-- (void) settingsBackgroundChanged: (id)sender
-{
-  NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-
-  _backgroundMode = (DockBackgroundMode)[sender tag];
-  [defaults setInteger:_backgroundMode forKey:DockBackgroundModeDefaultsKey];
-  [defaults synchronize];
-  [self updateDockBackground];
-  [self updateDockMenu];
-}
-
 - (void) settingsColorSliderChanged: (id)sender
 {
   if (!_settingsRedSlider || !_settingsGreenSlider || !_settingsBlueSlider)
@@ -1926,52 +1847,9 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [self updateDockMenu];
 }
 
-- (void) refreshDockBackground: (NSTimer *)timer
-{
-  if (_backgroundMode == DockBackgroundSimulatedTransparency)
-    {
-      [self updateDockBackground];
-    }
-}
-
 - (void) updateDockBackground
 {
-  NSImage *image;
-  BOOL wasVisible;
-
-  if (_updatingDockBackground)
-    {
-      return;
-    }
-
-  [_dockView setBackgroundMode:_backgroundMode];
   [_dockView setBackgroundColor:_backgroundColor];
-
-  if (_backgroundMode == DockBackgroundBlack)
-    {
-      [_dockView setBackgroundImage:nil];
-      return;
-    }
-
-  if (!_x11)
-    {
-      return;
-    }
-
-  _updatingDockBackground = YES;
-  wasVisible = [_window isVisible];
-
-  image = [_x11 backgroundImageForDockFrame:[_window frame]];
-  if (image)
-    {
-      [_dockView setBackgroundImage:image];
-    }
-  else if (!wasVisible)
-    {
-      [_dockView setBackgroundImage:nil];
-    }
-
-  _updatingDockBackground = NO;
 }
 
 - (void) quitDock: (id)sender

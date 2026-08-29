@@ -30,8 +30,6 @@
   NSSlider *_settingsRedSlider;
   NSSlider *_settingsGreenSlider;
   NSSlider *_settingsBlueSlider;
-  NSButton *_settingsBlackBackgroundButton;
-  NSButton *_settingsTransparentBackgroundButton;
   NSButton *_settingsEmptyRecyclerButton;
   DockView *_dockView;
   NSMutableArray *_items;
@@ -42,12 +40,9 @@
   NSTimer *_x11EventTimer;
   NSTimer *_scanTimer;
   NSTimer *_processScanTimer;
-  NSTimer *_backgroundRefreshTimer;
   NSMenu *_dockMenu;
   DockPlacement _dockPlacement;
-  DockBackgroundMode _backgroundMode;
   NSColor *_backgroundColor;
-  BOOL _updatingDockBackground;
 }
 
 @end

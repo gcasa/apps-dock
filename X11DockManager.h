@@ -59,13 +59,14 @@ typedef enum
   NSMutableSet *_knownWindows;
   NSConnection *_iconConnection;
   NSMutableDictionary *_iconWindowsByProcessID;
+  NSMutableDictionary *_applicationIconDataByProcessID;
+  NSMutableDictionary *_applicationIconBadgeByProcessID;
 }
 
 - (id) initWithDockView: (DockView *)view;
 - (void) setDelegate: (id)delegate;
 - (BOOL) start;
 - (void) setDockPlacement: (DockPlacement)placement;
-- (NSImage *) backgroundImageForDockFrame: (NSRect)dockFrame;
 - (void) processPendingEvents;
 - (void) drainTransientIconEvents;
 - (void) scanForDockApps;
