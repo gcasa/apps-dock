@@ -872,7 +872,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
       item = [self applicationItemMatchingTitle:title];
     }
 
-  if (item && icon)
+  if (item && icon && [item kind] != DockItemApplication)
     {
       [item setIcon:icon];
       [self refreshDock];
@@ -2385,7 +2385,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 	{
 	  [self setApplicationIconWindow:xWindow forItem:item];
 	  [item setState:DockItemRunning];
-	  if (icon)
+	  if (icon && [item kind] != DockItemApplication)
 	    {
 	      [item setIcon:icon];
 	    }
@@ -2402,7 +2402,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 	{
 	  [item setXWindow:xWindow];
 	}
-      if (icon)
+      if (icon && [item kind] != DockItemApplication)
 	{
 	  [item setIcon:icon];
 	}
@@ -2422,7 +2422,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 	  [item setPinned:NO];
 	  [item setState: (hidden ? DockItemHidden : DockItemRunning)];
 	  [item setXWindow:xWindow];
-	  if (icon)
+	  if (icon && [item kind] != DockItemApplication)
 	    {
 	      [item setIcon:icon];
 	    }
@@ -2466,7 +2466,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   if (item)
     {
       [item setState: (hidden ? DockItemHidden : DockItemRunning)];
-      if (icon)
+      if (icon && [item kind] != DockItemApplication)
 	{
 	  [item setIcon:icon];
 	}
