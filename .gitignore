@@ -2,3 +2,4 @@ obj
 *.app
 *.o
 .DS_Store
+*.out

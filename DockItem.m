@@ -720,6 +720,23 @@
     }
 }
 
+- (void) setIconPath: (NSString *)path
+{
+  if (_iconPath != path &&
+      !(_iconPath && path && [_iconPath isEqualToString:path]))
+    {
+      ASSIGNCOPY(_iconPath, path);
+    }
+}
+
+- (void) setOriginalIcon: (NSImage *)icon
+{
+  if (_originalIcon != icon)
+    {
+      ASSIGN(_originalIcon, icon);
+    }
+}
+
 - (void) restoreOriginalIcon
 {
   if (_originalIcon)

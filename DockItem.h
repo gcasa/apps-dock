@@ -62,6 +62,8 @@ typedef enum
 - (NSString *) iconPath;
 - (NSImage *) icon;
 - (void) setIcon: (NSImage *)icon;
+- (void) setIconPath: (NSString *)path;
+- (void) setOriginalIcon: (NSImage *)icon;
 - (void) restoreOriginalIcon;
 - (NSString *) badgeLabel;
 - (void) setBadgeLabel: (NSString *)label;
