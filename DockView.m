@@ -139,12 +139,6 @@ DockViewCalibratedBackgroundColor (NSColor *color)
                                                    ofType:@"png"];
   NSImage *image;
 
-  if (![path length])
-    {
-      path = [[@"Resources" stringByAppendingPathComponent:@"GNUstep_circle"]
-		  stringByAppendingPathExtension:@"png"];
-    }
-
   image = AUTORELEASE([[NSImage alloc] initWithContentsOfFile:path]);
   return image;
 }
@@ -154,12 +148,6 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   NSString *path = [[NSBundle mainBundle] pathForResource:@"Recycler.GNUstep"
                                                    ofType:@"xpm"];
   NSImage *image;
-
-  if (![path length])
-    {
-      path = [[@"Resources" stringByAppendingPathComponent:@"Recycler.GNUstep"]
-		  stringByAppendingPathExtension:@"xpm"];
-    }
 
   image = AUTORELEASE([[NSImage alloc] initWithContentsOfFile:path]);
   if (image)

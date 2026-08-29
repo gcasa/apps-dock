@@ -25,6 +25,8 @@
 #import <X11/Xatom.h>
 #import <X11/Xutil.h>
 #import <limits.h>
+#import <mntent.h>
+#import <paths.h>
 #import <string.h>
 #import <unistd.h>
 
@@ -133,6 +135,32 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 - (void) clearX11Error
 {
   X11DockManagerLastErrorCode = 0;
+}
+
+- (NSString *) procFilesystemPath
+{
+  FILE *mounts;
+  struct mntent *entry;
+  NSString *path = nil;
+
+  mounts = setmntent(_PATH_MOUNTED, "r");
+  if (!mounts)
+    {
+      return nil;
+    }
+
+  while ((entry = getmntent(mounts)) != NULL)
+    {
+      if (entry->mnt_type && strcmp(entry->mnt_type, "proc") == 0 &&
+	  entry->mnt_dir)
+	{
+	  path = [NSString stringWithUTF8String:entry->mnt_dir];
+	  break;
+	}
+    }
+
+  endmntent(mounts);
+  return [path length] ? path : nil;
 }
 
 - (void) setDockPlacement: (DockPlacement)placement
@@ -756,12 +784,22 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 
   if (pid > 0)
     {
-      char procPath[64];
+      NSString *procPath = [self procFilesystemPath];
+      NSString *linkPath;
       char target[PATH_MAX];
       ssize_t length;
 
-      snprintf(procPath, sizeof(procPath), "/proc/%d/exe", pid);
-      length = readlink(procPath, target, sizeof(target) - 1);
+      if (![procPath length])
+	{
+	  return nil;
+	}
+
+      linkPath = [[procPath stringByAppendingPathComponent:
+			      [NSString stringWithFormat:@"%d", pid]]
+		   stringByAppendingPathComponent:@"exe"];
+      length = readlink([linkPath fileSystemRepresentation],
+			target,
+			sizeof(target) - 1);
       if (length > 0)
 	{
 	  target[length] = '\0';
@@ -1220,15 +1258,15 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 - (BOOL) windowShouldBeIgnoredWithTitle: (NSString *)title path: (NSString *)path
 {
   NSString *lowerTitle = [title lowercaseString];
-  NSString *lowerPath = [path lowercaseString];
   NSString *lowerName = [[path lastPathComponent] lowercaseString];
+  NSArray *pathComponents = [[path lowercaseString] pathComponents];
 
   if ([lowerTitle isEqualToString:@"gworkspace"] ||
       [lowerTitle isEqualToString:@"dockwm"] ||
       [lowerName isEqualToString:@"gworkspace"] ||
       [lowerName isEqualToString:@"dockwm"] ||
-      [lowerPath rangeOfString:@"/gworkspace.app/"].location != NSNotFound ||
-      [lowerPath rangeOfString:@"/dockwm.app/"].location != NSNotFound)
+      [pathComponents containsObject:@"gworkspace.app"] ||
+      [pathComponents containsObject:@"dockwm.app"])
     {
       return YES;
     }

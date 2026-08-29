@@ -23,7 +23,11 @@
 #import <ctype.h>
 #import <dirent.h>
 #import <limits.h>
+#import <mntent.h>
+#import <paths.h>
 #import <signal.h>
+#import <stdlib.h>
+#import <string.h>
 #import <unistd.h>
 
 static CGFloat DockWindowWidth = 84.0;
@@ -356,6 +360,119 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   return [path stringByResolvingSymlinksInPath];
 }
 
+- (NSArray *) commandSearchPathComponents
+{
+  NSString *pathEnvironment = [[[NSProcessInfo processInfo] environment]
+				objectForKey:@"PATH"];
+  NSMutableArray *components = [NSMutableArray array];
+
+  if ([pathEnvironment length])
+    {
+      return [pathEnvironment componentsSeparatedByString:@":"];
+    }
+
+  {
+    size_t length = confstr(_CS_PATH, NULL, 0);
+
+    if (length > 0)
+      {
+	char *buffer = malloc(length);
+
+	if (buffer)
+	  {
+	    if (confstr(_CS_PATH, buffer, length) > 0)
+	      {
+		NSString *fallbackPath =
+		  [NSString stringWithUTF8String:buffer];
+
+		if ([fallbackPath length])
+		  {
+		    [components addObjectsFromArray:
+				  [fallbackPath componentsSeparatedByString:@":"]];
+		  }
+	      }
+	    free(buffer);
+	  }
+      }
+  }
+
+  return components;
+}
+
+- (NSString *) procFilesystemPath
+{
+  FILE *mounts;
+  struct mntent *entry;
+  NSString *path = nil;
+
+  mounts = setmntent(_PATH_MOUNTED, "r");
+  if (!mounts)
+    {
+      return nil;
+    }
+
+  while ((entry = getmntent(mounts)) != NULL)
+    {
+      if (entry->mnt_type && strcmp(entry->mnt_type, "proc") == 0 &&
+	  entry->mnt_dir)
+	{
+	  path = [NSString stringWithUTF8String:entry->mnt_dir];
+	  break;
+	}
+    }
+
+  endmntent(mounts);
+  return [path length] ? path : nil;
+}
+
+- (NSString *) procPathForProcessIdentifierString: (NSString *)identifier
+{
+  NSString *procPath = [self procFilesystemPath];
+
+  if (![procPath length] || ![identifier length])
+    {
+      return nil;
+    }
+
+  return [procPath stringByAppendingPathComponent:identifier];
+}
+
+- (BOOL) path: (NSString *)path isEqualToOrDescendantOfPath: (NSString *)parentPath
+{
+  NSArray *pathComponents;
+  NSArray *parentComponents;
+  NSUInteger i;
+
+  path = [self normalizedPath:path];
+  parentPath = [self normalizedPath:parentPath];
+  if (![path length] || ![parentPath length])
+    {
+      return NO;
+    }
+  if ([path isEqualToString:parentPath])
+    {
+      return YES;
+    }
+
+  pathComponents = [path pathComponents];
+  parentComponents = [parentPath pathComponents];
+  if ([pathComponents count] <= [parentComponents count])
+    {
+      return NO;
+    }
+
+  for (i = 0; i < [parentComponents count]; i++)
+    {
+      if (![[pathComponents objectAtIndex:i]
+	     isEqualToString:[parentComponents objectAtIndex:i]])
+	{
+	  return NO;
+	}
+    }
+
+  return YES;
+}
+
 - (NSString *) executablePathForApplicationPath: (NSString *)path
 {
   NSString *extension = [[path pathExtension] lowercaseString];
@@ -463,11 +580,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
       return [self normalizedPath:command];
     }
 
-  pathComponents = [[[NSProcessInfo processInfo] environment]
-		     objectForKey:@"PATH"] ?
-    [[[[NSProcessInfo processInfo] environment] objectForKey:@"PATH"]
-      componentsSeparatedByString:@":"] :
-    [NSArray arrayWithObjects:@"/usr/local/bin", @"/usr/bin", @"/bin", nil];
+  pathComponents = [self commandSearchPathComponents];
 
   for (i = 0; i < [pathComponents count]; i++)
     {
@@ -527,11 +640,17 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
 - (NSArray *) runningProcessExecutablePaths
 {
-  NSArray *entries = [[NSFileManager defaultManager]
-		       directoryContentsAtPath:@"/proc"];
+  NSString *procPath = [self procFilesystemPath];
+  NSArray *entries;
   NSMutableArray *paths = [NSMutableArray array];
   NSMutableSet *seenPaths = [NSMutableSet set];
   NSUInteger i;
+
+  if (![procPath length])
+    {
+      return paths;
+    }
+  entries = [[NSFileManager defaultManager] directoryContentsAtPath:procPath];
 
   for (i = 0; i < [entries count]; i++)
     {
@@ -545,7 +664,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 	  continue;
 	}
 
-      linkPath = [[@"/proc" stringByAppendingPathComponent:entry]
+      linkPath = [[procPath stringByAppendingPathComponent:entry]
 		   stringByAppendingPathComponent:@"exe"];
       length = readlink([linkPath fileSystemRepresentation],
 			target,
@@ -581,8 +700,8 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
       return nil;
     }
 
-  linkPath = [[@"/proc" stringByAppendingPathComponent:
-		 [processIdentifier stringValue]]
+  linkPath = [[self procPathForProcessIdentifierString:
+		      [processIdentifier stringValue]]
 	       stringByAppendingPathComponent:@"exe"];
   length = readlink([linkPath fileSystemRepresentation],
 		    target,
@@ -598,10 +717,16 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
 - (NSArray *) runningProcessIdentifiersForApplicationItem: (DockItem *)item
 {
-  NSArray *entries = [[NSFileManager defaultManager]
-		       directoryContentsAtPath:@"/proc"];
+  NSString *procPath = [self procFilesystemPath];
+  NSArray *entries;
   NSMutableArray *processIds = [NSMutableArray array];
   NSUInteger i;
+
+  if (![procPath length])
+    {
+      return processIds;
+    }
+  entries = [[NSFileManager defaultManager] directoryContentsAtPath:procPath];
 
   for (i = 0; i < [entries count]; i++)
     {
@@ -616,7 +741,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 	  continue;
 	}
 
-      linkPath = [[@"/proc" stringByAppendingPathComponent:entry]
+      linkPath = [[procPath stringByAppendingPathComponent:entry]
 		   stringByAppendingPathComponent:@"exe"];
       length = readlink([linkPath fileSystemRepresentation],
 			target,
@@ -657,7 +782,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
       ([processName length] && [processName isEqualToString:executableName]) ||
       ([itemPath length] &&
        [[[itemPath pathExtension] lowercaseString] isEqualToString:@"app"] &&
-       [processPath hasPrefix:[itemPath stringByAppendingString:@"/"]]))
+       [self path:processPath isEqualToOrDescendantOfPath:itemPath]))
     {
       return YES;
     }
@@ -875,10 +1000,11 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   for (i = 0; i < [processIdentifiers count]; i++)
     {
       NSNumber *processIdentifier = [processIdentifiers objectAtIndex:i];
-      NSString *processPath = [@"/proc" stringByAppendingPathComponent:
-					[processIdentifier stringValue]];
+      NSString *processPath = [self procPathForProcessIdentifierString:
+				      [processIdentifier stringValue]];
 
-      if (![[NSFileManager defaultManager] fileExistsAtPath:processPath])
+      if (![processPath length] ||
+	  ![[NSFileManager defaultManager] fileExistsAtPath:processPath])
 	{
 	  [_applicationIconUpdatesByProcessID removeObjectForKey:processIdentifier];
 	}
@@ -1275,12 +1401,9 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
 - (NSArray *) recyclerPaths
 {
-  NSString *home = NSHomeDirectory();
-  return [NSArray arrayWithObjects:
-		    [home stringByAppendingPathComponent:@".Trash"],
-		  [home stringByAppendingPathComponent:@".local/share/Trash/files"],
-		  [home stringByAppendingPathComponent:@"GNUstep/Library/Recycler"],
-		  nil];
+  return NSSearchPathForDirectoriesInDomains(NSTrashDirectory,
+					     NSAllDomainsMask,
+					     YES);
 }
 
 - (BOOL) directoryHasVisibleContentsAtPath: (NSString *)path
@@ -1513,9 +1636,8 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 	      NSString *path = [fallbackPaths objectAtIndex:i];
 	      NSString *normalizedRecyclerPath = [self normalizedPath:recyclerPath];
 
-	      if ([path isEqualToString:normalizedRecyclerPath] ||
-		  [path hasPrefix:
-			  [normalizedRecyclerPath stringByAppendingString:@"/"]])
+	      if ([self path:path
+		isEqualToOrDescendantOfPath:normalizedRecyclerPath])
 		{
 		  continue;
 		}
@@ -2071,8 +2193,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 	  ([windowName length] && [windowName isEqualToString:executableName]) ||
 	  ([itemPath length] &&
 	   [[[itemPath pathExtension] lowercaseString] isEqualToString:@"app"] &&
-	   [windowPath hasPrefix:
-			 [itemPath stringByAppendingString:@"/"]]))
+	   [self path:windowPath isEqualToOrDescendantOfPath:itemPath]))
 	{
 	  return item;
 	}
@@ -2311,15 +2432,15 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
 - (void) dockViewDidActivateTopIcon
 {
-  NSArray *paths = [NSArray arrayWithObjects:
-			      @"/usr/GNUstep/System/Applications/GWorkspace.app",
-			    @"/usr/GNUstep/Local/Applications/GWorkspace.app",
-			    nil];
+  NSArray *paths = NSSearchPathForDirectoriesInDomains(NSApplicationDirectory,
+						       NSAllDomainsMask,
+						       YES);
   NSUInteger i;
 
   for (i = 0; i < [paths count]; i++)
     {
-      NSString *path = [paths objectAtIndex:i];
+      NSString *path = [[paths objectAtIndex:i]
+			 stringByAppendingPathComponent:@"GWorkspace.app"];
       if ([[NSFileManager defaultManager] fileExistsAtPath:path])
 	{
 	  [self rememberLaunchedApplicationPath:path];
@@ -2354,9 +2475,14 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 	  command = [[command componentsSeparatedByString:@"%"] objectAtIndex:0];
 	  if ([command length])
 	    {
-	      [NSTask launchedTaskWithLaunchPath:@"/bin/sh"
-				       arguments:[NSArray arrayWithObjects:@"-lc", command, nil]];
-	      return YES;
+	      NSString *shellPath = [self pathForExecutableCommand:@"sh"];
+
+	      if ([shellPath length])
+		{
+		  [NSTask launchedTaskWithLaunchPath:shellPath
+					   arguments:[NSArray arrayWithObjects:@"-lc", command, nil]];
+		  return YES;
+		}
 	    }
 	  return NO;
 	}

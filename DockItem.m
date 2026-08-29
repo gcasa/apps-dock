@@ -199,7 +199,8 @@
 
 + (NSImage *) imageNamed: (NSString *)name inApplicationPath: (NSString *)path
 {
-  NSString *resources = [path stringByAppendingPathComponent:@"Resources"];
+  NSBundle *bundle = [NSBundle bundleWithPath:path];
+  NSString *resources = [bundle resourcePath];
   NSArray *basePaths;
   NSArray *extensions;
   NSUInteger i, j;
@@ -209,11 +210,21 @@
       return nil;
     }
 
-  basePaths = [NSArray arrayWithObjects:
-			 [resources stringByAppendingPathComponent:name],
-		       [path stringByAppendingPathComponent:name],
-		       name,
-		       nil];
+  if ([resources length])
+    {
+      basePaths = [NSArray arrayWithObjects:
+			     [resources stringByAppendingPathComponent:name],
+			   [path stringByAppendingPathComponent:name],
+			   name,
+			   nil];
+    }
+  else
+    {
+      basePaths = [NSArray arrayWithObjects:
+			     [path stringByAppendingPathComponent:name],
+			   name,
+			   nil];
+    }
   extensions = [NSArray arrayWithObjects:@"", @"tiff", @"tif", @"png", @"xpm", @"icns", nil];
 
   for (i = 0; i < [basePaths count]; i++)
@@ -239,15 +250,22 @@
   NSString *candidate = path;
   BOOL isDir = NO;
 
-  while ([candidate length] && ![candidate isEqualToString:@"/"])
+  while ([candidate length])
     {
+      NSString *parent;
+
       if ([[[candidate pathExtension] lowercaseString] isEqualToString:@"app"] &&
 	  [[NSFileManager defaultManager] fileExistsAtPath:candidate isDirectory:&isDir] &&
 	  isDir)
 	{
 	  return candidate;
 	}
-      candidate = [candidate stringByDeletingLastPathComponent];
+      parent = [candidate stringByDeletingLastPathComponent];
+      if (![parent length] || [parent isEqualToString:candidate])
+	{
+	  break;
+	}
+      candidate = parent;
     }
 
   return nil;
@@ -255,23 +273,13 @@
 
 + (NSImage *) iconForApplicationPath: (NSString *)path
 {
-  NSArray *infoPaths = [NSArray arrayWithObjects:
-				  [[path stringByAppendingPathComponent:@"Resources"] stringByAppendingPathComponent:@"Info-gnustep.plist"],
-				[path stringByAppendingPathComponent:@"Info-gnustep.plist"],
-				[path stringByAppendingPathComponent:@"Info.plist"],
-				nil];
+  NSDictionary *info = [[NSBundle bundleWithPath:path] infoDictionary];
   NSArray *iconKeys = [NSArray arrayWithObjects:
 				 @"NSIcon", @"ApplicationIcon", @"CFBundleIconFile", nil];
-  NSUInteger i, j;
+  NSUInteger j;
 
-  for (i = 0; i < [infoPaths count]; i++)
+  if (info)
     {
-      NSDictionary *info = [NSDictionary dictionaryWithContentsOfFile:[infoPaths objectAtIndex:i]];
-      if (!info)
-	{
-	  continue;
-	}
-
       for (j = 0; j < [iconKeys count]; j++)
 	{
 	  id iconName = [info objectForKey:[iconKeys objectAtIndex:j]];
@@ -448,9 +456,6 @@
 
   if ([[path stringByDeletingLastPathComponent] length])
     {
-      [directories addObject:
-		     [[path stringByDeletingLastPathComponent]
-			  stringByAppendingPathComponent:@"Resources"]];
       [directories addObject:[path stringByDeletingLastPathComponent]];
     }
 
@@ -466,8 +471,9 @@
                                         YES);
   for (i = 0; i < [libraryDirectories count]; i++)
     {
-      [directories addObject:[[libraryDirectories objectAtIndex:i]
-				  stringByAppendingPathComponent:@"WindowMaker/Icons"]];
+      [directories addObject:[[[libraryDirectories objectAtIndex:i]
+				  stringByAppendingPathComponent:@"WindowMaker"]
+				  stringByAppendingPathComponent:@"Icons"]];
     }
 
   return directories;
