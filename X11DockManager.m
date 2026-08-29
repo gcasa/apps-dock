@@ -1988,7 +1988,8 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 	}
 
       hasState = [self wmStateForWindow:window state:&state];
-      if ((hasState && state == WithdrawnState) ||
+      if ((hasState && state == WithdrawnState &&
+	   attr.map_state != IsViewable) ||
 	  (attr.map_state != IsViewable &&
 	   (!hasState || state != IconicState)))
 	{

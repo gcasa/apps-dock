@@ -838,6 +838,35 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   return changed;
 }
 
+- (BOOL) activateRunningApplicationWithProcessIdentifiers: (NSArray *)processIdentifiers
+{
+  NSUInteger i;
+
+  for (i = 0; i < [processIdentifiers count]; i++)
+    {
+      NSNumber *processIdentifier = [processIdentifiers objectAtIndex:i];
+      NSRunningApplication *application;
+
+      if (![processIdentifier isKindOfClass:[NSNumber class]])
+	{
+	  continue;
+	}
+
+      application = [NSRunningApplication
+		      runningApplicationWithProcessIdentifier:
+			(pid_t)[processIdentifier intValue]];
+      if (application &&
+	  [application activateWithOptions:
+			 NSApplicationActivateAllWindows |
+			 NSApplicationActivateIgnoringOtherApps])
+	{
+	  return YES;
+	}
+    }
+
+  return NO;
+}
+
 - (BOOL) shouldApplyX11Icon: (NSImage *)icon toItem: (DockItem *)item
 {
   NSString *bundlePath;
@@ -2284,22 +2313,32 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
       NSArray *processIds;
       BOOL launched = NO;
 
+      processIds = [self runningProcessIdentifiersForApplicationItem:item];
+      if ([processIds count])
+	{
+	  if ([self activateRunningApplicationWithProcessIdentifiers:processIds])
+	    {
+	      [item setState:DockItemRunning];
+	      [self refreshDock];
+	      return;
+	    }
+
+	  [_x11 drainTransientIconEvents];
+	  if ([_x11 activateApplicationWithProcessIdentifiers:processIds])
+	    {
+	      [_x11 drainTransientIconEvents];
+	      [item setState:DockItemRunning];
+	      [self refreshDock];
+	      return;
+	    }
+	  [_x11 drainTransientIconEvents];
+	}
+
       if ([item xWindow] && [item state] != DockItemNotRunning)
 	{
 	  [_x11 drainTransientIconEvents];
 	  [_x11 activateWindow:[item xWindow]];
 	  [_x11 drainTransientIconEvents];
-	  return;
-	}
-
-      processIds = [self runningProcessIdentifiersForApplicationItem:item];
-      if ([processIds count])
-	{
-	  [_x11 drainTransientIconEvents];
-	  [_x11 activateApplicationWithProcessIdentifiers:processIds];
-	  [_x11 drainTransientIconEvents];
-	  [item setState:DockItemRunning];
-	  [self refreshDock];
 	  return;
 	}
 
