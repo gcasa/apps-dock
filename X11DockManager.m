@@ -1783,7 +1783,7 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
                         processIdentifier:aProcessId
                                     title:nil])
     {
-      return NSMakeRect(0, 0, 64, 64);
+      return [self hiddenIconWindowFrame];
     }
 
 #if 0
@@ -1865,6 +1865,22 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 - (NSSize) getSizeWindow
 {
   return NSMakeSize(64, 64);
+}
+
+- (NSRect) hiddenIconWindowFrame
+{
+  Display *display = (Display *)_display;
+  int screen;
+
+  if (!display)
+    {
+      return NSMakeRect(0, 0, 64, 64);
+    }
+
+  screen = DefaultScreen(display);
+  return NSMakeRect(DisplayWidth(display, screen) + DockHiddenIconWindowOffset,
+		    DisplayHeight(display, screen) + DockHiddenIconWindowOffset,
+		    64, 64);
 }
 
 - (void) dockWindow: (unsigned long)xWindow atIndex: (NSUInteger)index
