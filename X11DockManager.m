@@ -385,7 +385,7 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 	}
     }
 
-  return [title length] ? title : [NSString stringWithFormat:@"0x%lx", (unsigned long)window];
+  return [title length] ? title : nil;
 }
 
 - (BOOL) wmStateForWindow: (Window)window state: (long *)state
@@ -1246,6 +1246,11 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
     {
       return NO;
     }
+  if (attr.map_state != IsViewable &&
+      (![self wmStateForWindow:window state:&state] || state != IconicState))
+    {
+      return NO;
+    }
 
   return YES;
 }
@@ -1473,6 +1478,11 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   hidden = [self windowIsHidden:window];
   title = [self titleForWindow:window];
   path = [self executablePathForWindow:window];
+
+  if (!dockApp && ![title length] && ![path length])
+    {
+      return;
+    }
 
   if ([self windowShouldBeIgnoredWithTitle:title path:path])
     {

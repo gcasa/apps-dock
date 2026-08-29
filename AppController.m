@@ -1389,6 +1389,14 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 	  [_items removeObjectAtIndex:i - 1];
 	  changed = YES;
 	}
+      else if ([item kind] == DockItemX11Window &&
+	       ![item isPinned] &&
+	       [item xWindow] &&
+	       ![_x11 windowExists:[item xWindow]])
+	{
+	  [_items removeObjectAtIndex:i - 1];
+	  changed = YES;
+	}
     }
 
   if (changed)
