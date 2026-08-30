@@ -1207,7 +1207,7 @@ DockViewCalibratedBackgroundColor (NSColor *color)
 	}
 
       startX = NSMinX(iconRect) + 2.0;
-      y = NSMinY(iconRect) + 2.0;
+      y = NSMinY(iconRect) - 7.0;
 
       for (i = 0; i < 3; i++)
 	{
