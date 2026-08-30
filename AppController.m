@@ -32,6 +32,7 @@
 
 static CGFloat DockCell = 64.0;
 static CGFloat DockGap = 2.0;
+static CGFloat DockCompactGap = 1.0;
 static CGFloat DockPad = 10.0;
 static CGFloat DockCompactPad = 0.0;
 static NSString *DockApplicationsDefaultsKey = @"DockApplications";
@@ -312,6 +313,11 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   return _dockCellSizeMode == DockCellSizeMode64 ? DockCompactPad : DockPad;
 }
 
+- (CGFloat) activeDockGap
+{
+  return _dockCellSizeMode == DockCellSizeMode64 ? DockCompactGap : DockGap;
+}
+
 - (CGFloat) activeDockWindowWidth
 {
   return DockCell + [self activeDockPad] * 2.0;
@@ -321,7 +327,9 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 {
   if (_dockView)
     {
-      [_dockView setIconCellSize:DockCell padding:[self activeDockPad]];
+      [_dockView setIconCellSize:DockCell
+			      gap:[self activeDockGap]
+			  padding:[self activeDockPad]];
     }
 }
 
@@ -1983,7 +1991,8 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   NSRect screenFrame = [[NSScreen mainScreen] frame];
   NSUInteger cellCount = [_items count] + 2;
   CGFloat pad = [self activeDockPad];
-  CGFloat length = pad * 2.0 + cellCount * DockCell + (cellCount - 1) * DockGap;
+  CGFloat gap = [self activeDockGap];
+  CGFloat length = pad * 2.0 + cellCount * DockCell + (cellCount - 1) * gap;
   CGFloat thickness = [self activeDockWindowWidth];
   CGFloat width = DockPlacementIsHorizontal(placement) ? length : thickness;
   CGFloat height = DockPlacementIsHorizontal(placement) ? thickness : length;

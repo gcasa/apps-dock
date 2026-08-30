@@ -97,6 +97,7 @@ DockViewCalibratedBackgroundColor (NSColor *color)
       _pinnedItemCount = 0;
       _backgroundColor = RETAIN([NSColor blackColor]);
       _cellSize = DockCell;
+      _dockGap = DockGap;
       _dockPad = DockPad;
       _gnustepIcon = RETAIN([self loadGNUstepIcon]);
       _recyclerIcon = RETAIN([self loadRecyclerIcon]);
@@ -340,20 +341,27 @@ DockViewCalibratedBackgroundColor (NSColor *color)
     }
 }
 
-- (void) setIconCellSize: (CGFloat)cellSize padding: (CGFloat)padding
+- (void) setIconCellSize: (CGFloat)cellSize
+		     gap: (CGFloat)gap
+		 padding: (CGFloat)padding
 {
   if (cellSize <= 0.0)
     {
       cellSize = DockCell;
+    }
+  if (gap < 0.0)
+    {
+      gap = 0.0;
     }
   if (padding < 0.0)
     {
       padding = 0.0;
     }
 
-  if (_cellSize != cellSize || _dockPad != padding)
+  if (_cellSize != cellSize || _dockGap != gap || _dockPad != padding)
     {
       _cellSize = cellSize;
+      _dockGap = gap;
       _dockPad = padding;
       [self setNeedsDisplay:YES];
     }
@@ -416,14 +424,14 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   NSRect topTile = [self topTileRect];
   if (_horizontal)
     {
-      return NSMakePoint(NSMaxX(topTile) + DockGap + index * (_cellSize + DockGap),
+      return NSMakePoint(NSMaxX(topTile) + _dockGap + index * (_cellSize + _dockGap),
 			 NSMinY(topTile));
     }
   else
     {
       return NSMakePoint(_dockPad,
-			 NSMinY(topTile) - DockGap - _cellSize
-			 - index * (_cellSize + DockGap));
+			 NSMinY(topTile) - _dockGap - _cellSize
+			 - index * (_cellSize + _dockGap));
     }
 }
 
@@ -1307,7 +1315,7 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   [[NSColor colorWithCalibratedWhite:0.95 alpha:0.95] set];
   if (_horizontal)
     {
-      NSRectFill(NSMakeRect(NSMinX(cell) - DockGap / 2.0 - thickness / 2.0,
+      NSRectFill(NSMakeRect(NSMinX(cell) - _dockGap / 2.0 - thickness / 2.0,
 			    NSMinY(cell) + 8.0,
 			    thickness,
 			    NSHeight(cell) - 16.0));
@@ -1315,7 +1323,7 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   else
     {
       NSRectFill(NSMakeRect(NSMinX(cell) + 8.0,
-			    NSMaxY(cell) + DockGap / 2.0 - thickness / 2.0,
+			    NSMaxY(cell) + _dockGap / 2.0 - thickness / 2.0,
 			    NSWidth(cell) - 16.0,
 			    thickness));
     }

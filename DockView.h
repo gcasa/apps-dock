@@ -49,6 +49,7 @@
   NSImage *_cellBackgroundImage;
   NSColor *_backgroundColor;
   CGFloat _cellSize;
+  CGFloat _dockGap;
   CGFloat _dockPad;
   BOOL _usesCellBackgroundTile;
   BOOL _showsBorder;
@@ -79,7 +80,9 @@
 - (void) setShowsBorder: (BOOL)showsBorder;
 - (BOOL) showsBorder;
 - (void) setRecyclerHasContents: (BOOL)hasContents;
-- (void) setIconCellSize: (CGFloat)cellSize padding: (CGFloat)padding;
+- (void) setIconCellSize: (CGFloat)cellSize
+		     gap: (CGFloat)gap
+		 padding: (CGFloat)padding;
 - (void) setUsesCellBackgroundTile: (BOOL)usesTile;
 - (BOOL) usesCellBackgroundTile;
 - (void) startWiggleForItem: (DockItem *)item;
