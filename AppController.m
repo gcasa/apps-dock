@@ -30,14 +30,22 @@
 #import <string.h>
 #import <unistd.h>
 
-static CGFloat DockWindowWidth = 84.0;
 static CGFloat DockCell = 64.0;
 static CGFloat DockGap = 2.0;
 static CGFloat DockPad = 10.0;
+static CGFloat DockCompactPad = 0.0;
 static NSString *DockApplicationsDefaultsKey = @"DockApplications";
 static NSString *DockOpenAtLoginApplicationsDefaultsKey = @"DockOpenAtLoginApplications";
 static NSString *DockBackgroundColorDefaultsKey = @"DockBackgroundColor";
 static NSString *DockShowBorderDefaultsKey = @"DockShowBorder";
+static NSString *DockCellSizeModeDefaultsKey = @"DockCellSizeMode";
+static NSString *DockUseCellTileBackgroundDefaultsKey = @"DockUseCellTileBackground";
+
+enum
+{
+  DockCellSizeModeCurrent = 0,
+  DockCellSizeMode64 = 1
+};
 
 static NSColor *
 DockCalibratedBackgroundColor (NSColor *color)
@@ -94,7 +102,9 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   _applicationIconWindowItems = [NSMutableDictionary new];
   _applicationIconUpdatesByProcessID = [NSMutableDictionary new];
   _dockPlacement = [self savedDockPlacement];
+  _dockCellSizeMode = [self savedDockCellSizeMode];
   _backgroundColor = RETAIN([self savedBackgroundColor]);
+  _useCellTileBackground = [self savedUseCellTileBackground];
   _showDockBorder = [self savedShowDockBorder];
   frame = [self dockWindowFrameForPlacement:_dockPlacement];
 
@@ -113,6 +123,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
                                                          NSHeight(frame))];
   [_dockView setDelegate:self];
   [_dockView setHorizontal:DockPlacementIsHorizontal(_dockPlacement)];
+  [self applyDockCellSizeToView];
   [_dockView setBackgroundColor:_backgroundColor];
   [_dockView setShowsBorder:_showDockBorder];
   [_dockView setItems:_items];
@@ -144,6 +155,9 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [_processScanTimer invalidate];
   DESTROY(_settingsEmptyRecyclerButton);
   DESTROY(_settingsShowBorderButton);
+  DESTROY(_settingsUseCellTileButton);
+  DESTROY(_settings64CellSizeButton);
+  DESTROY(_settingsCurrentCellSizeButton);
   DESTROY(_settingsBlueSlider);
   DESTROY(_settingsGreenSlider);
   DESTROY(_settingsRedSlider);
@@ -256,6 +270,59 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 {
   [[NSUserDefaults standardUserDefaults] setBool:_showDockBorder
 					  forKey:DockShowBorderDefaultsKey];
+}
+
+- (NSInteger) savedDockCellSizeMode
+{
+  NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+  id savedMode = [defaults objectForKey:DockCellSizeModeDefaultsKey];
+
+  if (savedMode)
+    {
+      NSInteger mode = [defaults integerForKey:DockCellSizeModeDefaultsKey];
+      if (mode == DockCellSizeMode64)
+	{
+	  return mode;
+	}
+    }
+
+  return DockCellSizeModeCurrent;
+}
+
+- (void) saveDockCellSizeMode
+{
+  [[NSUserDefaults standardUserDefaults] setInteger:_dockCellSizeMode
+					     forKey:DockCellSizeModeDefaultsKey];
+}
+
+- (BOOL) savedUseCellTileBackground
+{
+  return [[NSUserDefaults standardUserDefaults]
+	   boolForKey:DockUseCellTileBackgroundDefaultsKey];
+}
+
+- (void) saveUseCellTileBackground
+{
+  [[NSUserDefaults standardUserDefaults] setBool:_useCellTileBackground
+					  forKey:DockUseCellTileBackgroundDefaultsKey];
+}
+
+- (CGFloat) activeDockPad
+{
+  return _dockCellSizeMode == DockCellSizeMode64 ? DockCompactPad : DockPad;
+}
+
+- (CGFloat) activeDockWindowWidth
+{
+  return DockCell + [self activeDockPad] * 2.0;
+}
+
+- (void) applyDockCellSizeToView
+{
+  if (_dockView)
+    {
+      [_dockView setIconCellSize:DockCell padding:[self activeDockPad]];
+    }
 }
 
 - (void) loadPersistedApplications
@@ -1915,9 +1982,11 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 {
   NSRect screenFrame = [[NSScreen mainScreen] frame];
   NSUInteger cellCount = [_items count] + 2;
-  CGFloat length = DockPad * 2.0 + cellCount * DockCell + (cellCount - 1) * DockGap;
-  CGFloat width = DockPlacementIsHorizontal(placement) ? length : DockWindowWidth;
-  CGFloat height = DockPlacementIsHorizontal(placement) ? DockWindowWidth : length;
+  CGFloat pad = [self activeDockPad];
+  CGFloat length = pad * 2.0 + cellCount * DockCell + (cellCount - 1) * DockGap;
+  CGFloat thickness = [self activeDockWindowWidth];
+  CGFloat width = DockPlacementIsHorizontal(placement) ? length : thickness;
+  CGFloat height = DockPlacementIsHorizontal(placement) ? thickness : length;
   CGFloat x;
   CGFloat y;
 
@@ -2055,7 +2124,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     }
 
   _settingsPanel = [[NSPanel alloc]
-		     initWithContentRect:NSMakeRect(0, 0, 320, 320)
+		     initWithContentRect:NSMakeRect(0, 0, 320, 386)
 			       styleMask:NSTitledWindowMask | NSClosableWindowMask
 				 backing:NSBackingStoreBuffered
 				   defer:NO];
@@ -2066,11 +2135,11 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   contentView = [_settingsPanel contentView];
 
   label = [self settingsLabelWithTitle:@"Placement"
-                                 frame:NSMakeRect(18, 276, 110, 20)];
+                                 frame:NSMakeRect(18, 342, 110, 20)];
   [contentView addSubview:label];
 
   _settingsPlacementPopup =
-    [[NSPopUpButton alloc] initWithFrame:NSMakeRect(132, 272, 170, 26)
+    [[NSPopUpButton alloc] initWithFrame:NSMakeRect(132, 338, 170, 26)
                                pullsDown:NO];
   placements = [NSArray arrayWithObjects:
 			  @"Left Top",
@@ -2090,38 +2159,65 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [contentView addSubview:_settingsPlacementPopup];
 
   label = [self settingsLabelWithTitle:@"Color"
-                                 frame:NSMakeRect(18, 232, 110, 20)];
+                                 frame:NSMakeRect(18, 298, 110, 20)];
   [contentView addSubview:label];
 
   _settingsBackgroundColorWell =
-    [[NSColorWell alloc] initWithFrame:NSMakeRect(132, 226, 58, 32)];
+    [[NSColorWell alloc] initWithFrame:NSMakeRect(132, 292, 58, 32)];
   [_settingsBackgroundColorWell setEnabled:NO];
   [contentView addSubview:_settingsBackgroundColorWell];
 
   label = [self settingsLabelWithTitle:@"Red"
-                                 frame:NSMakeRect(18, 194, 70, 20)];
+                                 frame:NSMakeRect(18, 260, 70, 20)];
   [contentView addSubview:label];
   _settingsRedSlider =
-    [self settingsColorSliderWithFrame:NSMakeRect(92, 190, 210, 24)];
+    [self settingsColorSliderWithFrame:NSMakeRect(92, 256, 210, 24)];
   [contentView addSubview:_settingsRedSlider];
 
   label = [self settingsLabelWithTitle:@"Green"
-                                 frame:NSMakeRect(18, 164, 70, 20)];
+                                 frame:NSMakeRect(18, 230, 70, 20)];
   [contentView addSubview:label];
   _settingsGreenSlider =
-    [self settingsColorSliderWithFrame:NSMakeRect(92, 160, 210, 24)];
+    [self settingsColorSliderWithFrame:NSMakeRect(92, 226, 210, 24)];
   [contentView addSubview:_settingsGreenSlider];
 
   label = [self settingsLabelWithTitle:@"Blue"
-                                 frame:NSMakeRect(18, 134, 70, 20)];
+                                 frame:NSMakeRect(18, 200, 70, 20)];
   [contentView addSubview:label];
   _settingsBlueSlider =
-    [self settingsColorSliderWithFrame:NSMakeRect(92, 130, 210, 24)];
+    [self settingsColorSliderWithFrame:NSMakeRect(92, 196, 210, 24)];
   [contentView addSubview:_settingsBlueSlider];
+
+  label = [self settingsLabelWithTitle:@"Icon Cells"
+                                 frame:NSMakeRect(18, 152, 110, 20)];
+  [contentView addSubview:label];
+
+  _settingsCurrentCellSizeButton =
+    [self settingsButtonWithTitle:@"Current Size"
+                            frame:NSMakeRect(132, 150, 160, 24)
+                       buttonType:NSRadioButton
+                           action:@selector(settingsDockCellSizeChanged:)];
+  [_settingsCurrentCellSizeButton setTag:DockCellSizeModeCurrent];
+  [contentView addSubview:_settingsCurrentCellSizeButton];
+
+  _settings64CellSizeButton =
+    [self settingsButtonWithTitle:@"64 x 64"
+                            frame:NSMakeRect(132, 126, 160, 24)
+                       buttonType:NSRadioButton
+                           action:@selector(settingsDockCellSizeChanged:)];
+  [_settings64CellSizeButton setTag:DockCellSizeMode64];
+  [contentView addSubview:_settings64CellSizeButton];
+
+  _settingsUseCellTileButton =
+    [self settingsButtonWithTitle:@"Use common_Tile"
+                            frame:NSMakeRect(18, 88, 170, 24)
+                       buttonType:NSSwitchButton
+                           action:@selector(settingsUseCellTileChanged:)];
+  [contentView addSubview:_settingsUseCellTileButton];
 
   _settingsShowBorderButton =
     [self settingsButtonWithTitle:@"Show Border"
-                            frame:NSMakeRect(18, 86, 140, 24)
+                            frame:NSMakeRect(18, 62, 140, 24)
                        buttonType:NSSwitchButton
                            action:@selector(settingsShowBorderChanged:)];
   [contentView addSubview:_settingsShowBorderButton];
@@ -2159,6 +2255,12 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     }
 
   [_settingsPlacementPopup selectItemWithTag:(NSInteger)_dockPlacement];
+  [_settingsCurrentCellSizeButton setState:
+      (_dockCellSizeMode == DockCellSizeModeCurrent ? NSOnState : NSOffState)];
+  [_settings64CellSizeButton setState:
+      (_dockCellSizeMode == DockCellSizeMode64 ? NSOnState : NSOffState)];
+  [_settingsUseCellTileButton setState:
+      (_useCellTileBackground ? NSOnState : NSOffState)];
   if (![_settingsPanel isVisible])
     {
       color = DockCalibratedBackgroundColor(_backgroundColor);
@@ -2234,9 +2336,38 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [self saveShowDockBorder];
 }
 
+- (void) settingsUseCellTileChanged: (id)sender
+{
+  NSButton *button = (NSButton *)sender;
+
+  _useCellTileBackground = [button state] == NSOnState;
+  [_dockView setUsesCellBackgroundTile:_useCellTileBackground];
+  [self saveUseCellTileBackground];
+}
+
+- (void) settingsDockCellSizeChanged: (id)sender
+{
+  NSInteger mode = [sender tag];
+
+  if (mode != DockCellSizeMode64)
+    {
+      mode = DockCellSizeModeCurrent;
+    }
+
+  if (_dockCellSizeMode != mode)
+    {
+      _dockCellSizeMode = mode;
+      [self saveDockCellSizeMode];
+      [self applyDockPlacement];
+    }
+
+  [self updateSettingsPanelControls];
+}
+
 - (void) applyDockPlacement
 {
   [[NSUserDefaults standardUserDefaults] setInteger:_dockPlacement forKey:@"DockPlacement"];
+  [self applyDockCellSizeToView];
   [_dockView setHorizontal:DockPlacementIsHorizontal(_dockPlacement)];
   [_window setFrame:[self dockWindowFrameForPlacement:_dockPlacement]
             display:YES];
@@ -2251,6 +2382,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 - (void) updateDockBackground
 {
   [_dockView setBackgroundColor:_backgroundColor];
+  [_dockView setUsesCellBackgroundTile:_useCellTileBackground];
   [_dockView setShowsBorder:_showDockBorder];
 }
 

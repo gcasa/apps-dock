@@ -96,8 +96,11 @@ DockViewCalibratedBackgroundColor (NSColor *color)
       _dropIndex = NSNotFound;
       _pinnedItemCount = 0;
       _backgroundColor = RETAIN([NSColor blackColor]);
+      _cellSize = DockCell;
+      _dockPad = DockPad;
       _gnustepIcon = RETAIN([self loadGNUstepIcon]);
       _recyclerIcon = RETAIN([self loadRecyclerIcon]);
+      _cellBackgroundImage = RETAIN([self loadCellBackgroundImage]);
       [self registerForDraggedTypes:
 	      [NSArray arrayWithObjects:NSFilenamesPboardType,
 		       NSURLPboardType,
@@ -127,6 +130,7 @@ DockViewCalibratedBackgroundColor (NSColor *color)
       [self removeTrackingRect:_trackingRectTag];
     }
   DESTROY(_backgroundColor);
+  DESTROY(_cellBackgroundImage);
   DESTROY(_gnustepIcon);
   DESTROY(_recyclerIcon);
   DESTROY(_items);
@@ -156,6 +160,11 @@ DockViewCalibratedBackgroundColor (NSColor *color)
     }
 
   return nil;
+}
+
+- (NSImage *) loadCellBackgroundImage
+{
+  return [NSImage imageNamed:@"common_Tile"];
 }
 
 - (void) updateTrackingRect
@@ -331,6 +340,39 @@ DockViewCalibratedBackgroundColor (NSColor *color)
     }
 }
 
+- (void) setIconCellSize: (CGFloat)cellSize padding: (CGFloat)padding
+{
+  if (cellSize <= 0.0)
+    {
+      cellSize = DockCell;
+    }
+  if (padding < 0.0)
+    {
+      padding = 0.0;
+    }
+
+  if (_cellSize != cellSize || _dockPad != padding)
+    {
+      _cellSize = cellSize;
+      _dockPad = padding;
+      [self setNeedsDisplay:YES];
+    }
+}
+
+- (void) setUsesCellBackgroundTile: (BOOL)usesTile
+{
+  if (_usesCellBackgroundTile != usesTile)
+    {
+      _usesCellBackgroundTile = usesTile;
+      [self setNeedsDisplay:YES];
+    }
+}
+
+- (BOOL) usesCellBackgroundTile
+{
+  return _usesCellBackgroundTile;
+}
+
 - (void) setHorizontal: (BOOL)horizontal
 {
   if (_horizontal != horizontal)
@@ -347,7 +389,7 @@ DockViewCalibratedBackgroundColor (NSColor *color)
 
 - (NSSize) cellSize
 {
-  return NSMakeSize(DockCell, DockCell);
+  return NSMakeSize(_cellSize, _cellSize);
 }
 
 - (NSRect) topTileRect
@@ -355,17 +397,17 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   NSRect bounds = [self bounds];
   if (_horizontal)
     {
-      return NSMakeRect(DockPad,
-			DockPad,
-			DockCell,
-			DockCell);
+      return NSMakeRect(_dockPad,
+			_dockPad,
+			_cellSize,
+			_cellSize);
     }
   else
     {
-      return NSMakeRect(DockPad,
-			NSMaxY(bounds) - DockPad - DockCell,
-			DockCell,
-			DockCell);
+      return NSMakeRect(_dockPad,
+			NSMaxY(bounds) - _dockPad - _cellSize,
+			_cellSize,
+			_cellSize);
     }
 }
 
@@ -374,21 +416,21 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   NSRect topTile = [self topTileRect];
   if (_horizontal)
     {
-      return NSMakePoint(NSMaxX(topTile) + DockGap + index * (DockCell + DockGap),
+      return NSMakePoint(NSMaxX(topTile) + DockGap + index * (_cellSize + DockGap),
 			 NSMinY(topTile));
     }
   else
     {
-      return NSMakePoint(DockPad,
-			 NSMinY(topTile) - DockGap - DockCell
-			 - index * (DockCell + DockGap));
+      return NSMakePoint(_dockPad,
+			 NSMinY(topTile) - DockGap - _cellSize
+			 - index * (_cellSize + DockGap));
     }
 }
 
 - (NSRect) recyclerTileRect
 {
   NSPoint origin = [self cellOriginAtIndex:[_items count]];
-  return NSMakeRect(origin.x, origin.y, DockCell, DockCell);
+  return NSMakeRect(origin.x, origin.y, _cellSize, _cellSize);
 }
 
 - (NSUInteger) indexAtPoint: (NSPoint)p
@@ -398,7 +440,7 @@ DockViewCalibratedBackgroundColor (NSColor *color)
     {
       NSRect r = NSMakeRect([self cellOriginAtIndex:i].x,
 			    [self cellOriginAtIndex:i].y,
-			    DockCell, DockCell);
+			    _cellSize, _cellSize);
       if (NSPointInRect(p, r))
 	{
 	  return i;
@@ -424,7 +466,7 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   for (i = 0; i < [_items count]; i++)
     {
       NSPoint origin = [self cellOriginAtIndex:i];
-      NSRect cell = NSMakeRect(origin.x, origin.y, DockCell, DockCell);
+      NSRect cell = NSMakeRect(origin.x, origin.y, _cellSize, _cellSize);
 
       if (_horizontal)
 	{
@@ -503,7 +545,7 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   if (index >= 0 && index < (NSInteger)[_items count])
     {
       NSPoint origin = [self cellOriginAtIndex: (NSUInteger)index];
-      return NSMakeRect(origin.x, origin.y, DockCell, DockCell);
+      return NSMakeRect(origin.x, origin.y, _cellSize, _cellSize);
     }
 
   return NSZeroRect;
@@ -984,6 +1026,36 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   return YES;
 }
 
+- (void) drawCellBackgroundInCell: (NSRect)cell
+{
+  NSSize imageSize;
+  NSRect sourceRect;
+
+  if (!_usesCellBackgroundTile || !_cellBackgroundImage)
+    {
+      return;
+    }
+
+  imageSize = [_cellBackgroundImage size];
+  if (imageSize.width <= 0.0 || imageSize.height <= 0.0)
+    {
+      NSImageRep *rep = [[_cellBackgroundImage representations] count]
+	? [[_cellBackgroundImage representations] objectAtIndex:0] : nil;
+      if (!rep)
+	{
+	  return;
+	}
+      imageSize = NSMakeSize([rep pixelsWide], [rep pixelsHigh]);
+      [_cellBackgroundImage setSize:imageSize];
+    }
+
+  sourceRect = NSMakeRect(0.0, 0.0, imageSize.width, imageSize.height);
+  [_cellBackgroundImage drawInRect:cell
+			  fromRect:sourceRect
+			 operation:NSCompositeSourceOver
+			  fraction:1.0];
+}
+
 - (BOOL) drawImage: (NSImage *)image inCell: (NSRect)cell size: (CGFloat)size
 {
   return [self drawImage:image inCell:cell size:size angle:0.0];
@@ -1106,6 +1178,7 @@ DockViewCalibratedBackgroundColor (NSColor *color)
 {
   NSRect cell = [self topTileRect];
 
+  [self drawCellBackgroundInCell:cell];
   [self drawImage:_gnustepIcon inCell:cell size:50.0];
 }
 
@@ -1175,6 +1248,8 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   NSRect cell = [self recyclerTileRect];
   CGFloat angle = 0.0;
 
+  [self drawCellBackgroundInCell:cell];
+
   if (_recyclerWiggleStartTime)
     {
       NSTimeInterval elapsed = [NSDate timeIntervalSinceReferenceDate] -
@@ -1222,7 +1297,7 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   if (_dropIndex < [_items count])
     {
       NSPoint origin = [self cellOriginAtIndex:_dropIndex];
-      cell = NSMakeRect(origin.x, origin.y, DockCell, DockCell);
+      cell = NSMakeRect(origin.x, origin.y, _cellSize, _cellSize);
     }
   else
     {
@@ -1263,7 +1338,7 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   if (index > 0)
     {
       origin = [self cellOriginAtIndex:index - 1];
-      previousCell = NSMakeRect(origin.x, origin.y, DockCell, DockCell);
+      previousCell = NSMakeRect(origin.x, origin.y, _cellSize, _cellSize);
     }
   else
     {
@@ -1273,7 +1348,7 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   if (index < [_items count])
     {
       origin = [self cellOriginAtIndex:index];
-      nextCell = NSMakeRect(origin.x, origin.y, DockCell, DockCell);
+      nextCell = NSMakeRect(origin.x, origin.y, _cellSize, _cellSize);
     }
   else
     {
@@ -1342,8 +1417,9 @@ DockViewCalibratedBackgroundColor (NSColor *color)
     {
       DockItem *item = [_items objectAtIndex:i];
       NSPoint origin = [self cellOriginAtIndex:i];
-      NSRect cell = NSMakeRect(origin.x, origin.y, DockCell, DockCell);
+      NSRect cell = NSMakeRect(origin.x, origin.y, _cellSize, _cellSize);
 
+      [self drawCellBackgroundInCell:cell];
       [self drawDockTileForItem:item inCell:cell size:46.0];
       [self drawStateForItem:item inCell:cell];
     }
@@ -1402,8 +1478,8 @@ DockViewCalibratedBackgroundColor (NSColor *color)
 - (NSImage *) dragImageForItemAtIndex: (NSUInteger)index
 {
   NSImage *image = AUTORELEASE([[NSImage alloc]
-				 initWithSize:NSMakeSize(DockCell, DockCell)]);
-  NSRect cell = NSMakeRect(0.0, 0.0, DockCell, DockCell);
+				 initWithSize:NSMakeSize(_cellSize, _cellSize)]);
+  NSRect cell = NSMakeRect(0.0, 0.0, _cellSize, _cellSize);
 
   if (index >= [_items count])
     {
@@ -1411,6 +1487,7 @@ DockViewCalibratedBackgroundColor (NSColor *color)
     }
 
   [image lockFocus];
+  [self drawCellBackgroundInCell:cell];
   [self drawDockTileForItem:[_items objectAtIndex:index] inCell:cell size:46.0];
   [self drawStateForItem:[_items objectAtIndex:index] inCell:cell];
   [image unlockFocus];
@@ -1437,8 +1514,8 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   {
     NSPasteboard *pasteboard = [NSPasteboard pasteboardWithName:NSDragPboard];
     NSImage *dragImage = [self dragImageForItemAtIndex:_mouseDownItemIndex];
-    NSPoint dragPoint = NSMakePoint(location.x - DockCell / 2.0,
-                                    location.y - DockCell / 2.0);
+    NSPoint dragPoint = NSMakePoint(location.x - _cellSize / 2.0,
+                                    location.y - _cellSize / 2.0);
 
     [pasteboard declareTypes:[NSArray arrayWithObject:DockReorderPboardType]
                        owner:nil];

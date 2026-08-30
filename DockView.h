@@ -46,7 +46,11 @@
   BOOL _performedDragOperation;
   NSImage *_gnustepIcon;
   NSImage *_recyclerIcon;
+  NSImage *_cellBackgroundImage;
   NSColor *_backgroundColor;
+  CGFloat _cellSize;
+  CGFloat _dockPad;
+  BOOL _usesCellBackgroundTile;
   BOOL _showsBorder;
   BOOL _recyclerHasContents;
   BOOL _horizontal;
@@ -75,6 +79,9 @@
 - (void) setShowsBorder: (BOOL)showsBorder;
 - (BOOL) showsBorder;
 - (void) setRecyclerHasContents: (BOOL)hasContents;
+- (void) setIconCellSize: (CGFloat)cellSize padding: (CGFloat)padding;
+- (void) setUsesCellBackgroundTile: (BOOL)usesTile;
+- (BOOL) usesCellBackgroundTile;
 - (void) startWiggleForItem: (DockItem *)item;
 - (void) startRecyclerWiggle;
 - (void) setHorizontal: (BOOL)horizontal;
