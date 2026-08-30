@@ -47,6 +47,7 @@
   NSImage *_gnustepIcon;
   NSImage *_recyclerIcon;
   NSColor *_backgroundColor;
+  BOOL _showsBorder;
   BOOL _recyclerHasContents;
   BOOL _horizontal;
   NSTimer *_tooltipTimer;
@@ -71,6 +72,8 @@
 - (void) setItems: (NSArray *)items;
 - (void) setPinnedItemCount: (NSUInteger)count;
 - (void) setBackgroundColor: (NSColor *)color;
+- (void) setShowsBorder: (BOOL)showsBorder;
+- (BOOL) showsBorder;
 - (void) setRecyclerHasContents: (BOOL)hasContents;
 - (void) startWiggleForItem: (DockItem *)item;
 - (void) startRecyclerWiggle;

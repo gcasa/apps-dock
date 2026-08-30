@@ -37,6 +37,7 @@ static CGFloat DockPad = 10.0;
 static NSString *DockApplicationsDefaultsKey = @"DockApplications";
 static NSString *DockOpenAtLoginApplicationsDefaultsKey = @"DockOpenAtLoginApplications";
 static NSString *DockBackgroundColorDefaultsKey = @"DockBackgroundColor";
+static NSString *DockShowBorderDefaultsKey = @"DockShowBorder";
 
 static NSColor *
 DockCalibratedBackgroundColor (NSColor *color)
@@ -94,6 +95,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   _applicationIconUpdatesByProcessID = [NSMutableDictionary new];
   _dockPlacement = [self savedDockPlacement];
   _backgroundColor = RETAIN([self savedBackgroundColor]);
+  _showDockBorder = [self savedShowDockBorder];
   frame = [self dockWindowFrameForPlacement:_dockPlacement];
 
   _window = [[NSWindow alloc] initWithContentRect:frame
@@ -112,6 +114,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [_dockView setDelegate:self];
   [_dockView setHorizontal:DockPlacementIsHorizontal(_dockPlacement)];
   [_dockView setBackgroundColor:_backgroundColor];
+  [_dockView setShowsBorder:_showDockBorder];
   [_dockView setItems:_items];
   [_dockView setPinnedItemCount:[self pinnedApplicationCount]];
   [_dockView setMenu:[self dockMenu]];
@@ -140,6 +143,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [_scanTimer invalidate];
   [_processScanTimer invalidate];
   DESTROY(_settingsEmptyRecyclerButton);
+  DESTROY(_settingsShowBorderButton);
   DESTROY(_settingsBlueSlider);
   DESTROY(_settingsGreenSlider);
   DESTROY(_settingsRedSlider);
@@ -240,6 +244,18 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [components setObject:[NSNumber numberWithDouble:blue] forKey:@"Blue"];
   [components setObject:[NSNumber numberWithDouble:alpha] forKey:@"Alpha"];
   [defaults setObject:components forKey:DockBackgroundColorDefaultsKey];
+}
+
+- (BOOL) savedShowDockBorder
+{
+  return [[NSUserDefaults standardUserDefaults]
+	   boolForKey:DockShowBorderDefaultsKey];
+}
+
+- (void) saveShowDockBorder
+{
+  [[NSUserDefaults standardUserDefaults] setBool:_showDockBorder
+					  forKey:DockShowBorderDefaultsKey];
 }
 
 - (void) loadPersistedApplications
@@ -2103,6 +2119,13 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     [self settingsColorSliderWithFrame:NSMakeRect(92, 130, 210, 24)];
   [contentView addSubview:_settingsBlueSlider];
 
+  _settingsShowBorderButton =
+    [self settingsButtonWithTitle:@"Show Border"
+                            frame:NSMakeRect(18, 86, 140, 24)
+                       buttonType:NSSwitchButton
+                           action:@selector(settingsShowBorderChanged:)];
+  [contentView addSubview:_settingsShowBorderButton];
+
   _settingsEmptyRecyclerButton =
     [self settingsButtonWithTitle:@"Empty Recycler"
                             frame:NSMakeRect(18, 24, 120, 28)
@@ -2145,6 +2168,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
       [_settingsGreenSlider setDoubleValue:green * 255.0];
       [_settingsBlueSlider setDoubleValue:blue * 255.0];
     }
+  [_settingsShowBorderButton setState:(_showDockBorder ? NSOnState : NSOffState)];
   [_settingsEmptyRecyclerButton setEnabled:[self recyclerHasContents]];
 }
 
@@ -2201,6 +2225,15 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [self saveBackgroundColor];
 }
 
+- (void) settingsShowBorderChanged: (id)sender
+{
+  NSButton *button = (NSButton *)sender;
+
+  _showDockBorder = [button state] == NSOnState;
+  [_dockView setShowsBorder:_showDockBorder];
+  [self saveShowDockBorder];
+}
+
 - (void) applyDockPlacement
 {
   [[NSUserDefaults standardUserDefaults] setInteger:_dockPlacement forKey:@"DockPlacement"];
@@ -2218,6 +2251,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 - (void) updateDockBackground
 {
   [_dockView setBackgroundColor:_backgroundColor];
+  [_dockView setShowsBorder:_showDockBorder];
 }
 
 - (void) quitDock: (id)sender

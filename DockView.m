@@ -308,6 +308,20 @@ DockViewCalibratedBackgroundColor (NSColor *color)
     }
 }
 
+- (void) setShowsBorder: (BOOL)showsBorder
+{
+  if (_showsBorder != showsBorder)
+    {
+      _showsBorder = showsBorder;
+      [self setNeedsDisplay:YES];
+    }
+}
+
+- (BOOL) showsBorder
+{
+  return _showsBorder;
+}
+
 - (void) setRecyclerHasContents: (BOOL)hasContents
 {
   if (_recyclerHasContents != hasContents)
@@ -1297,6 +1311,23 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   [self drawSeparatorBeforeIndex:[_items count]];
 }
 
+- (void) drawDockBorder
+{
+  NSRect bounds;
+  NSBezierPath *path;
+
+  if (!_showsBorder)
+    {
+      return;
+    }
+
+  bounds = NSInsetRect([self bounds], 0.5, 0.5);
+  path = [NSBezierPath bezierPathWithRect:bounds];
+  [path setLineWidth:1.0];
+  [[NSColor colorWithCalibratedWhite:1.0 alpha:0.60] set];
+  [path stroke];
+}
+
 - (void) drawRect: (NSRect)dirtyRect
 {
   NSUInteger i;
@@ -1320,6 +1351,7 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   [self drawDropIndicator];
   [self drawRecyclerTile];
   [self drawTooltip];
+  [self drawDockBorder];
 }
 
 - (void) mouseMoved: (NSEvent *)event

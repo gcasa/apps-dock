@@ -30,6 +30,7 @@
   NSSlider *_settingsRedSlider;
   NSSlider *_settingsGreenSlider;
   NSSlider *_settingsBlueSlider;
+  NSButton *_settingsShowBorderButton;
   NSButton *_settingsEmptyRecyclerButton;
   DockView *_dockView;
   NSMutableArray *_items;
@@ -43,6 +44,7 @@
   NSMenu *_dockMenu;
   DockPlacement _dockPlacement;
   NSColor *_backgroundColor;
+  BOOL _showDockBorder;
 }
 
 @end
