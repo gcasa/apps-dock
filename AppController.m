@@ -41,6 +41,7 @@ static NSString *DockBackgroundColorDefaultsKey = @"DockBackgroundColor";
 static NSString *DockShowBorderDefaultsKey = @"DockShowBorder";
 static NSString *DockCellSizeModeDefaultsKey = @"DockCellSizeMode";
 static NSString *DockUseCellTileBackgroundDefaultsKey = @"DockUseCellTileBackground";
+static NSString *DockRunningIndicatorModeDefaultsKey = @"DockRunningIndicatorMode";
 
 enum
 {
@@ -104,6 +105,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   _applicationIconUpdatesByProcessID = [NSMutableDictionary new];
   _dockPlacement = [self savedDockPlacement];
   _dockCellSizeMode = [self savedDockCellSizeMode];
+  _runningIndicatorMode = [self savedRunningIndicatorMode];
   _backgroundColor = RETAIN([self savedBackgroundColor]);
   _useCellTileBackground = [self savedUseCellTileBackground];
   _showDockBorder = [self savedShowDockBorder];
@@ -127,6 +129,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [self applyDockCellSizeToView];
   [_dockView setBackgroundColor:_backgroundColor];
   [_dockView setShowsBorder:_showDockBorder];
+  [_dockView setRunningIndicatorMode:_runningIndicatorMode];
   [_dockView setItems:_items];
   [_dockView setPinnedItemCount:[self pinnedApplicationCount]];
   [_dockView setMenu:[self dockMenu]];
@@ -157,6 +160,8 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   DESTROY(_settingsEmptyRecyclerButton);
   DESTROY(_settingsShowBorderButton);
   DESTROY(_settingsUseCellTileButton);
+  DESTROY(_settingsNotRunningDotsButton);
+  DESTROY(_settingsRunningDotButton);
   DESTROY(_settings64CellSizeButton);
   DESTROY(_settingsCurrentCellSizeButton);
   DESTROY(_settingsBlueSlider);
@@ -294,6 +299,29 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 {
   [[NSUserDefaults standardUserDefaults] setInteger:_dockCellSizeMode
 					     forKey:DockCellSizeModeDefaultsKey];
+}
+
+- (DockRunningIndicatorMode) savedRunningIndicatorMode
+{
+  NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+  id savedMode = [defaults objectForKey:DockRunningIndicatorModeDefaultsKey];
+
+  if (savedMode)
+    {
+      NSInteger mode = [defaults integerForKey:DockRunningIndicatorModeDefaultsKey];
+      if (mode == DockRunningIndicatorModeNotRunningDots)
+	{
+	  return DockRunningIndicatorModeNotRunningDots;
+	}
+    }
+
+  return DockRunningIndicatorModeRunningDot;
+}
+
+- (void) saveRunningIndicatorMode
+{
+  [[NSUserDefaults standardUserDefaults] setInteger:_runningIndicatorMode
+					     forKey:DockRunningIndicatorModeDefaultsKey];
 }
 
 - (BOOL) savedUseCellTileBackground
@@ -2133,7 +2161,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     }
 
   _settingsPanel = [[NSPanel alloc]
-		     initWithContentRect:NSMakeRect(0, 0, 320, 386)
+		     initWithContentRect:NSMakeRect(0, 0, 320, 458)
 			       styleMask:NSTitledWindowMask | NSClosableWindowMask
 				 backing:NSBackingStoreBuffered
 				   defer:NO];
@@ -2144,11 +2172,11 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   contentView = [_settingsPanel contentView];
 
   label = [self settingsLabelWithTitle:@"Placement"
-                                 frame:NSMakeRect(18, 342, 110, 20)];
+                                 frame:NSMakeRect(18, 414, 110, 20)];
   [contentView addSubview:label];
 
   _settingsPlacementPopup =
-    [[NSPopUpButton alloc] initWithFrame:NSMakeRect(132, 338, 170, 26)
+    [[NSPopUpButton alloc] initWithFrame:NSMakeRect(132, 410, 170, 26)
                                pullsDown:NO];
   placements = [NSArray arrayWithObjects:
 			  @"Left Top",
@@ -2168,42 +2196,42 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [contentView addSubview:_settingsPlacementPopup];
 
   label = [self settingsLabelWithTitle:@"Color"
-                                 frame:NSMakeRect(18, 298, 110, 20)];
+                                 frame:NSMakeRect(18, 370, 110, 20)];
   [contentView addSubview:label];
 
   _settingsBackgroundColorWell =
-    [[NSColorWell alloc] initWithFrame:NSMakeRect(132, 292, 58, 32)];
+    [[NSColorWell alloc] initWithFrame:NSMakeRect(132, 364, 58, 32)];
   [_settingsBackgroundColorWell setEnabled:NO];
   [contentView addSubview:_settingsBackgroundColorWell];
 
   label = [self settingsLabelWithTitle:@"Red"
-                                 frame:NSMakeRect(18, 260, 70, 20)];
+                                 frame:NSMakeRect(18, 332, 70, 20)];
   [contentView addSubview:label];
   _settingsRedSlider =
-    [self settingsColorSliderWithFrame:NSMakeRect(92, 256, 210, 24)];
+    [self settingsColorSliderWithFrame:NSMakeRect(92, 328, 210, 24)];
   [contentView addSubview:_settingsRedSlider];
 
   label = [self settingsLabelWithTitle:@"Green"
-                                 frame:NSMakeRect(18, 230, 70, 20)];
+                                 frame:NSMakeRect(18, 302, 70, 20)];
   [contentView addSubview:label];
   _settingsGreenSlider =
-    [self settingsColorSliderWithFrame:NSMakeRect(92, 226, 210, 24)];
+    [self settingsColorSliderWithFrame:NSMakeRect(92, 298, 210, 24)];
   [contentView addSubview:_settingsGreenSlider];
 
   label = [self settingsLabelWithTitle:@"Blue"
-                                 frame:NSMakeRect(18, 200, 70, 20)];
+                                 frame:NSMakeRect(18, 272, 70, 20)];
   [contentView addSubview:label];
   _settingsBlueSlider =
-    [self settingsColorSliderWithFrame:NSMakeRect(92, 196, 210, 24)];
+    [self settingsColorSliderWithFrame:NSMakeRect(92, 268, 210, 24)];
   [contentView addSubview:_settingsBlueSlider];
 
   label = [self settingsLabelWithTitle:@"Icon Cells"
-                                 frame:NSMakeRect(18, 152, 110, 20)];
+                                 frame:NSMakeRect(18, 224, 110, 20)];
   [contentView addSubview:label];
 
   _settingsCurrentCellSizeButton =
     [self settingsButtonWithTitle:@"Current Size"
-                            frame:NSMakeRect(132, 150, 160, 24)
+                            frame:NSMakeRect(132, 222, 160, 24)
                        buttonType:NSRadioButton
                            action:@selector(settingsDockCellSizeChanged:)];
   [_settingsCurrentCellSizeButton setTag:DockCellSizeModeCurrent];
@@ -2211,11 +2239,31 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
   _settings64CellSizeButton =
     [self settingsButtonWithTitle:@"64 x 64"
-                            frame:NSMakeRect(132, 126, 160, 24)
+                            frame:NSMakeRect(132, 198, 160, 24)
                        buttonType:NSRadioButton
                            action:@selector(settingsDockCellSizeChanged:)];
   [_settings64CellSizeButton setTag:DockCellSizeMode64];
   [contentView addSubview:_settings64CellSizeButton];
+
+  label = [self settingsLabelWithTitle:@"State Dots"
+                                 frame:NSMakeRect(18, 152, 110, 20)];
+  [contentView addSubview:label];
+
+  _settingsRunningDotButton =
+    [self settingsButtonWithTitle:@"Dot when running"
+                            frame:NSMakeRect(132, 150, 170, 24)
+                       buttonType:NSRadioButton
+                           action:@selector(settingsRunningIndicatorModeChanged:)];
+  [_settingsRunningDotButton setTag:DockRunningIndicatorModeRunningDot];
+  [contentView addSubview:_settingsRunningDotButton];
+
+  _settingsNotRunningDotsButton =
+    [self settingsButtonWithTitle:@"Dots when stopped"
+                            frame:NSMakeRect(132, 126, 170, 24)
+                       buttonType:NSRadioButton
+                           action:@selector(settingsRunningIndicatorModeChanged:)];
+  [_settingsNotRunningDotsButton setTag:DockRunningIndicatorModeNotRunningDots];
+  [contentView addSubview:_settingsNotRunningDotsButton];
 
   _settingsUseCellTileButton =
     [self settingsButtonWithTitle:@"Use common_Tile"
@@ -2268,6 +2316,12 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
       (_dockCellSizeMode == DockCellSizeModeCurrent ? NSOnState : NSOffState)];
   [_settings64CellSizeButton setState:
       (_dockCellSizeMode == DockCellSizeMode64 ? NSOnState : NSOffState)];
+  [_settingsRunningDotButton setState:
+      (_runningIndicatorMode == DockRunningIndicatorModeRunningDot ?
+       NSOnState : NSOffState)];
+  [_settingsNotRunningDotsButton setState:
+      (_runningIndicatorMode == DockRunningIndicatorModeNotRunningDots ?
+       NSOnState : NSOffState)];
   [_settingsUseCellTileButton setState:
       (_useCellTileBackground ? NSOnState : NSOffState)];
   if (![_settingsPanel isVisible])
@@ -2373,6 +2427,25 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [self updateSettingsPanelControls];
 }
 
+- (void) settingsRunningIndicatorModeChanged: (id)sender
+{
+  NSInteger mode = [sender tag];
+
+  if (mode != DockRunningIndicatorModeNotRunningDots)
+    {
+      mode = DockRunningIndicatorModeRunningDot;
+    }
+
+  if (_runningIndicatorMode != (DockRunningIndicatorMode)mode)
+    {
+      _runningIndicatorMode = (DockRunningIndicatorMode)mode;
+      [_dockView setRunningIndicatorMode:_runningIndicatorMode];
+      [self saveRunningIndicatorMode];
+    }
+
+  [self updateSettingsPanelControls];
+}
+
 - (void) applyDockPlacement
 {
   [[NSUserDefaults standardUserDefaults] setInteger:_dockPlacement forKey:@"DockPlacement"];
@@ -2393,6 +2466,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [_dockView setBackgroundColor:_backgroundColor];
   [_dockView setUsesCellBackgroundTile:_useCellTileBackground];
   [_dockView setShowsBorder:_showDockBorder];
+  [_dockView setRunningIndicatorMode:_runningIndicatorMode];
 }
 
 - (void) quitDock: (id)sender

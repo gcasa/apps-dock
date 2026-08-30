@@ -32,6 +32,8 @@
   NSSlider *_settingsBlueSlider;
   NSButton *_settingsCurrentCellSizeButton;
   NSButton *_settings64CellSizeButton;
+  NSButton *_settingsRunningDotButton;
+  NSButton *_settingsNotRunningDotsButton;
   NSButton *_settingsUseCellTileButton;
   NSButton *_settingsShowBorderButton;
   NSButton *_settingsEmptyRecyclerButton;
@@ -47,6 +49,7 @@
   NSMenu *_dockMenu;
   DockPlacement _dockPlacement;
   NSInteger _dockCellSizeMode;
+  DockRunningIndicatorMode _runningIndicatorMode;
   NSColor *_backgroundColor;
   BOOL _useCellTileBackground;
   BOOL _showDockBorder;

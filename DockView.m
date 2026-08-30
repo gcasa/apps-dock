@@ -99,6 +99,7 @@ DockViewCalibratedBackgroundColor (NSColor *color)
       _cellSize = DockCell;
       _dockGap = DockGap;
       _dockPad = DockPad;
+      _runningIndicatorMode = DockRunningIndicatorModeRunningDot;
       _gnustepIcon = RETAIN([self loadGNUstepIcon]);
       _recyclerIcon = RETAIN([self loadRecyclerIcon]);
       _cellBackgroundImage = RETAIN([self loadCellBackgroundImage]);
@@ -330,6 +331,25 @@ DockViewCalibratedBackgroundColor (NSColor *color)
 - (BOOL) showsBorder
 {
   return _showsBorder;
+}
+
+- (void) setRunningIndicatorMode: (DockRunningIndicatorMode)mode
+{
+  if (mode != DockRunningIndicatorModeNotRunningDots)
+    {
+      mode = DockRunningIndicatorModeRunningDot;
+    }
+
+  if (_runningIndicatorMode != mode)
+    {
+      _runningIndicatorMode = mode;
+      [self setNeedsDisplay:YES];
+    }
+}
+
+- (DockRunningIndicatorMode) runningIndicatorMode
+{
+  return _runningIndicatorMode;
 }
 
 - (void) setRecyclerHasContents: (BOOL)hasContents
@@ -1165,8 +1185,47 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   CGFloat x;
   CGFloat y = NSMinY(cell) + 2.0;
 
-  if ([item kind] != DockItemApplication ||
-      [item state] == DockItemNotRunning)
+  if ([item kind] != DockItemApplication)
+    {
+      return;
+    }
+
+  if (_runningIndicatorMode == DockRunningIndicatorModeNotRunningDots)
+    {
+      NSUInteger i;
+      CGFloat iconSize = 46.0;
+      NSRect iconRect = NSMakeRect(NSMidX(cell) - iconSize / 2.0,
+				   NSMidY(cell) - iconSize / 2.0,
+				   iconSize,
+				   iconSize);
+      CGFloat spacing = dotSize + 3.0;
+      CGFloat startX;
+
+      if ([item state] != DockItemNotRunning)
+	{
+	  return;
+	}
+
+      startX = NSMinX(iconRect) + 2.0;
+      y = NSMinY(iconRect) + 2.0;
+
+      for (i = 0; i < 3; i++)
+	{
+	  x = startX + spacing * (CGFloat)i;
+
+	  [[NSColor colorWithCalibratedWhite:0.0 alpha:0.65] set];
+	  [[NSBezierPath bezierPathWithOvalInRect:
+			   NSMakeRect(x - 1.0, y - 1.0,
+				      dotSize + 2.0, dotSize + 2.0)] fill];
+
+	  [[NSColor colorWithCalibratedWhite:0.92 alpha:0.95] set];
+	  [[NSBezierPath bezierPathWithOvalInRect:
+			   NSMakeRect(x, y, dotSize, dotSize)] fill];
+	}
+      return;
+    }
+
+  if ([item state] == DockItemNotRunning)
     {
       return;
     }

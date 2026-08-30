@@ -21,6 +21,12 @@
 
 @class DockItem;
 
+typedef enum
+  {
+    DockRunningIndicatorModeRunningDot = 0,
+    DockRunningIndicatorModeNotRunningDots = 1
+  } DockRunningIndicatorMode;
+
 @protocol DockViewDelegate
 - (void) dockViewDidReceivePaths: (NSArray *)paths;
 - (void) dockViewDidReceivePaths: (NSArray *)paths
@@ -53,6 +59,7 @@
   CGFloat _dockPad;
   BOOL _usesCellBackgroundTile;
   BOOL _showsBorder;
+  DockRunningIndicatorMode _runningIndicatorMode;
   BOOL _recyclerHasContents;
   BOOL _horizontal;
   NSTimer *_tooltipTimer;
@@ -79,6 +86,8 @@
 - (void) setBackgroundColor: (NSColor *)color;
 - (void) setShowsBorder: (BOOL)showsBorder;
 - (BOOL) showsBorder;
+- (void) setRunningIndicatorMode: (DockRunningIndicatorMode)mode;
+- (DockRunningIndicatorMode) runningIndicatorMode;
 - (void) setRecyclerHasContents: (BOOL)hasContents;
 - (void) setIconCellSize: (CGFloat)cellSize
 		     gap: (CGFloat)gap
