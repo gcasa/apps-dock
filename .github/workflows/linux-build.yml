@@ -124,7 +124,9 @@ jobs:
             --with-library-combo=ng-gnu-gnu
           make -j"$(nproc)" install
 
+          set +u
           . "$PREFIX/share/GNUstep/Makefiles/GNUstep.sh"
+          set -u
 
           cd "$RUNNER_TEMP/gnustep-src/libs-base-base-1_30_0"
           ./configure --prefix="$PREFIX" --disable-mixedabi
@@ -145,9 +147,13 @@ jobs:
           set -eux
 
           if [[ "${{ matrix.runtime }}" == "new" ]]; then
+            set +u
             . "$GNUSTEP_PREFIX/share/GNUstep/Makefiles/GNUstep.sh"
+            set -u
           else
+            set +u
             . /usr/share/GNUstep/Makefiles/GNUstep.sh
+            set -u
           fi
 
           gnustep-config --objc-flags
