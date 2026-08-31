@@ -1696,9 +1696,31 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
 - (NSArray *) recyclerPaths
 {
-  return NSSearchPathForDirectoriesInDomains(NSTrashDirectory,
-					     NSAllDomainsMask,
-					     YES);
+  NSMutableArray *paths = [NSMutableArray array];
+  NSString *homeTrashPath = [NSHomeDirectory()
+			      stringByAppendingPathComponent:@".Trash"];
+  NSArray *searchPaths;
+  NSUInteger i;
+
+  if ([homeTrashPath length])
+    {
+      [paths addObject:homeTrashPath];
+    }
+
+  searchPaths = NSSearchPathForDirectoriesInDomains(NSTrashDirectory,
+						    NSAllDomainsMask,
+						    YES);
+  for (i = 0; i < [searchPaths count]; i++)
+    {
+      NSString *path = [searchPaths objectAtIndex:i];
+
+      if ([path length] && ![paths containsObject:path])
+	{
+	  [paths addObject:path];
+	}
+    }
+
+  return paths;
 }
 
 - (BOOL) directoryHasVisibleContentsAtPath: (NSString *)path
@@ -1856,18 +1878,21 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 - (void) dockViewDidReceivePathsInRecycler: (NSArray *)paths
 {
   NSFileManager *fileManager = [NSFileManager defaultManager];
-  NSMutableDictionary *filesBySource = [NSMutableDictionary dictionary];
-  NSMutableArray *fallbackPaths = [NSMutableArray array];
+  NSString *recyclerPath = [self recyclerPathForDropping];
+  NSString *normalizedRecyclerPath = [self normalizedPath:recyclerPath];
   BOOL recycled = NO;
   NSUInteger i;
+
+  if (![recyclerPath length])
+    {
+      NSBeep();
+      return;
+    }
 
   for (i = 0; i < [paths count]; i++)
     {
       NSString *path = [paths objectAtIndex:i];
       NSString *normalizedPath = [self normalizedPath:path];
-      NSString *source;
-      NSString *filename;
-      NSMutableArray *files;
 
       if (![normalizedPath length] ||
 	  ![fileManager fileExistsAtPath:normalizedPath])
@@ -1875,73 +1900,15 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 	  continue;
 	}
 
-      if (![fallbackPaths containsObject:normalizedPath])
-	{
-	  [fallbackPaths addObject:normalizedPath];
-	}
-
-      source = [normalizedPath stringByDeletingLastPathComponent];
-      filename = [normalizedPath lastPathComponent];
-      if (![source length] || ![filename length])
+      if ([self path:normalizedPath
+	isEqualToOrDescendantOfPath:normalizedRecyclerPath])
 	{
 	  continue;
 	}
 
-      files = [filesBySource objectForKey:source];
-      if (!files)
+      if ([self movePathToRecyclerFallback:normalizedPath recyclerPath:recyclerPath])
 	{
-	  files = [NSMutableArray array];
-	  [filesBySource setObject:files forKey:source];
-	}
-      if (![files containsObject:filename])
-	{
-	  [files addObject:filename];
-	}
-    }
-
-  {
-    NSEnumerator *enumerator = [filesBySource keyEnumerator];
-    NSString *source;
-
-    while ((source = [enumerator nextObject]))
-      {
-	NSInteger tag = 0;
-	NSArray *files = [filesBySource objectForKey:source];
-
-	if ([[NSWorkspace sharedWorkspace]
-	      performFileOperation:NSWorkspaceRecycleOperation
-			    source:source
-		       destination:@""
-			     files:files
-			       tag:&tag])
-	  {
-	    recycled = YES;
-	  }
-      }
-  }
-
-  if ([fallbackPaths count])
-    {
-      NSString *recyclerPath = [self recyclerPathForDropping];
-
-      if ([recyclerPath length])
-	{
-	  for (i = 0; i < [fallbackPaths count]; i++)
-	    {
-	      NSString *path = [fallbackPaths objectAtIndex:i];
-	      NSString *normalizedRecyclerPath = [self normalizedPath:recyclerPath];
-
-	      if ([self path:path
-		isEqualToOrDescendantOfPath:normalizedRecyclerPath])
-		{
-		  continue;
-		}
-
-	      if ([self movePathToRecyclerFallback:path recyclerPath:recyclerPath])
-		{
-		  recycled = YES;
-		}
-	    }
+	  recycled = YES;
 	}
     }
 
@@ -2725,9 +2692,17 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
 - (void) dockViewDidRemoveItemAtIndex: (NSUInteger)index
 {
+  DockItem *item;
+
   if (index >= [_items count])
     {
       return;
+    }
+
+  item = [_items objectAtIndex:index];
+  if ([item kind] == DockItemApplication && [[item path] length])
+    {
+      [self setApplicationPath:[item path] openAtLogin:NO];
     }
 
   [_items removeObjectAtIndex:index];
@@ -2797,6 +2772,20 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 - (void) dockViewDidEmptyRecycler: (id)dockView
 {
   [self emptyRecycler:dockView];
+}
+
+- (void) dockViewDidActivateRecycler
+{
+  NSString *path = [self recyclerPathForDropping];
+
+  if ([path length])
+    {
+      [[NSWorkspace sharedWorkspace] openFile:path];
+    }
+  else
+    {
+      NSBeep();
+    }
 }
 
 - (void) dockViewDidActivateItem: (DockItem *)item

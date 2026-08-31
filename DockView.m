@@ -33,6 +33,7 @@ static NSString *GWLSFolderPboardType = @"GWLSFolderPboardType";
 static NSString *GWDockIconPboardType = @"DockIconPboardType";
 static NSString *DockReorderPboardType = @"DockWMReorderPboardType";
 static NSUInteger DockTopIconClickIndex = NSUIntegerMax - 1;
+static NSUInteger DockRecyclerClickIndex = NSUIntegerMax - 2;
 static NSInteger DockHoverNone = -1;
 static NSInteger DockHoverTopIcon = -2;
 static NSInteger DockHoverRecycler = -3;
@@ -859,6 +860,8 @@ DockViewCalibratedBackgroundColor (NSColor *color)
       if ([dict isKindOfClass:[NSDictionary class]])
 	{
 	  [self addPathsFromPasteboardObject:[dict objectForKey:@"paths"]
+				     toArray:collectedPaths];
+	  [self addPathsFromPasteboardObject:[dict objectForKey:@"path"]
 				     toArray:collectedPaths];
 	}
     }
@@ -1867,6 +1870,7 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   NSUInteger clickedIndex = index;
   BOOL isDoubleClick = NO;
   BOOL topIconClicked = [self topIconContainsPoint:location];
+  BOOL recyclerClicked = [self recyclerContainsPoint:location];
 
   _mouseDownPoint = location;
   _mouseDownItemIndex = index;
@@ -1879,6 +1883,10 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   if (topIconClicked)
     {
       clickedIndex = DockTopIconClickIndex;
+    }
+  else if (recyclerClicked)
+    {
+      clickedIndex = DockRecyclerClickIndex;
     }
 
   if (clickedIndex != NSNotFound)
@@ -1902,6 +1910,13 @@ DockViewCalibratedBackgroundColor (NSColor *color)
 	  if ([_delegate respondsToSelector:@selector(dockViewDidActivateTopIcon)])
 	    {
 	      [_delegate dockViewDidActivateTopIcon];
+	    }
+	}
+      else if (recyclerClicked)
+	{
+	  if ([_delegate respondsToSelector:@selector(dockViewDidActivateRecycler)])
+	    {
+	      [_delegate dockViewDidActivateRecycler];
 	    }
 	}
       else if ([_delegate respondsToSelector:@selector(dockViewDidActivateItem:)])

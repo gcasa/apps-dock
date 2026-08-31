@@ -34,6 +34,7 @@ typedef enum
 - (void) dockViewDidReceivePathsInRecycler: (NSArray *)paths;
 - (void) dockViewDidActivateItem: (DockItem *)item;
 - (void) dockViewDidActivateTopIcon;
+- (void) dockViewDidActivateRecycler;
 - (void) dockViewDidMoveItemFromIndex: (NSUInteger)fromIndex
                               toIndex: (NSUInteger)toIndex;
 - (void) dockViewDidRemoveItemAtIndex: (NSUInteger)index;
