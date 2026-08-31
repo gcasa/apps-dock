@@ -1,0 +1,163 @@
+name: Linux Build
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: clang / GNUstep new runtime
+            compiler: clang
+            runtime: new
+            cc: clang
+            cxx: clang++
+            library_combo: ng-gnu-gnu
+          - name: gcc / GNUstep legacy runtime
+            compiler: gcc
+            runtime: legacy
+            cc: gcc
+            cxx: g++
+            library_combo: gnu-gnu-gnu
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install common dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            curl \
+            libffi-dev \
+            libgnutls28-dev \
+            libicu-dev \
+            libjpeg-dev \
+            libpng-dev \
+            libtiff-dev \
+            libx11-dev \
+            libxext-dev \
+            libxml2-dev \
+            libxslt1-dev \
+            ninja-build \
+            pkg-config
+
+      - name: Install clang toolchain
+        if: matrix.runtime == 'new'
+        run: |
+          sudo apt-get install -y clang lld
+
+      - name: Install gcc GNUstep packages
+        if: matrix.runtime == 'legacy'
+        run: |
+          sudo apt-get install -y gcc gobjc gnustep-devel
+
+      - name: Build GNUstep with clang and libobjc2
+        if: matrix.runtime == 'new'
+        env:
+          PREFIX: ${{ runner.temp }}/gnustep-new-runtime
+          CC: ${{ matrix.cc }}
+          CXX: ${{ matrix.cxx }}
+          CPP: clang -E
+        run: |
+          set -eux
+
+          export CPPFLAGS="-I$PREFIX/include"
+          export LDFLAGS="-L$PREFIX/lib -Wl,-rpath,$PREFIX/lib -fuse-ld=lld"
+          export LD_LIBRARY_PATH="$PREFIX/lib:${LD_LIBRARY_PATH:-}"
+          export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PREFIX/share/pkgconfig:${PKG_CONFIG_PATH:-}"
+
+          mkdir -p "$PREFIX" "$RUNNER_TEMP/gnustep-src"
+          cd "$RUNNER_TEMP/gnustep-src"
+
+          curl -L -o tools-make.tar.gz https://github.com/gnustep/tools-make/archive/refs/tags/make-2_9_3.tar.gz
+          curl -L -o libobjc2.tar.gz https://github.com/gnustep/libobjc2/archive/refs/tags/v2.2.tar.gz
+          curl -L -o libs-base.tar.gz https://github.com/gnustep/libs-base/archive/refs/tags/base-1_30_0.tar.gz
+          curl -L -o libs-gui.tar.gz https://github.com/gnustep/libs-gui/archive/refs/tags/gui-0_31_1.tar.gz
+
+          tar -xf tools-make.tar.gz
+          tar -xf libobjc2.tar.gz
+          tar -xf libs-base.tar.gz
+          tar -xf libs-gui.tar.gz
+
+          cd tools-make-make-2_9_3
+          ./configure --prefix="$PREFIX" --with-layout=fhs
+          make -j"$(nproc)" install
+
+          cd "$RUNNER_TEMP/gnustep-src/libobjc2-2.2"
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$PREFIX" \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_OBJC_COMPILER=clang \
+            -DCMAKE_PREFIX_PATH="$PREFIX" \
+            -DCMAKE_LINKER=lld
+          cmake --build build
+          cmake --install build
+
+          cd "$RUNNER_TEMP/gnustep-src/tools-make-make-2_9_3"
+          make distclean
+          ./configure \
+            --prefix="$PREFIX" \
+            --with-layout=fhs \
+            --enable-native-objc-exceptions \
+            --with-runtime-abi=gnustep-2.2 \
+            --with-library-combo=ng-gnu-gnu
+          make -j"$(nproc)" install
+
+          . "$PREFIX/share/GNUstep/Makefiles/GNUstep.sh"
+
+          cd "$RUNNER_TEMP/gnustep-src/libs-base-base-1_30_0"
+          ./configure --prefix="$PREFIX" --disable-mixedabi
+          make -j"$(nproc)" install
+
+          cd "$RUNNER_TEMP/gnustep-src/libs-gui-gui-0_31_1"
+          ./configure --prefix="$PREFIX"
+          make -j"$(nproc)" install
+
+      - name: Build app
+        shell: bash
+        env:
+          CC: ${{ matrix.cc }}
+          CXX: ${{ matrix.cxx }}
+          LIBRARY_COMBO: ${{ matrix.library_combo }}
+          GNUSTEP_PREFIX: ${{ runner.temp }}/gnustep-new-runtime
+        run: |
+          set -eux
+
+          if [[ "${{ matrix.runtime }}" == "new" ]]; then
+            . "$GNUSTEP_PREFIX/share/GNUstep/Makefiles/GNUstep.sh"
+          else
+            . /usr/share/GNUstep/Makefiles/GNUstep.sh
+          fi
+
+          gnustep-config --objc-flags
+          gnustep-config --gui-libs
+          make clean
+          make -j"$(nproc)" messages=yes
+
+      - name: Upload app bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: DockWM-${{ matrix.compiler }}-${{ matrix.runtime }}-runtime
+          path: DockWM.app
+          if-no-files-found: error
