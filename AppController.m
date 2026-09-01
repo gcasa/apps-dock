@@ -1331,10 +1331,15 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
                                           title: (NSString *)title
 {
   DockItem *item = nil;
+  NSNumber *processIdentifierNumber = nil;
+  NSUInteger originalItemCount = [_items count];
 
   if (processIdentifier > 0)
     {
-      NSNumber *processIdentifierNumber = [NSNumber numberWithInt:processIdentifier];
+      processIdentifierNumber = [NSNumber numberWithInt:processIdentifier];
+      [self rememberApplicationIcon:icon
+			  badgeLabel:nil
+		   processIdentifier:processIdentifierNumber];
 
       item = [self applicationItemMatchingProcessIdentifier:processIdentifierNumber];
       if (!item)
@@ -1348,7 +1353,21 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
       item = [self applicationItemMatchingTitle:title];
     }
 
-  if (item && [self shouldApplyX11Icon:icon toItem:item])
+  if (item && processIdentifierNumber)
+    {
+      if ([self applyApplicationIconUpdate:
+		  [_applicationIconUpdatesByProcessID
+		    objectForKey:processIdentifierNumber]
+				       toItem:item])
+	{
+	  [_dockView setNeedsDisplay:YES];
+	}
+      if ([_items count] != originalItemCount)
+	{
+	  [self refreshDock];
+	}
+    }
+  else if (item && [self shouldApplyX11Icon:icon toItem:item])
     {
       NSString *identifier = nil;
 
@@ -1371,6 +1390,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 {
   DockItem *item = nil;
   NSNumber *processIdentifierNumber = nil;
+  NSUInteger originalItemCount = [_items count];
 
   if (processIdentifier > 0)
     {
@@ -1394,6 +1414,10 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 				       toItem:item])
 	{
 	  [_dockView setNeedsDisplay:YES];
+	}
+      if ([_items count] != originalItemCount)
+	{
+	  [self refreshDock];
 	}
     }
 }

@@ -58,6 +58,7 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 - (BOOL) rememberApplicationIconWindow: (Window)window
                      processIdentifier: (int)processIdentifier
                                  title: (NSString *)title;
+- (void) hideApplicationIconWindow: (Window)window;
 - (BOOL) windowLooksLikeWindowMakerDockApp: (Window)window;
 - (BOOL) windowIsKnownDockAppWindow: (Window)window;
 - (void) updateHostWindowShape;
@@ -1290,17 +1291,53 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   XFlush(display);
 }
 
-- (void) handlePossiblyNewWindow: (Window)window
+- (void) hideApplicationIconWindow: (Window)window
 {
   Display *display = (Display *)_display;
+  NSRect frame;
 
   if (!display || window == (Window)_hostWindow)
     {
       return;
     }
 
-  if ([self windowIsSmallGNUstepIconOrMiniWindow:window] ||
-      ([self windowIsSmallRootOverrideRedirectWindow:window] &&
+  frame = [self hiddenIconWindowFrame];
+  XMoveResizeWindow(display,
+		    window,
+		    (int)NSMinX(frame),
+		    (int)NSMinY(frame),
+		    (unsigned int)NSWidth(frame),
+		    (unsigned int)NSHeight(frame));
+  XMapWindow(display, window);
+  XFlush(display);
+}
+
+- (void) handlePossiblyNewWindow: (Window)window
+{
+  Display *display = (Display *)_display;
+  int processIdentifier;
+  NSString *title;
+
+  if (!display || window == (Window)_hostWindow)
+    {
+      return;
+    }
+
+  if ([self windowIsSmallGNUstepIconOrMiniWindow:window])
+    {
+      processIdentifier = [self processIdentifierForWindow:window];
+      title = [self classNameForWindow:window];
+      if ([self rememberApplicationIconWindow:window
+			    processIdentifier:processIdentifier
+					title:title])
+	{
+	  return;
+	}
+      [self unmapIconWindow:window];
+      return;
+    }
+
+  if (([self windowIsSmallRootOverrideRedirectWindow:window] &&
        ![self windowLooksLikeWindowMakerDockApp:window]))
     {
       [self unmapIconWindow:window];
@@ -1344,8 +1381,17 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
     {
       return NO;
     }
-  if ([self windowIsSmallGNUstepIconOrMiniWindow:window] ||
-      ([self windowIsSmallRootOverrideRedirectWindow:window] &&
+  if ([self windowIsSmallGNUstepIconOrMiniWindow:window])
+    {
+      if (![self rememberApplicationIconWindow:window
+			    processIdentifier:[self processIdentifierForWindow:window]
+					title:[self classNameForWindow:window]])
+	{
+	  [self unmapIconWindow:window];
+	}
+      return NO;
+    }
+  if (([self windowIsSmallRootOverrideRedirectWindow:window] &&
        ![self windowLooksLikeWindowMakerDockApp:window]))
     {
       [self unmapIconWindow:window];
@@ -1683,6 +1729,7 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   NSNumber *windowKey;
   XWindowAttributes attr;
   NSImage *icon;
+  NSData *iconData;
 
   if (window == (Window)_hostWindow)
     {
@@ -1728,7 +1775,12 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   [_knownWindows removeObject:windowKey];
 
   icon = [self imageFromWindowContents:window];
-  [self unmapIconWindow:window];
+  iconData = [icon TIFFRepresentation];
+  if (iconData)
+    {
+      [_iconImageDataByProcessID setObject:iconData forKey:identifier];
+    }
+  [self hideApplicationIconWindow:window];
 
   if (processIdentifier == getpid())
     {
