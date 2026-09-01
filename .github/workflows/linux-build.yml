@@ -19,6 +19,10 @@ jobs:
   build:
     name: ${{ matrix.name }}
     runs-on: ubuntu-24.04
+    env:
+      SRC_PATH: ${{ github.workspace }}/source
+      DEPS_PATH: ${{ github.workspace }}/dependencies
+      INSTALL_PATH: ${{ github.workspace }}/build
     strategy:
       fail-fast: false
       matrix:
@@ -39,6 +43,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          path: ${{ env.SRC_PATH }}
 
       - name: Install common dependencies
         run: |
@@ -72,7 +78,7 @@ jobs:
       - name: Build GNUstep with clang and libobjc2
         if: matrix.runtime == 'new'
         env:
-          PREFIX: ${{ runner.temp }}/gnustep-new-runtime
+          PREFIX: ${{ env.INSTALL_PATH }}
           CC: ${{ matrix.cc }}
           CXX: ${{ matrix.cxx }}
           CPP: clang -E
@@ -84,8 +90,8 @@ jobs:
           export LD_LIBRARY_PATH="$PREFIX/lib:${LD_LIBRARY_PATH:-}"
           export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PREFIX/share/pkgconfig:${PKG_CONFIG_PATH:-}"
 
-          mkdir -p "$PREFIX" "$RUNNER_TEMP/gnustep-src"
-          cd "$RUNNER_TEMP/gnustep-src"
+          mkdir -p "$PREFIX" "$DEPS_PATH"
+          cd "$DEPS_PATH"
 
           git clone --depth 1 --branch make-2_9_3 https://github.com/gnustep/tools-make.git tools-make
           git clone --depth 1 --branch v2.2 https://github.com/gnustep/libobjc2.git libobjc2
@@ -96,11 +102,11 @@ jobs:
           git submodule sync
           git submodule update --init --depth 1
 
-          cd "$RUNNER_TEMP/gnustep-src/tools-make"
+          cd "$DEPS_PATH/tools-make"
           ./configure --prefix="$PREFIX" --with-layout=fhs
           make -j"$(nproc)" install
 
-          cd "$RUNNER_TEMP/gnustep-src/libobjc2"
+          cd "$DEPS_PATH/libobjc2"
           cmake -S . -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX="$PREFIX" \
@@ -112,7 +118,7 @@ jobs:
           cmake --build build
           cmake --install build
 
-          cd "$RUNNER_TEMP/gnustep-src/tools-make"
+          cd "$DEPS_PATH/tools-make"
           make distclean
           ./configure \
             --prefix="$PREFIX" \
@@ -126,21 +132,22 @@ jobs:
           . "$PREFIX/share/GNUstep/Makefiles/GNUstep.sh"
           set -u
 
-          cd "$RUNNER_TEMP/gnustep-src/libs-base"
+          cd "$DEPS_PATH/libs-base"
           ./configure --prefix="$PREFIX" --disable-mixedabi
           make -j"$(nproc)" install
 
-          cd "$RUNNER_TEMP/gnustep-src/libs-gui"
+          cd "$DEPS_PATH/libs-gui"
           ./configure --prefix="$PREFIX"
           make -j"$(nproc)" install
 
       - name: Build app
         shell: bash
+        working-directory: ${{ env.SRC_PATH }}
         env:
           CC: ${{ matrix.cc }}
           CXX: ${{ matrix.cxx }}
           LIBRARY_COMBO: ${{ matrix.library_combo }}
-          GNUSTEP_PREFIX: ${{ runner.temp }}/gnustep-new-runtime
+          GNUSTEP_PREFIX: ${{ env.INSTALL_PATH }}
         run: |
           set -eux
 
@@ -163,5 +170,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: DockWM-${{ matrix.compiler }}-${{ matrix.runtime }}-runtime
-          path: DockWM.app
+          path: ${{ env.SRC_PATH }}/DockWM.app
           if-no-files-found: error
