@@ -902,20 +902,12 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 
 - (NSImage *) iconForIdentifier: (id)identifier
 {
-  NSNumber *windowKey;
-
   if (!identifier)
     {
       return nil;
     }
 
-  windowKey = [_iconWindowsByProcessID objectForKey:identifier];
-  if (!windowKey)
-    {
-      return nil;
-    }
-
-  return [self imageFromWindowContents:(Window)[windowKey unsignedLongValue]];
+  return nil;
 }
 
 - (BOOL) windowHasGNUstepStyleMask: (unsigned long)styleMask
@@ -1728,8 +1720,6 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   id identifier;
   NSNumber *windowKey;
   XWindowAttributes attr;
-  NSImage *icon;
-  NSData *iconData;
 
   if (window == (Window)_hostWindow)
     {
@@ -1774,27 +1764,7 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   [_iconWindowsByProcessID setObject:windowKey forKey:identifier];
   [_knownWindows removeObject:windowKey];
 
-  icon = [self imageFromWindowContents:window];
-  iconData = [icon TIFFRepresentation];
-  if (iconData)
-    {
-      [_iconImageDataByProcessID setObject:iconData forKey:identifier];
-    }
   [self hideApplicationIconWindow:window];
-
-  if (processIdentifier == getpid())
-    {
-      XFlush((Display *)_display);
-      return YES;
-    }
-
-  if (icon && [_delegate respondsToSelector:
-			   @selector(x11DockManagerDidUpdateApplicationIcon:processIdentifier:title:)])
-    {
-      [_delegate x11DockManagerDidUpdateApplicationIcon:icon
-				      processIdentifier:processIdentifier
-						  title:title];
-    }
 
   return YES;
 }
@@ -1863,11 +1833,6 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
       NSNumber *windowKey = [_iconWindowsByProcessID objectForKey:iconKey];
       Window window = (Window)[windowKey unsignedLongValue];
       XWindowAttributes attr;
-      NSImage *icon;
-      NSData *iconData;
-      int processIdentifier = 0;
-      NSString *title = nil;
-
       [self clearX11Error];
       if (!XGetWindowAttributes((Display *)_display, window, &attr) ||
 	  [self x11ErrorOccurred])
@@ -1875,33 +1840,6 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 	  [_iconWindowsByProcessID removeObjectForKey:iconKey];
 	  [_iconImageDataByProcessID removeObjectForKey:iconKey];
 	  continue;
-	}
-
-      icon = [self imageFromWindowContents:window];
-      iconData = [icon TIFFRepresentation];
-      if (!icon || !iconData)
-	{
-	  continue;
-	}
-
-      if (![iconData isEqual:[_iconImageDataByProcessID objectForKey:iconKey]])
-	{
-	  [_iconImageDataByProcessID setObject:iconData forKey:iconKey];
-	  if ([iconKey isKindOfClass:[NSNumber class]])
-	    {
-	      processIdentifier = [iconKey intValue];
-	    }
-	  else if ([iconKey isKindOfClass:[NSString class]])
-	    {
-	      title = iconKey;
-	    }
-	  if ([_delegate respondsToSelector:
-			   @selector(x11DockManagerDidUpdateApplicationIcon:processIdentifier:title:)])
-	    {
-	      [_delegate x11DockManagerDidUpdateApplicationIcon:icon
-					      processIdentifier:processIdentifier
-							  title:title];
-	    }
 	}
     }
 }

@@ -19,7 +19,7 @@ make
 ## Run
 
 ```sh
-./AppsDockWM.app/AppsDockWM
+./DockWM.app/DockWM
 ```
 
 The AppKit dock accepts filesystem drops. A companion X11 override-redirect host
