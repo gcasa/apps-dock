@@ -88,6 +88,14 @@ DockCalibratedBackgroundColor (NSColor *color)
                                    alpha:alpha];
 }
 
+static NSString *
+DockLargerCellSizeTitle(void)
+{
+  CGFloat tileSize = DockCell + DockPad * 2.0;
+
+  return [NSString stringWithFormat:@"%.0f x %.0f", tileSize, tileSize];
+}
+
 static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 {
   return placement == DockPlacementTopCenter || placement == DockPlacementBottomCenter;
@@ -164,9 +172,6 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   DESTROY(_settingsRunningDotButton);
   DESTROY(_settings64CellSizeButton);
   DESTROY(_settingsCurrentCellSizeButton);
-  DESTROY(_settingsBlueSlider);
-  DESTROY(_settingsGreenSlider);
-  DESTROY(_settingsRedSlider);
   DESTROY(_settingsBackgroundColorWell);
   DESTROY(_settingsPlacementPopup);
   DESTROY(_settingsPanel);
@@ -286,13 +291,13 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   if (savedMode)
     {
       NSInteger mode = [defaults integerForKey:DockCellSizeModeDefaultsKey];
-      if (mode == DockCellSizeMode64)
+      if (mode == DockCellSizeModeCurrent || mode == DockCellSizeMode64)
 	{
 	  return mode;
 	}
     }
 
-  return DockCellSizeModeCurrent;
+  return DockCellSizeMode64;
 }
 
 - (void) saveDockCellSizeMode
@@ -2146,23 +2151,12 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   return button;
 }
 
-- (NSSlider *) settingsColorSliderWithFrame: (NSRect)frame
-{
-  NSSlider *slider = [[NSSlider alloc] initWithFrame:frame];
-
-  [slider setMinValue:0.0];
-  [slider setMaxValue:255.0];
-  [slider setContinuous:YES];
-  [slider setTarget:self];
-  [slider setAction:@selector(settingsColorSliderChanged:)];
-  return slider;
-}
-
 - (void) createSettingsPanel
 {
   NSView *contentView;
   NSTextField *label;
   NSButton *closeButton;
+  NSColorPanel *colorPanel;
   NSArray *placements;
   NSUInteger i;
 
@@ -2172,7 +2166,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     }
 
   _settingsPanel = [[NSPanel alloc]
-		     initWithContentRect:NSMakeRect(0, 0, 320, 458)
+		     initWithContentRect:NSMakeRect(0, 0, 320, 368)
 			       styleMask:NSTitledWindowMask | NSClosableWindowMask
 				 backing:NSBackingStoreBuffered
 				   defer:NO];
@@ -2183,11 +2177,11 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   contentView = [_settingsPanel contentView];
 
   label = [self settingsLabelWithTitle:@"Placement"
-                                 frame:NSMakeRect(18, 414, 110, 20)];
+                                 frame:NSMakeRect(18, 324, 110, 20)];
   [contentView addSubview:label];
 
   _settingsPlacementPopup =
-    [[NSPopUpButton alloc] initWithFrame:NSMakeRect(132, 410, 170, 26)
+    [[NSPopUpButton alloc] initWithFrame:NSMakeRect(132, 320, 170, 26)
                                pullsDown:NO];
   placements = [NSArray arrayWithObjects:
 			  @"Left Top",
@@ -2207,54 +2201,37 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [contentView addSubview:_settingsPlacementPopup];
 
   label = [self settingsLabelWithTitle:@"Color"
-                                 frame:NSMakeRect(18, 370, 110, 20)];
+                                 frame:NSMakeRect(18, 280, 110, 20)];
   [contentView addSubview:label];
 
   _settingsBackgroundColorWell =
-    [[NSColorWell alloc] initWithFrame:NSMakeRect(132, 364, 58, 32)];
-  [_settingsBackgroundColorWell setEnabled:NO];
+    [[NSColorWell alloc] initWithFrame:NSMakeRect(132, 274, 58, 32)];
+  [_settingsBackgroundColorWell setTarget:self];
+  [_settingsBackgroundColorWell setAction:@selector(settingsBackgroundColorChanged:)];
   [contentView addSubview:_settingsBackgroundColorWell];
-
-  label = [self settingsLabelWithTitle:@"Red"
-                                 frame:NSMakeRect(18, 332, 70, 20)];
-  [contentView addSubview:label];
-  _settingsRedSlider =
-    [self settingsColorSliderWithFrame:NSMakeRect(92, 328, 210, 24)];
-  [contentView addSubview:_settingsRedSlider];
-
-  label = [self settingsLabelWithTitle:@"Green"
-                                 frame:NSMakeRect(18, 302, 70, 20)];
-  [contentView addSubview:label];
-  _settingsGreenSlider =
-    [self settingsColorSliderWithFrame:NSMakeRect(92, 298, 210, 24)];
-  [contentView addSubview:_settingsGreenSlider];
-
-  label = [self settingsLabelWithTitle:@"Blue"
-                                 frame:NSMakeRect(18, 272, 70, 20)];
-  [contentView addSubview:label];
-  _settingsBlueSlider =
-    [self settingsColorSliderWithFrame:NSMakeRect(92, 268, 210, 24)];
-  [contentView addSubview:_settingsBlueSlider];
+  colorPanel = [NSColorPanel sharedColorPanel];
+  [colorPanel setShowsAlpha:NO];
+  [colorPanel setContinuous:YES];
 
   label = [self settingsLabelWithTitle:@"Icon Cells"
                                  frame:NSMakeRect(18, 224, 110, 20)];
   [contentView addSubview:label];
 
-  _settingsCurrentCellSizeButton =
-    [self settingsButtonWithTitle:@"Current Size"
-                            frame:NSMakeRect(132, 222, 160, 24)
-                       buttonType:NSRadioButton
-                           action:@selector(settingsDockCellSizeChanged:)];
-  [_settingsCurrentCellSizeButton setTag:DockCellSizeModeCurrent];
-  [contentView addSubview:_settingsCurrentCellSizeButton];
-
   _settings64CellSizeButton =
     [self settingsButtonWithTitle:@"64 x 64"
-                            frame:NSMakeRect(132, 198, 160, 24)
+                            frame:NSMakeRect(132, 222, 160, 24)
                        buttonType:NSRadioButton
                            action:@selector(settingsDockCellSizeChanged:)];
   [_settings64CellSizeButton setTag:DockCellSizeMode64];
   [contentView addSubview:_settings64CellSizeButton];
+
+  _settingsCurrentCellSizeButton =
+    [self settingsButtonWithTitle:DockLargerCellSizeTitle()
+                            frame:NSMakeRect(132, 198, 160, 24)
+                       buttonType:NSRadioButton
+                           action:@selector(settingsDockCellSizeChanged:)];
+  [_settingsCurrentCellSizeButton setTag:DockCellSizeModeCurrent];
+  [contentView addSubview:_settingsCurrentCellSizeButton];
 
   label = [self settingsLabelWithTitle:@"State Dots"
                                  frame:NSMakeRect(18, 152, 110, 20)];
@@ -2312,10 +2289,6 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 - (void) updateSettingsPanelControls
 {
   NSColor *color;
-  CGFloat red = 0.0;
-  CGFloat green = 0.0;
-  CGFloat blue = 0.0;
-  CGFloat alpha = 1.0;
 
   if (!_settingsPanel)
     {
@@ -2323,6 +2296,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     }
 
   [_settingsPlacementPopup selectItemWithTag:(NSInteger)_dockPlacement];
+  [_settingsCurrentCellSizeButton setTitle:DockLargerCellSizeTitle()];
   [_settingsCurrentCellSizeButton setState:
       (_dockCellSizeMode == DockCellSizeModeCurrent ? NSOnState : NSOffState)];
   [_settings64CellSizeButton setState:
@@ -2338,11 +2312,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   if (![_settingsPanel isVisible])
     {
       color = DockCalibratedBackgroundColor(_backgroundColor);
-      [color getRed:&red green:&green blue:&blue alpha:&alpha];
       [_settingsBackgroundColorWell setColor:color];
-      [_settingsRedSlider setDoubleValue:red * 255.0];
-      [_settingsGreenSlider setDoubleValue:green * 255.0];
-      [_settingsBlueSlider setDoubleValue:blue * 255.0];
     }
   [_settingsShowBorderButton setState:(_showDockBorder ? NSOnState : NSOffState)];
   [_settingsEmptyRecyclerButton setEnabled:[self recyclerHasContents]];
@@ -2358,7 +2328,6 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
 - (void) closeSettingsPanel: (id)sender
 {
-  [self settingsColorSliderChanged:sender];
   [[NSUserDefaults standardUserDefaults] synchronize];
   [_settingsPanel orderOut:sender];
 }
@@ -2384,18 +2353,15 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [self applyDockPlacement];
 }
 
-- (void) settingsColorSliderChanged: (id)sender
+- (void) settingsBackgroundColorChanged: (id)sender
 {
-  if (!_settingsRedSlider || !_settingsGreenSlider || !_settingsBlueSlider)
+  if (!_settingsBackgroundColorWell)
     {
       return;
     }
 
   ASSIGN(_backgroundColor,
-         [NSColor colorWithCalibratedRed:[_settingsRedSlider doubleValue] / 255.0
-                                   green:[_settingsGreenSlider doubleValue] / 255.0
-                                    blue:[_settingsBlueSlider doubleValue] / 255.0
-                                   alpha:1.0]);
+         DockCalibratedBackgroundColor([_settingsBackgroundColorWell color]));
   [_dockView setBackgroundColor:_backgroundColor];
   [_settingsBackgroundColorWell setColor:_backgroundColor];
   [self saveBackgroundColor];

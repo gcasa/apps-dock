@@ -29,9 +29,6 @@
   NSPanel *_settingsPanel;
   NSPopUpButton *_settingsPlacementPopup;
   NSColorWell *_settingsBackgroundColorWell;
-  NSSlider *_settingsRedSlider;
-  NSSlider *_settingsGreenSlider;
-  NSSlider *_settingsBlueSlider;
   NSButton *_settingsCurrentCellSizeButton;
   NSButton *_settings64CellSizeButton;
   NSButton *_settingsRunningDotButton;
@@ -147,13 +144,12 @@ matchesRunningProcessPath: (NSString *)processPath;
                                  frame: (NSRect)frame
                             buttonType: (NSButtonType)buttonType
                                 action: (SEL)action;
-- (NSSlider *) settingsColorSliderWithFrame: (NSRect)frame;
 - (void) createSettingsPanel;
 - (void) updateSettingsPanelControls;
 - (void) showSettingsPanel: (id)sender;
 - (void) closeSettingsPanel: (id)sender;
 - (void) settingsPlacementChanged: (id)sender;
-- (void) settingsColorSliderChanged: (id)sender;
+- (void) settingsBackgroundColorChanged: (id)sender;
 - (void) settingsShowBorderChanged: (id)sender;
 - (void) settingsUseCellTileChanged: (id)sender;
 - (void) settingsDockCellSizeChanged: (id)sender;
