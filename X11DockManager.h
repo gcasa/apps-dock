@@ -59,6 +59,7 @@ typedef enum
   NSMutableSet *_knownWindows;
   NSConnection *_iconConnection;
   NSMutableDictionary *_iconWindowsByProcessID;
+  NSMutableDictionary *_iconImageDataByProcessID;
   BOOL _scanPending;
   NSTimeInterval _lastEventScanTime;
 }

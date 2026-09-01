@@ -991,6 +991,39 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   return nil;
 }
 
+- (DockItem *) transientApplicationItemForProcessIdentifier: (NSNumber *)processIdentifier
+{
+  NSString *processPath;
+  NSString *bundlePath;
+  DockItem *item;
+
+  if (![processIdentifier isKindOfClass:[NSNumber class]])
+    {
+      return nil;
+    }
+
+  processPath = [self executablePathForProcessIdentifier:processIdentifier];
+  bundlePath = [DockItem applicationBundlePathForPath:processPath];
+  if (![bundlePath length] ||
+      [self applicationBundlePathIsDockWM:bundlePath] ||
+      [self dockHasApplicationPath:bundlePath])
+    {
+      return nil;
+    }
+
+  item = [self transientApplicationItemMatchingBundlePath:bundlePath];
+  if (item)
+    {
+      return item;
+    }
+
+  item = [DockItem applicationItemWithPath:bundlePath];
+  [item setPinned:NO];
+  [item setState:DockItemRunning];
+  [_items addObject:item];
+  return item;
+}
+
 - (BOOL) item: (DockItem *)item iconMatchesImage: (NSImage *)image
 {
   return [item icon] == image;
@@ -1296,8 +1329,14 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
   if (processIdentifier > 0)
     {
-      item = [self applicationItemMatchingProcessIdentifier:
-				    [NSNumber numberWithInt:processIdentifier]];
+      NSNumber *processIdentifierNumber = [NSNumber numberWithInt:processIdentifier];
+
+      item = [self applicationItemMatchingProcessIdentifier:processIdentifierNumber];
+      if (!item)
+	{
+	  item = [self transientApplicationItemForProcessIdentifier:
+				processIdentifierNumber];
+	}
     }
   if (!item && [title length])
     {
@@ -1335,6 +1374,11 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 			  badgeLabel:badgeLabel
 		   processIdentifier:processIdentifierNumber];
       item = [self applicationItemMatchingProcessIdentifier:processIdentifierNumber];
+      if (!item)
+	{
+	  item = [self transientApplicationItemForProcessIdentifier:
+				processIdentifierNumber];
+	}
     }
 
   if (item)

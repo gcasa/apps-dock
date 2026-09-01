@@ -95,6 +95,7 @@ matchesRunningProcessPath: (NSString *)processPath;
                                     paths: (NSArray *)processPaths;
 - (DockItem *) transientApplicationItemMatchingBundlePath: (NSString *)path;
 - (DockItem *) applicationItemMatchingProcessIdentifier: (NSNumber *)processIdentifier;
+- (DockItem *) transientApplicationItemForProcessIdentifier: (NSNumber *)processIdentifier;
 - (BOOL) item: (DockItem *)item iconMatchesImage: (NSImage *)image;
 - (NSString *) x11IconCacheDirectory;
 - (NSString *) x11IconCacheFileNameForIdentifier: (NSString *)identifier;
