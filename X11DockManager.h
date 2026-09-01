@@ -60,6 +60,8 @@ typedef enum
   NSConnection *_iconConnection;
   NSMutableDictionary *_iconWindowsByProcessID;
   NSMutableDictionary *_iconImageDataByProcessID;
+  NSMutableDictionary *_dockedWindowFrames;
+  NSMutableSet *_dockAppWindows;
   BOOL _scanPending;
   NSTimeInterval _lastEventScanTime;
 }

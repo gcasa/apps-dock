@@ -2922,13 +2922,21 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 					     path: (NSString *)path
 					  dockApp: (BOOL)dockApp
 {
-  DockItem *item = [self applicationItemMatchingExecutablePath:path];
+  DockItem *item = [self itemForXWindow:xWindow];
   BOOL matchedApplication;
   NSString *iconIdentifier = [self x11IconIdentifierForTitle:title
 							path:path
 						      window:xWindow];
 
   if (!item)
+    {
+      item = [self itemForApplicationIconWindow:xWindow];
+    }
+  if (!item)
+    {
+      item = [self applicationItemMatchingExecutablePath:path];
+    }
+  if (!item && (!dockApp || [path length]))
     {
       item = [self applicationItemMatchingTitle:title];
     }

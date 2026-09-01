@@ -24,9 +24,11 @@
 #import <X11/Xlib.h>
 #import <X11/Xatom.h>
 #import <X11/Xutil.h>
+#import <X11/extensions/shape.h>
 #import <limits.h>
 #import <mntent.h>
 #import <paths.h>
+#import <stdlib.h>
 #import <string.h>
 #import <unistd.h>
 
@@ -48,11 +50,17 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 - (void) registerIconManager;
 - (NSRect) x11FrameForDockPlacement: (DockPlacement)placement;
 - (NSString *) classNameForWindow: (Window)window;
+- (Window) dockAppIconWindowForWindow: (Window)window;
+- (BOOL) windowHasDockAppClass: (Window)window;
+- (BOOL) windowIsDockAppIconChild: (Window)window;
 - (id) iconIdentifierForProcessIdentifier: (int)processIdentifier
                                     title: (NSString *)title;
 - (BOOL) rememberApplicationIconWindow: (Window)window
                      processIdentifier: (int)processIdentifier
                                  title: (NSString *)title;
+- (BOOL) windowLooksLikeWindowMakerDockApp: (Window)window;
+- (BOOL) windowIsKnownDockAppWindow: (Window)window;
+- (void) updateHostWindowShape;
 - (NSRect) hiddenIconWindowFrame;
 @end
 
@@ -67,6 +75,8 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
       _knownWindows = [NSMutableSet new];
       _iconWindowsByProcessID = [NSMutableDictionary new];
       _iconImageDataByProcessID = [NSMutableDictionary new];
+      _dockedWindowFrames = [NSMutableDictionary new];
+      _dockAppWindows = [NSMutableSet new];
     }
   return self;
 }
@@ -87,6 +97,8 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
     }
   DESTROY(_iconWindowsByProcessID);
   DESTROY(_iconImageDataByProcessID);
+  DESTROY(_dockedWindowFrames);
+  DESTROY(_dockAppWindows);
   DESTROY(_iconConnection);
   DESTROY(_knownWindows);
   DEALLOC;
@@ -119,11 +131,13 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 			      CopyFromParent, InputOutput, CopyFromParent,
 			      CWOverrideRedirect | CWBackPixel | CWEventMask,
 			      &attrs);
+  XStoreName(display, (Window)_hostWindow, "DockWM X11 Dock Host");
   XMapWindow(display, (Window)_hostWindow);
   XFlush(display);
   _display = display;
   XSetErrorHandler(X11DockManagerHandleError);
   XSelectInput(display, root, SubstructureNotifyMask | PropertyChangeMask);
+  [self updateHostWindowShape];
   [self registerIconManager];
   return YES;
 }
@@ -1074,6 +1088,147 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   return result;
 }
 
+- (BOOL) windowIsSmallDockedOverrideRedirectWindow: (Window)window
+{
+  Display *display = (Display *)_display;
+  Window root;
+  Window parent;
+  Window *children = NULL;
+  unsigned int childCount = 0;
+  XWindowAttributes attr;
+  BOOL result = NO;
+
+  if (!display || !_hostWindow || window == (Window)_hostWindow ||
+      ![self windowIsSmallIconSized:window])
+    {
+      return NO;
+    }
+
+  root = RootWindow(display, DefaultScreen(display));
+
+  [self clearX11Error];
+  if (!XGetWindowAttributes(display, window, &attr) ||
+      [self x11ErrorOccurred])
+    {
+      return NO;
+    }
+
+  [self clearX11Error];
+  if (XQueryTree(display, window, &root, &parent, &children, &childCount) &&
+      ![self x11ErrorOccurred])
+    {
+      result = attr.override_redirect && parent == (Window)_hostWindow;
+    }
+  if (children)
+    {
+      XFree(children);
+    }
+
+  return result;
+}
+
+- (BOOL) windowHasTransientForHint: (Window)window
+{
+  Display *display = (Display *)_display;
+  Window transientFor = None;
+
+  if (!display)
+    {
+      return NO;
+    }
+
+  [self clearX11Error];
+  if (XGetTransientForHint(display, window, &transientFor) &&
+      ![self x11ErrorOccurred] &&
+      transientFor != None)
+    {
+      return YES;
+    }
+
+  return NO;
+}
+
+- (BOOL) windowIsDockAppIconChild: (Window)window
+{
+  Display *display = (Display *)_display;
+  Window root;
+  Window parent;
+  Window *children = NULL;
+  unsigned int childCount = 0;
+  BOOL result = NO;
+
+  if (!display || window == (Window)_hostWindow ||
+      ![self windowIsSmallIconSized:window])
+    {
+      return NO;
+    }
+
+  [self clearX11Error];
+  if (XQueryTree(display, window, &root, &parent, &children, &childCount) &&
+      ![self x11ErrorOccurred])
+    {
+      result = parent != None && parent != root &&
+	[self windowHasDockAppClass:parent];
+    }
+  if (children)
+    {
+      XFree(children);
+    }
+
+  return result;
+}
+
+- (BOOL) windowLooksLikeWindowMakerDockApp: (Window)window
+{
+  Display *display = (Display *)_display;
+  XWindowAttributes attr;
+  Window dockWindow;
+  NSString *title;
+
+  dockWindow = [self dockAppIconWindowForWindow:window];
+  if (dockWindow == None)
+    {
+      return NO;
+    }
+  if (![self windowHasDockAppClass:window] &&
+      ![self windowIsDockAppIconChild:window] &&
+      ![self windowIsSmallRootOverrideRedirectWindow:window] &&
+      ![self windowIsSmallDockedOverrideRedirectWindow:window])
+    {
+      return NO;
+    }
+
+  [self clearX11Error];
+  if (!XGetWindowAttributes(display, dockWindow, &attr) ||
+      [self x11ErrorOccurred])
+    {
+      return NO;
+    }
+
+  if (attr.map_state != IsViewable &&
+      ![self windowHasDockAppClass:window] &&
+      ![self windowIsDockAppIconChild:window])
+    {
+      return NO;
+    }
+  if ([self windowHasTransientForHint:window])
+    {
+      return NO;
+    }
+  if ([self windowHasIgnoredWindowType:window])
+    {
+      return NO;
+    }
+
+  title = [self titleForWindow:window];
+  if ([title length] || [self processIdentifierForWindow:window] > 0)
+    {
+      return YES;
+    }
+
+  return NO;
+}
+
 - (void) unmapIconWindow: (Window)window
 {
   Display *display = (Display *)_display;
@@ -1145,7 +1300,8 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
     }
 
   if ([self windowIsSmallGNUstepIconOrMiniWindow:window] ||
-      [self windowIsSmallRootOverrideRedirectWindow:window])
+      ([self windowIsSmallRootOverrideRedirectWindow:window] &&
+       ![self windowLooksLikeWindowMakerDockApp:window]))
     {
       [self unmapIconWindow:window];
       return;
@@ -1162,7 +1318,15 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 
 - (BOOL) windowLooksLikeDockApp: (Window)window
 {
-  return [self windowIsRegisteredIconWindow:window];
+  return [self windowIsRegisteredIconWindow:window] ||
+    [self windowIsKnownDockAppWindow:window] ||
+    [self windowLooksLikeWindowMakerDockApp:window];
+}
+
+- (BOOL) windowIsKnownDockAppWindow: (Window)window
+{
+  return [_dockAppWindows containsObject:
+			    [NSNumber numberWithUnsignedLong:(unsigned long)window]];
 }
 
 - (BOOL) windowLooksManageable: (Window)window
@@ -1170,6 +1334,7 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   Display *display = (Display *)_display;
   XWindowAttributes attr;
   long state = NormalState;
+  BOOL dockApp;
 
   if (window == (Window)_hostWindow)
     {
@@ -1180,7 +1345,8 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
       return NO;
     }
   if ([self windowIsSmallGNUstepIconOrMiniWindow:window] ||
-      [self windowIsSmallRootOverrideRedirectWindow:window])
+      ([self windowIsSmallRootOverrideRedirectWindow:window] &&
+       ![self windowLooksLikeWindowMakerDockApp:window]))
     {
       [self unmapIconWindow:window];
       return NO;
@@ -1194,11 +1360,12 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
     {
       return NO;
     }
+  dockApp = [self windowLooksLikeDockApp:window];
   if ([self wmStateForWindow:window state:&state] && state == WithdrawnState)
     {
-      return NO;
+      return dockApp;
     }
-  if (attr.override_redirect)
+  if (attr.override_redirect && !dockApp)
     {
       return NO;
     }
@@ -1329,7 +1496,7 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
     {
       return NO;
     }
-  if (attr.override_redirect)
+  if (attr.override_redirect && ![self windowLooksLikeDockApp:window])
     {
       return NO;
     }
@@ -1344,7 +1511,20 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 
 - (BOOL) windowExists: (unsigned long)xWindow
 {
-  return [self knownWindowStillExists:(Window)xWindow];
+  BOOL exists = [self knownWindowStillExists:(Window)xWindow];
+
+  if (!exists &&
+      [_dockedWindowFrames objectForKey:
+			     [NSNumber numberWithUnsignedLong:xWindow]])
+    {
+      [_dockedWindowFrames removeObjectForKey:
+			     [NSNumber numberWithUnsignedLong:xWindow]];
+      [_dockAppWindows removeObject:
+			 [NSNumber numberWithUnsignedLong:xWindow]];
+      [self updateHostWindowShape];
+    }
+
+  return exists;
 }
 
 - (BOOL) windowShouldBeIgnoredWithTitle: (NSString *)title path: (NSString *)path
@@ -1426,6 +1606,73 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
     }
 
   return [name length] ? name : nil;
+}
+
+- (BOOL) windowHasDockAppClass: (Window)window
+{
+  Display *display = (Display *)_display;
+  XClassHint hint;
+  BOOL dockApp = NO;
+
+  [self clearX11Error];
+  if (XGetClassHint(display, window, &hint) && ![self x11ErrorOccurred])
+    {
+      if ((hint.res_class && strcasecmp(hint.res_class, "DockApp") == 0) ||
+	  (hint.res_name && strcasecmp(hint.res_name, "DockApp") == 0))
+	{
+	  dockApp = YES;
+	}
+      if (hint.res_name)
+	{
+	  XFree(hint.res_name);
+	}
+      if (hint.res_class)
+	{
+	  XFree(hint.res_class);
+	}
+    }
+
+  return dockApp;
+}
+
+- (Window) dockAppIconWindowForWindow: (Window)window
+{
+  Display *display = (Display *)_display;
+  XWMHints *hints;
+  Window iconWindow = None;
+
+  if (!display || window == (Window)_hostWindow)
+    {
+      return None;
+    }
+
+  [self clearX11Error];
+  hints = XGetWMHints(display, window);
+  if (![self x11ErrorOccurred] && hints)
+    {
+      if ((hints->flags & IconWindowHint) && hints->icon_window != None &&
+	  [self windowIsSmallIconSized:hints->icon_window])
+	{
+	  iconWindow = hints->icon_window;
+	}
+      XFree(hints);
+    }
+  else if (hints)
+    {
+      XFree(hints);
+    }
+
+  if (iconWindow != None)
+    {
+      return iconWindow;
+    }
+
+  if ([self windowIsSmallIconSized:window])
+    {
+      return window;
+    }
+
+  return None;
 }
 
 - (BOOL) rememberApplicationIconWindow: (Window)window
@@ -1610,6 +1857,7 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 - (void) scanClientWindow: (Window)window
 {
   NSNumber *key = [NSNumber numberWithUnsignedLong:(unsigned long)window];
+  Window reportedWindow = window;
   BOOL dockApp;
   BOOL hidden;
   NSString *title;
@@ -1629,9 +1877,21 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
     }
 
   dockApp = [self windowLooksLikeDockApp:window];
+  if (dockApp)
+    {
+      Window iconWindow = [self dockAppIconWindowForWindow:window];
+
+      if (iconWindow != None)
+	{
+	  reportedWindow = iconWindow;
+	  [_dockAppWindows addObject:
+			     [NSNumber numberWithUnsignedLong:
+					       (unsigned long)reportedWindow]];
+	}
+    }
   hidden = [self windowIsHidden:window];
   title = [self titleForWindow:window];
-  path = [self executablePathForWindow:window];
+  path = dockApp ? nil : [self executablePathForWindow:window];
 
   if (!dockApp && ![title length] && ![path length])
     {
@@ -1647,9 +1907,9 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 			   @selector(x11DockManagerDidDiscoverWindowWithTitle:window:hidden:icon:path:dockApp:)])
 	    {
 	      [_delegate x11DockManagerDidDiscoverWindowWithTitle:title
-							   window:(unsigned long)window
+							   window:(unsigned long)reportedWindow
 							   hidden:YES
-							     icon:[self iconForWindow:window]
+							     icon:[self iconForWindow:reportedWindow]
 							     path:path
 							  dockApp:dockApp];
 	    }
@@ -1662,9 +1922,9 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 		   @selector(x11DockManagerDidDiscoverWindowWithTitle:window:hidden:icon:path:dockApp:)])
     {
       [_delegate x11DockManagerDidDiscoverWindowWithTitle:title
-						   window:(unsigned long)window
+						   window:(unsigned long)reportedWindow
 						   hidden:hidden
-						     icon:[self iconForWindow:window]
+						     icon:[self iconForWindow:reportedWindow]
 						     path:path
 						  dockApp:dockApp];
     }
@@ -1797,20 +2057,75 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 		    64, 64);
 }
 
+- (void) updateHostWindowShape
+{
+  Display *display = (Display *)_display;
+  NSArray *frames;
+  XRectangle *rectangles = NULL;
+  int eventBase;
+  int errorBase;
+  NSUInteger count;
+  NSUInteger i;
+
+  if (!display || !_hostWindow ||
+      !XShapeQueryExtension(display, &eventBase, &errorBase))
+    {
+      return;
+    }
+
+  frames = [_dockedWindowFrames allValues];
+  count = [frames count];
+  if (count > 0)
+    {
+      rectangles = malloc(sizeof(XRectangle) * count);
+      if (!rectangles)
+	{
+	  return;
+	}
+      for (i = 0; i < count; i++)
+	{
+	  NSRect rect = [[frames objectAtIndex:i] rectValue];
+
+	  rectangles[i].x = (short)NSMinX(rect);
+	  rectangles[i].y = (short)NSMinY(rect);
+	  rectangles[i].width = (unsigned short)NSWidth(rect);
+	  rectangles[i].height = (unsigned short)NSHeight(rect);
+	}
+    }
+
+  XShapeCombineRectangles(display, (Window)_hostWindow, ShapeBounding,
+			  0, 0, rectangles, (int)count, ShapeSet, YXBanded);
+  XShapeCombineRectangles(display, (Window)_hostWindow, ShapeInput,
+			  0, 0, rectangles, (int)count, ShapeSet, YXBanded);
+  if (rectangles)
+    {
+      free(rectangles);
+    }
+  XFlush(display);
+}
+
 - (void) dockWindow: (unsigned long)xWindow atIndex: (NSUInteger)index
 {
   Display *display = (Display *)_display;
   NSPoint origin;
+  int x;
+  int y;
 
   if (!display || !_hostWindow) return;
-  if (![self windowIsRegisteredIconWindow:(Window)xWindow])
+  if (![self windowIsRegisteredIconWindow:(Window)xWindow] &&
+      ![self windowIsKnownDockAppWindow:(Window)xWindow] &&
+      ![self windowLooksLikeWindowMakerDockApp:(Window)xWindow])
     {
       return;
     }
   origin = [_dockView cellOriginAtIndex:index];
-  XReparentWindow(display, (Window)xWindow, (Window)_hostWindow,
-                  (int)origin.x,
-                  (int)(NSHeight([_dockView bounds]) - origin.y - 64.0));
+  x = (int)origin.x;
+  y = (int)(NSHeight([_dockView bounds]) - origin.y - 64.0);
+  [_dockedWindowFrames setObject:[NSValue valueWithRect:NSMakeRect(x, y, 64, 64)]
+			   forKey:[NSNumber numberWithUnsignedLong:xWindow]];
+  [self updateHostWindowShape];
+  XRaiseWindow(display, (Window)_hostWindow);
+  XReparentWindow(display, (Window)xWindow, (Window)_hostWindow, x, y);
   XResizeWindow(display, (Window)xWindow, 64, 64);
   XMapRaised(display, (Window)xWindow);
   XFlush(display);
@@ -1820,12 +2135,18 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 {
   Display *display = (Display *)_display;
   NSPoint origin;
+  int x;
+  int y;
 
   if (!display || !_hostWindow) return;
   origin = [_dockView cellOriginAtIndex:index];
-  XMoveWindow(display, (Window)xWindow,
-              (int)origin.x,
-              (int)(NSHeight([_dockView bounds]) - origin.y - 64.0));
+  x = (int)origin.x;
+  y = (int)(NSHeight([_dockView bounds]) - origin.y - 64.0);
+  [_dockedWindowFrames setObject:[NSValue valueWithRect:NSMakeRect(x, y, 64, 64)]
+			   forKey:[NSNumber numberWithUnsignedLong:xWindow]];
+  [self updateHostWindowShape];
+  XRaiseWindow(display, (Window)_hostWindow);
+  XMoveWindow(display, (Window)xWindow, x, y);
   XFlush(display);
 }
 
