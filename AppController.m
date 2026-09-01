@@ -175,6 +175,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   DESTROY(_settingsDeleteApplicationButton);
   DESTROY(_settingsMoveApplicationDownButton);
   DESTROY(_settingsMoveApplicationUpButton);
+  DESTROY(_settingsOpenAtLoginButton);
   DESTROY(_settingsApplyApplicationButton);
   DESTROY(_settingsApplicationArgumentsField);
   DESTROY(_settingsApplicationPopup);
@@ -2531,6 +2532,13 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [_settingsApplyApplicationButton setBezelStyle:NSRoundedBezelStyle];
   [contentView addSubview:_settingsApplyApplicationButton];
 
+  _settingsOpenAtLoginButton =
+    [self settingsButtonWithTitle:@"Open At Login"
+                            frame:NSMakeRect(212, 56, 160, 24)
+                       buttonType:NSSwitchButton
+                           action:@selector(settingsOpenAtLoginChanged:)];
+  [contentView addSubview:_settingsOpenAtLoginButton];
+
   _settingsMoveApplicationUpButton =
     [self settingsButtonWithTitle:@"Move Up"
                             frame:NSMakeRect(212, 88, 84, 28)
@@ -2621,10 +2629,22 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     {
       DockItem *item = [_items objectAtIndex:i];
 
-      if ([item kind] == DockItemApplication && [item isPinned] &&
+      if (([item kind] == DockItemApplication ||
+	   [item kind] == DockItemX11Window) &&
 	  ![self applicationBundlePathIsDockWM:[item path]])
 	{
-	  [_settingsApplicationPopup addItemWithTitle:[item title]];
+	  NSString *title = [item title];
+
+	  if (![item isPinned])
+	    {
+	      title = [NSString stringWithFormat:@"%@ (Not Docked)", title];
+	    }
+	  if ([item kind] == DockItemX11Window)
+	    {
+	      title = [NSString stringWithFormat:@"%@ (WindowMaker)", title];
+	    }
+
+	  [_settingsApplicationPopup addItemWithTitle:title];
 	  [[_settingsApplicationPopup lastItem]
 	    setRepresentedObject:[NSNumber numberWithUnsignedInteger:i]];
 	  if (item == selectedItem)
@@ -2648,13 +2668,20 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     {
       DockItem *item = [_items objectAtIndex:selectedIndex];
       NSUInteger pinnedCount = [self pinnedApplicationCount];
+      BOOL openAtLogin = [self applicationPathIsOpenAtLogin:[item path]];
+      BOOL hasApplicationPath = [item kind] == DockItemApplication &&
+	[[item path] length] > 0;
 
       [_settingsApplicationArgumentsField setStringValue:
 	  ([item launchArguments] ? [item launchArguments] : @"")];
-      [_settingsApplicationArgumentsField setEnabled:YES];
-      [_settingsApplyApplicationButton setEnabled:YES];
+      [_settingsApplicationArgumentsField setEnabled:hasApplicationPath];
+      [_settingsApplyApplicationButton setEnabled:hasApplicationPath];
+      [_settingsOpenAtLoginButton setState:(openAtLogin ? NSOnState : NSOffState)];
+      [_settingsOpenAtLoginButton setEnabled:hasApplicationPath];
       [_settingsMoveApplicationUpButton setEnabled:(selectedIndex > 0)];
-      [_settingsMoveApplicationDownButton setEnabled:(selectedIndex + 1 < pinnedCount)];
+      [_settingsMoveApplicationDownButton setEnabled:
+	  (selectedIndex + 1 < [_items count] &&
+	   (![item isPinned] || selectedIndex + 1 < pinnedCount))];
       [_settingsDeleteApplicationButton setEnabled:YES];
     }
   else
@@ -2662,6 +2689,8 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
       [_settingsApplicationArgumentsField setStringValue:@""];
       [_settingsApplicationArgumentsField setEnabled:NO];
       [_settingsApplyApplicationButton setEnabled:NO];
+      [_settingsOpenAtLoginButton setState:NSOffState];
+      [_settingsOpenAtLoginButton setEnabled:NO];
       [_settingsMoveApplicationUpButton setEnabled:NO];
       [_settingsMoveApplicationDownButton setEnabled:NO];
       [_settingsDeleteApplicationButton setEnabled:NO];
@@ -2862,9 +2891,32 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [self updateSettingsPanelControls];
 }
 
+- (void) settingsOpenAtLoginChanged: (id)sender
+{
+  NSUInteger index = [self selectedSettingsApplicationIndex];
+  DockItem *item;
+
+  if (index == NSNotFound)
+    {
+      return;
+    }
+
+  item = [_items objectAtIndex:index];
+  if ([item kind] != DockItemApplication || ![[item path] length])
+    {
+      return;
+    }
+
+  [self setApplicationPath:[item path]
+	       openAtLogin:[_settingsOpenAtLoginButton state] == NSOnState];
+  [self updateSettingsPanelControls];
+}
+
 - (void) settingsMoveApplicationUp: (id)sender
 {
   NSUInteger index = [self selectedSettingsApplicationIndex];
+  NSUInteger pinnedCount = [self pinnedApplicationCount];
+  NSUInteger targetIndex;
   DockItem *item;
 
   if (index == NSNotFound || index == 0)
@@ -2872,9 +2924,14 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
       return;
     }
 
+  targetIndex = index - 1;
   item = RETAIN([_items objectAtIndex:index]);
   [_items removeObjectAtIndex:index];
-  [_items insertObject:item atIndex:index - 1];
+  if (![item isPinned] && targetIndex < pinnedCount)
+    {
+      [item setPinned:YES];
+    }
+  [_items insertObject:item atIndex:targetIndex];
   [self savePersistedApplications];
   [self refreshDock];
   [self updateSettingsPanelControls];
@@ -2887,16 +2944,28 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 {
   NSUInteger index = [self selectedSettingsApplicationIndex];
   NSUInteger pinnedCount = [self pinnedApplicationCount];
+  NSUInteger targetIndex;
   DockItem *item;
 
-  if (index == NSNotFound || index + 1 >= pinnedCount)
+  if (index == NSNotFound || index + 1 >= [_items count])
     {
       return;
     }
 
   item = RETAIN([_items objectAtIndex:index]);
+  if ([item isPinned] && index + 1 >= pinnedCount)
+    {
+      DESTROY(item);
+      return;
+    }
+
+  targetIndex = index + 1;
   [_items removeObjectAtIndex:index];
-  [_items insertObject:item atIndex:index + 1];
+  if (![item isPinned] && targetIndex < pinnedCount)
+    {
+      [item setPinned:YES];
+    }
+  [_items insertObject:item atIndex:targetIndex];
   [self savePersistedApplications];
   [self refreshDock];
   [self updateSettingsPanelControls];
@@ -3314,8 +3383,8 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
 - (BOOL) dockView: (id)dockView canShowSettingsForItem: (DockItem *)item
 {
-  return [item kind] == DockItemApplication &&
-    [[item path] length] &&
+  return ([item kind] == DockItemApplication ||
+	  [item kind] == DockItemX11Window) &&
     ![self applicationBundlePathIsDockWM:[item path]];
 }
 
