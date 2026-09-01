@@ -106,6 +106,7 @@ DockViewCalibratedBackgroundColor (NSColor *color)
       _dropIndex = NSNotFound;
       _pinnedItemCount = 0;
       _backgroundColor = RETAIN([NSColor blackColor]);
+      _backgroundAlpha = 1.0;
       _cellSize = DockCell;
       _dockGap = DockGap;
       _dockPad = DockPad;
@@ -325,6 +326,24 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   if (_backgroundColor != color)
     {
       ASSIGN(_backgroundColor, color);
+      [self setNeedsDisplay:YES];
+    }
+}
+
+- (void) setBackgroundAlpha: (CGFloat)alpha
+{
+  if (alpha < 0.2)
+    {
+      alpha = 0.2;
+    }
+  else if (alpha > 1.0)
+    {
+      alpha = 1.0;
+    }
+
+  if (_backgroundAlpha != alpha)
+    {
+      _backgroundAlpha = alpha;
       [self setNeedsDisplay:YES];
     }
 }
@@ -641,11 +660,26 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   NSMenuItem *menuItem;
   BOOL hasPath = [[item path] length] > 0;
   BOOL openAtLogin = NO;
+  BOOL canShowSettings = NO;
 
   if ([_delegate respondsToSelector:
 		 @selector(dockView:itemIsOpenAtLogin:)])
     {
       openAtLogin = [_delegate dockView:self itemIsOpenAtLogin:item];
+    }
+  if ([_delegate respondsToSelector:
+		 @selector(dockView:canShowSettingsForItem:)])
+    {
+      canShowSettings = [_delegate dockView:self canShowSettingsForItem:item];
+    }
+
+  if ([item kind] == DockItemApplication && canShowSettings)
+    {
+      menuItem = [self menuItemWithTitle:@"Settings..."
+				  action:@selector(showItemSettings:)
+				    item:item];
+      [menu addItem:menuItem];
+      [menu addItem:[NSMenuItem separatorItem]];
     }
 
   menuItem = [self menuItemWithTitle:@"Open At Login"
@@ -701,6 +735,17 @@ DockViewCalibratedBackgroundColor (NSColor *color)
 		 @selector(dockView:didShowItemInFileViewer:)])
     {
       [_delegate dockView:self didShowItemInFileViewer:item];
+    }
+}
+
+- (void) showItemSettings: (id)sender
+{
+  DockItem *item = [sender representedObject];
+
+  if ([_delegate respondsToSelector:
+		 @selector(dockView:didShowSettingsForItem:)])
+    {
+      [_delegate dockView:self didShowSettingsForItem:item];
     }
 }
 
@@ -1485,8 +1530,18 @@ DockViewCalibratedBackgroundColor (NSColor *color)
 - (void) drawRect: (NSRect)dirtyRect
 {
   NSUInteger i;
+  NSColor *backgroundColor;
+  CGFloat red = 0.0;
+  CGFloat green = 0.0;
+  CGFloat blue = 0.0;
+  CGFloat alpha = 1.0;
 
-  [_backgroundColor set];
+  backgroundColor = DockViewCalibratedBackgroundColor(_backgroundColor);
+  [backgroundColor getRed:&red green:&green blue:&blue alpha:&alpha];
+  [[NSColor colorWithCalibratedRed:red
+                             green:green
+                              blue:blue
+                             alpha:alpha * _backgroundAlpha] set];
   NSRectFill([self bounds]);
 
   [self drawTopTile];

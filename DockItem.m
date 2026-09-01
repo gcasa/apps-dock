@@ -643,6 +643,7 @@
   DESTROY(_title);
   DESTROY(_path);
   DESTROY(_iconPath);
+  DESTROY(_launchArguments);
   DESTROY(_badgeLabel);
   DESTROY(_icon);
   DESTROY(_originalIcon);
@@ -673,6 +674,21 @@
 - (NSString *) path
 {
   return _path;
+}
+
+- (NSString *) launchArguments
+{
+  return _launchArguments;
+}
+
+- (void) setLaunchArguments: (NSString *)arguments
+{
+  if (_launchArguments != arguments &&
+      !(_launchArguments && arguments &&
+	[_launchArguments isEqualToString:arguments]))
+    {
+      ASSIGNCOPY(_launchArguments, arguments);
+    }
 }
 
 - (NSString *) iconPath

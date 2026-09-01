@@ -39,6 +39,7 @@ typedef enum
   NSString *_title;
   NSString *_path;
   NSString *_iconPath;
+  NSString *_launchArguments;
   NSString *_badgeLabel;
   NSImage *_icon;
   NSImage *_originalIcon;
@@ -59,6 +60,8 @@ typedef enum
 - (void) setState: (DockItemState)state;
 - (NSString *) title;
 - (NSString *) path;
+- (NSString *) launchArguments;
+- (void) setLaunchArguments: (NSString *)arguments;
 - (NSString *) iconPath;
 - (NSImage *) icon;
 - (void) setIcon: (NSImage *)icon;

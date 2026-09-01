@@ -41,6 +41,8 @@ typedef enum
 - (BOOL) dockView: (id)dockView itemIsOpenAtLogin: (DockItem *)item;
 - (void) dockView: (id)dockView didToggleOpenAtLoginForItem: (DockItem *)item;
 - (void) dockView: (id)dockView didShowItemInFileViewer: (DockItem *)item;
+- (BOOL) dockView: (id)dockView canShowSettingsForItem: (DockItem *)item;
+- (void) dockView: (id)dockView didShowSettingsForItem: (DockItem *)item;
 - (void) dockView: (id)dockView didQuitItem: (DockItem *)item;
 - (void) dockViewDidEmptyRecycler: (id)dockView;
 @end
@@ -55,6 +57,7 @@ typedef enum
   NSImage *_recyclerIcon;
   NSImage *_cellBackgroundImage;
   NSColor *_backgroundColor;
+  CGFloat _backgroundAlpha;
   CGFloat _cellSize;
   CGFloat _dockGap;
   CGFloat _dockPad;
@@ -85,6 +88,7 @@ typedef enum
 - (void) setItems: (NSArray *)items;
 - (void) setPinnedItemCount: (NSUInteger)count;
 - (void) setBackgroundColor: (NSColor *)color;
+- (void) setBackgroundAlpha: (CGFloat)alpha;
 - (void) setShowsBorder: (BOOL)showsBorder;
 - (BOOL) showsBorder;
 - (void) setRunningIndicatorMode: (DockRunningIndicatorMode)mode;

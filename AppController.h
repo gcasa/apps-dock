@@ -29,6 +29,7 @@
   NSPanel *_settingsPanel;
   NSPopUpButton *_settingsPlacementPopup;
   NSColorWell *_settingsBackgroundColorWell;
+  NSSlider *_settingsTransparencySlider;
   NSButton *_settingsCurrentCellSizeButton;
   NSButton *_settings64CellSizeButton;
   NSButton *_settingsRunningDotButton;
@@ -36,6 +37,13 @@
   NSButton *_settingsUseCellTileButton;
   NSButton *_settingsShowBorderButton;
   NSButton *_settingsEmptyRecyclerButton;
+  NSPopUpButton *_settingsApplicationPopup;
+  NSTextField *_settingsApplicationArgumentsField;
+  NSButton *_settingsApplyApplicationButton;
+  NSButton *_settingsOpenAtLoginButton;
+  NSButton *_settingsMoveApplicationUpButton;
+  NSButton *_settingsMoveApplicationDownButton;
+  NSButton *_settingsDeleteApplicationButton;
   DockView *_dockView;
   NSMutableArray *_items;
   NSMutableSet *_launchedApplicationPaths;
@@ -50,6 +58,7 @@
   NSInteger _dockCellSizeMode;
   DockRunningIndicatorMode _runningIndicatorMode;
   NSColor *_backgroundColor;
+  CGFloat _windowAlpha;
   BOOL _useCellTileBackground;
   BOOL _showDockBorder;
 }
@@ -57,6 +66,8 @@
 - (DockPlacement) savedDockPlacement;
 - (NSColor *) savedBackgroundColor;
 - (void) saveBackgroundColor;
+- (CGFloat) savedWindowAlpha;
+- (void) saveWindowAlpha;
 - (BOOL) savedShowDockBorder;
 - (void) saveShowDockBorder;
 - (NSInteger) savedDockCellSizeMode;
@@ -71,6 +82,9 @@
 - (void) applyDockCellSizeToView;
 - (void) loadPersistedApplications;
 - (void) savePersistedApplications;
+- (id) persistedApplicationRecordForItem: (DockItem *)item;
+- (NSString *) persistedApplicationPathFromRecord: (id)record;
+- (NSString *) persistedApplicationArgumentsFromRecord: (id)record;
 - (BOOL) dockHasApplicationPath: (NSString *)path;
 - (NSUInteger) pinnedApplicationCount;
 - (NSString *) normalizedPath: (NSString *)path;
@@ -120,6 +134,9 @@ matchesRunningProcessPath: (NSString *)processPath;
 - (BOOL) applicationPathIsOpenAtLogin: (NSString *)path;
 - (void) setApplicationPath: (NSString *)path openAtLogin: (BOOL)openAtLogin;
 - (BOOL) launchApplicationAtPath: (NSString *)path;
+- (BOOL) launchApplicationItem: (DockItem *)item;
+- (NSArray *) launchArgumentsFromString: (NSString *)arguments;
+- (NSString *) shellQuotedArgument: (NSString *)argument;
 - (void) terminateApplicationItemProcesses: (DockItem *)item;
 - (void) launchOpenAtLoginApplications;
 - (void) performInitialApplicationScans;
@@ -150,10 +167,20 @@ matchesRunningProcessPath: (NSString *)processPath;
 - (void) closeSettingsPanel: (id)sender;
 - (void) settingsPlacementChanged: (id)sender;
 - (void) settingsBackgroundColorChanged: (id)sender;
+- (void) settingsTransparencyChanged: (id)sender;
 - (void) settingsShowBorderChanged: (id)sender;
 - (void) settingsUseCellTileChanged: (id)sender;
 - (void) settingsDockCellSizeChanged: (id)sender;
 - (void) settingsRunningIndicatorModeChanged: (id)sender;
+- (void) settingsApplicationSelectionChanged: (id)sender;
+- (void) settingsApplyApplicationArguments: (id)sender;
+- (void) settingsOpenAtLoginChanged: (id)sender;
+- (void) settingsMoveApplicationUp: (id)sender;
+- (void) settingsMoveApplicationDown: (id)sender;
+- (void) settingsDeleteApplication: (id)sender;
+- (void) showSettingsForDockItem: (DockItem *)item;
+- (NSUInteger) selectedSettingsApplicationIndex;
+- (void) selectSettingsApplicationItem: (DockItem *)item;
 - (void) applyDockPlacement;
 - (void) updateDockBackground;
 - (void) quitDock: (id)sender;
@@ -166,6 +193,6 @@ matchesRunningProcessPath: (NSString *)processPath;
 - (NSUInteger) indexForItem: (DockItem *)targetItem;
 - (DockItem *) applicationItemMatchingTitle: (NSString *)title;
 - (DockItem *) applicationItemMatchingExecutablePath: (NSString *)path;
-- (BOOL) launchDesktopFile: (NSString *)path;
+- (BOOL) launchDesktopFile: (NSString *)path arguments: (NSArray *)arguments;
 
 @end

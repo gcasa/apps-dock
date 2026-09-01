@@ -36,8 +36,11 @@ static CGFloat DockCompactGap = 1.0;
 static CGFloat DockPad = 10.0;
 static CGFloat DockCompactPad = 0.0;
 static NSString *DockApplicationsDefaultsKey = @"DockApplications";
+static NSString *DockApplicationPathKey = @"Path";
+static NSString *DockApplicationArgumentsKey = @"Arguments";
 static NSString *DockOpenAtLoginApplicationsDefaultsKey = @"DockOpenAtLoginApplications";
 static NSString *DockBackgroundColorDefaultsKey = @"DockBackgroundColor";
+static NSString *DockWindowAlphaDefaultsKey = @"DockWindowAlpha";
 static NSString *DockShowBorderDefaultsKey = @"DockShowBorder";
 static NSString *DockCellSizeModeDefaultsKey = @"DockCellSizeMode";
 static NSString *DockUseCellTileBackgroundDefaultsKey = @"DockUseCellTileBackground";
@@ -115,6 +118,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   _dockCellSizeMode = [self savedDockCellSizeMode];
   _runningIndicatorMode = [self savedRunningIndicatorMode];
   _backgroundColor = RETAIN([self savedBackgroundColor]);
+  _windowAlpha = [self savedWindowAlpha];
   _useCellTileBackground = [self savedUseCellTileBackground];
   _showDockBorder = [self savedShowDockBorder];
   frame = [self dockWindowFrameForPlacement:_dockPlacement];
@@ -125,6 +129,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
                                             defer:NO];
   [_window setLevel:NSDockWindowLevel];
   [_window setOpaque:NO];
+  [_window setAlphaValue:_windowAlpha];
   [_window setBackgroundColor:[NSColor clearColor]];
   [_window setTitle:@"AppsDockWM"];
   [_window setAcceptsMouseMovedEvents:YES];
@@ -136,6 +141,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [_dockView setHorizontal:DockPlacementIsHorizontal(_dockPlacement)];
   [self applyDockCellSizeToView];
   [_dockView setBackgroundColor:_backgroundColor];
+  [_dockView setBackgroundAlpha:_windowAlpha];
   [_dockView setShowsBorder:_showDockBorder];
   [_dockView setRunningIndicatorMode:_runningIndicatorMode];
   [_dockView setItems:_items];
@@ -166,12 +172,19 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [_scanTimer invalidate];
   [_processScanTimer invalidate];
   DESTROY(_settingsEmptyRecyclerButton);
+  DESTROY(_settingsDeleteApplicationButton);
+  DESTROY(_settingsMoveApplicationDownButton);
+  DESTROY(_settingsMoveApplicationUpButton);
+  DESTROY(_settingsApplyApplicationButton);
+  DESTROY(_settingsApplicationArgumentsField);
+  DESTROY(_settingsApplicationPopup);
   DESTROY(_settingsShowBorderButton);
   DESTROY(_settingsUseCellTileButton);
   DESTROY(_settingsNotRunningDotsButton);
   DESTROY(_settingsRunningDotButton);
   DESTROY(_settings64CellSizeButton);
   DESTROY(_settingsCurrentCellSizeButton);
+  DESTROY(_settingsTransparencySlider);
   DESTROY(_settingsBackgroundColorWell);
   DESTROY(_settingsPlacementPopup);
   DESTROY(_settingsPanel);
@@ -269,6 +282,36 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [components setObject:[NSNumber numberWithDouble:blue] forKey:@"Blue"];
   [components setObject:[NSNumber numberWithDouble:alpha] forKey:@"Alpha"];
   [defaults setObject:components forKey:DockBackgroundColorDefaultsKey];
+}
+
+- (CGFloat) savedWindowAlpha
+{
+  NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+  id savedAlpha = [defaults objectForKey:DockWindowAlphaDefaultsKey];
+  CGFloat alpha;
+
+  if (!savedAlpha)
+    {
+      return 1.0;
+    }
+
+  alpha = [defaults floatForKey:DockWindowAlphaDefaultsKey];
+  if (alpha < 0.2)
+    {
+      alpha = 0.2;
+    }
+  else if (alpha > 1.0)
+    {
+      alpha = 1.0;
+    }
+
+  return alpha;
+}
+
+- (void) saveWindowAlpha
+{
+  [[NSUserDefaults standardUserDefaults] setFloat:_windowAlpha
+					   forKey:DockWindowAlphaDefaultsKey];
 }
 
 - (BOOL) savedShowDockBorder
@@ -379,13 +422,15 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
   for (i = 0; i < [paths count]; i++)
     {
-      id path = [paths objectAtIndex:i];
+      id record = [paths objectAtIndex:i];
+      NSString *path = [self persistedApplicationPathFromRecord:record];
+      NSString *arguments = [self persistedApplicationArgumentsFromRecord:record];
       NSString *bundlePath;
       NSString *applicationPath;
       DockItem *transientItem;
       BOOL isDir = NO;
 
-      if (![path isKindOfClass:[NSString class]])
+      if (![path length])
 	{
 	  continue;
 	}
@@ -403,7 +448,11 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 	    {
 	      [_items removeObject:transientItem];
 	    }
-	  [_items addObject:[DockItem applicationItemWithPath:applicationPath]];
+	  {
+	    DockItem *item = [DockItem applicationItemWithPath:applicationPath];
+	    [item setLaunchArguments:arguments];
+	    [_items addObject:item];
+	  }
 	}
     }
 }
@@ -412,24 +461,83 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 {
   NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
   NSMutableArray *paths = [NSMutableArray array];
+  NSMutableSet *savedPaths = [NSMutableSet set];
   NSUInteger i;
 
   for (i = 0; i < [_items count]; i++)
     {
       DockItem *item = [_items objectAtIndex:i];
       NSString *path = [item path];
+      NSString *normalizedPath = [self normalizedPath:path];
+
+      if (![normalizedPath length])
+	{
+	  normalizedPath = path;
+	}
 
       if ([item kind] == DockItemApplication &&
 	  [item isPinned] &&
 	  [path length] &&
-	  ![paths containsObject:path])
+	  ![savedPaths containsObject:normalizedPath])
 	{
-	  [paths addObject:path];
+	  if ([normalizedPath length])
+	    {
+	      [savedPaths addObject:normalizedPath];
+	    }
+	  [paths addObject:[self persistedApplicationRecordForItem:item]];
 	}
     }
 
   [defaults setObject:paths forKey:DockApplicationsDefaultsKey];
   [defaults synchronize];
+}
+
+- (id) persistedApplicationRecordForItem: (DockItem *)item
+{
+  NSString *path = [item path];
+  NSString *arguments = [item launchArguments];
+
+  if (![arguments length])
+    {
+      return path;
+    }
+
+  return [NSDictionary dictionaryWithObjectsAndKeys:
+			 path, DockApplicationPathKey,
+			 arguments, DockApplicationArgumentsKey,
+			 nil];
+}
+
+- (NSString *) persistedApplicationPathFromRecord: (id)record
+{
+  if ([record isKindOfClass:[NSString class]])
+    {
+      return record;
+    }
+  if ([record isKindOfClass:[NSDictionary class]])
+    {
+      id path = [record objectForKey:DockApplicationPathKey];
+
+      if ([path isKindOfClass:[NSString class]])
+	{
+	  return path;
+	}
+    }
+  return nil;
+}
+
+- (NSString *) persistedApplicationArgumentsFromRecord: (id)record
+{
+  if ([record isKindOfClass:[NSDictionary class]])
+    {
+      id arguments = [record objectForKey:DockApplicationArgumentsKey];
+
+      if ([arguments isKindOfClass:[NSString class]])
+	{
+	  return arguments;
+	}
+    }
+  return nil;
 }
 
 - (BOOL) dockHasApplicationPath: (NSString *)path
@@ -1553,13 +1661,21 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
 - (BOOL) launchApplicationAtPath: (NSString *)path
 {
+  DockItem *item = [DockItem applicationItemWithPath:path];
+  return [self launchApplicationItem:item];
+}
+
+- (BOOL) launchApplicationItem: (DockItem *)item
+{
+  NSString *path = [item path];
+  NSArray *arguments = [self launchArgumentsFromString:[item launchArguments]];
   NSString *extension = [[path pathExtension] lowercaseString];
   BOOL isDir = NO;
 
   [[NSFileManager defaultManager] fileExistsAtPath:path isDirectory:&isDir];
   if ([extension isEqualToString:@"desktop"])
     {
-      return [self launchDesktopFile:path];
+      return [self launchDesktopFile:path arguments:arguments];
     }
   else if ([extension isEqualToString:@"app"])
     {
@@ -1568,10 +1684,11 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
       if ([[NSFileManager defaultManager] isExecutableFileAtPath:executablePath])
 	{
 	  [NSTask launchedTaskWithLaunchPath:executablePath
-				   arguments:[NSArray array]];
+				   arguments:arguments];
 	  return YES;
 	}
-      if ([[NSWorkspace sharedWorkspace] launchApplication:path])
+      if (![arguments count] &&
+	  [[NSWorkspace sharedWorkspace] launchApplication:path])
 	{
 	  return YES;
 	}
@@ -1583,11 +1700,79 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     }
   else if ([[NSFileManager defaultManager] isExecutableFileAtPath:path])
     {
-      [NSTask launchedTaskWithLaunchPath:path arguments:[NSArray array]];
+      [NSTask launchedTaskWithLaunchPath:path arguments:arguments];
       return YES;
     }
 
   return [[NSWorkspace sharedWorkspace] openFile:path];
+}
+
+- (NSArray *) launchArgumentsFromString: (NSString *)arguments
+{
+  NSMutableArray *tokens = [NSMutableArray array];
+  NSMutableString *token = [NSMutableString string];
+  NSUInteger i;
+  BOOL inSingleQuote = NO;
+  BOOL inDoubleQuote = NO;
+  BOOL escaping = NO;
+
+  for (i = 0; i < [arguments length]; i++)
+    {
+      unichar character = [arguments characterAtIndex:i];
+
+      if (escaping)
+	{
+	  [token appendFormat:@"%C", character];
+	  escaping = NO;
+	  continue;
+	}
+      if (character == '\\' && !inSingleQuote)
+	{
+	  escaping = YES;
+	  continue;
+	}
+      if (character == '\'' && !inDoubleQuote)
+	{
+	  inSingleQuote = !inSingleQuote;
+	  continue;
+	}
+      if (character == '"' && !inSingleQuote)
+	{
+	  inDoubleQuote = !inDoubleQuote;
+	  continue;
+	}
+      if (!inSingleQuote && !inDoubleQuote &&
+	  [[NSCharacterSet whitespaceAndNewlineCharacterSet]
+	    characterIsMember:character])
+	{
+	  if ([token length])
+	    {
+	      [tokens addObject:[[token copy] autorelease]];
+	      [token setString:@""];
+	    }
+	  continue;
+	}
+
+      [token appendFormat:@"%C", character];
+    }
+
+  if (escaping)
+    {
+      [token appendString:@"\\"];
+    }
+  if ([token length])
+    {
+      [tokens addObject:[[token copy] autorelease]];
+    }
+
+  return tokens;
+}
+
+- (NSString *) shellQuotedArgument: (NSString *)argument
+{
+  return [NSString stringWithFormat:@"'%@'",
+		   [argument stringByReplacingOccurrencesOfString:@"'"
+						       withString:@"'\\''"]];
 }
 
 - (void) terminateApplicationItemProcesses: (DockItem *)item
@@ -1616,6 +1801,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     {
       NSString *path = [paths objectAtIndex:i];
       DockItem *item;
+      NSUInteger itemIndex;
 
       if (![[NSFileManager defaultManager] fileExistsAtPath:path])
 	{
@@ -1623,13 +1809,25 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 	}
 
       item = [DockItem applicationItemWithPath:path];
+      for (itemIndex = 0; itemIndex < [_items count]; itemIndex++)
+	{
+	  DockItem *candidate = [_items objectAtIndex:itemIndex];
+
+	  if ([candidate kind] == DockItemApplication &&
+	      [[self normalizedPath:[candidate path]]
+		isEqualToString:[self normalizedPath:path]])
+	    {
+	      item = candidate;
+	      break;
+	    }
+	}
       if ([self applicationItemHasRunningProcess:item paths:processPaths])
 	{
 	  continue;
 	}
 
       [self rememberLaunchedApplicationPath:path];
-      [self launchApplicationAtPath:path];
+      [self launchApplicationItem:item];
       [_x11 drainTransientIconEvents];
     }
 }
@@ -2190,7 +2388,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     }
 
   _settingsPanel = [[NSPanel alloc]
-		     initWithContentRect:NSMakeRect(0, 0, 320, 368)
+		     initWithContentRect:NSMakeRect(0, 0, 460, 520)
 			       styleMask:NSTitledWindowMask | NSClosableWindowMask
 				 backing:NSBackingStoreBuffered
 				   defer:NO];
@@ -2201,11 +2399,11 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   contentView = [_settingsPanel contentView];
 
   label = [self settingsLabelWithTitle:@"Placement"
-                                 frame:NSMakeRect(18, 324, 110, 20)];
+                                 frame:NSMakeRect(18, 476, 110, 20)];
   [contentView addSubview:label];
 
   _settingsPlacementPopup =
-    [[NSPopUpButton alloc] initWithFrame:NSMakeRect(132, 320, 170, 26)
+    [[NSPopUpButton alloc] initWithFrame:NSMakeRect(132, 472, 170, 26)
                                pullsDown:NO];
   placements = [NSArray arrayWithObjects:
 			  @"Left Top",
@@ -2225,11 +2423,11 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [contentView addSubview:_settingsPlacementPopup];
 
   label = [self settingsLabelWithTitle:@"Color"
-                                 frame:NSMakeRect(18, 280, 110, 20)];
+                                 frame:NSMakeRect(18, 432, 110, 20)];
   [contentView addSubview:label];
 
   _settingsBackgroundColorWell =
-    [[NSColorWell alloc] initWithFrame:NSMakeRect(132, 274, 58, 32)];
+    [[NSColorWell alloc] initWithFrame:NSMakeRect(132, 426, 58, 32)];
   [_settingsBackgroundColorWell setTarget:self];
   [_settingsBackgroundColorWell setAction:@selector(settingsBackgroundColorChanged:)];
   [contentView addSubview:_settingsBackgroundColorWell];
@@ -2237,13 +2435,26 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [colorPanel setShowsAlpha:NO];
   [colorPanel setContinuous:YES];
 
+  label = [self settingsLabelWithTitle:@"Transparency"
+                                 frame:NSMakeRect(18, 398, 110, 20)];
+  [contentView addSubview:label];
+
+  _settingsTransparencySlider =
+    [[NSSlider alloc] initWithFrame:NSMakeRect(132, 394, 300, 24)];
+  [_settingsTransparencySlider setMinValue:0.2];
+  [_settingsTransparencySlider setMaxValue:1.0];
+  [_settingsTransparencySlider setContinuous:YES];
+  [_settingsTransparencySlider setTarget:self];
+  [_settingsTransparencySlider setAction:@selector(settingsTransparencyChanged:)];
+  [contentView addSubview:_settingsTransparencySlider];
+
   label = [self settingsLabelWithTitle:@"Icon Cells"
-                                 frame:NSMakeRect(18, 224, 110, 20)];
+                                 frame:NSMakeRect(18, 376, 110, 20)];
   [contentView addSubview:label];
 
   _settings64CellSizeButton =
     [self settingsButtonWithTitle:@"64 x 64"
-                            frame:NSMakeRect(132, 222, 160, 24)
+                            frame:NSMakeRect(132, 374, 160, 24)
                        buttonType:NSRadioButton
                            action:@selector(settingsDockCellSizeChanged:)];
   [_settings64CellSizeButton setTag:DockCellSizeMode64];
@@ -2251,19 +2462,19 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
   _settingsCurrentCellSizeButton =
     [self settingsButtonWithTitle:DockLargerCellSizeTitle()
-                            frame:NSMakeRect(132, 198, 160, 24)
+                            frame:NSMakeRect(132, 350, 160, 24)
                        buttonType:NSRadioButton
                            action:@selector(settingsDockCellSizeChanged:)];
   [_settingsCurrentCellSizeButton setTag:DockCellSizeModeCurrent];
   [contentView addSubview:_settingsCurrentCellSizeButton];
 
   label = [self settingsLabelWithTitle:@"State Dots"
-                                 frame:NSMakeRect(18, 152, 110, 20)];
+                                 frame:NSMakeRect(18, 304, 110, 20)];
   [contentView addSubview:label];
 
   _settingsRunningDotButton =
     [self settingsButtonWithTitle:@"Dot when running"
-                            frame:NSMakeRect(132, 150, 170, 24)
+                            frame:NSMakeRect(132, 302, 170, 24)
                        buttonType:NSRadioButton
                            action:@selector(settingsRunningIndicatorModeChanged:)];
   [_settingsRunningDotButton setTag:DockRunningIndicatorModeRunningDot];
@@ -2271,7 +2482,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
   _settingsNotRunningDotsButton =
     [self settingsButtonWithTitle:@"Dots when stopped"
-                            frame:NSMakeRect(132, 126, 170, 24)
+                            frame:NSMakeRect(132, 278, 170, 24)
                        buttonType:NSRadioButton
                            action:@selector(settingsRunningIndicatorModeChanged:)];
   [_settingsNotRunningDotsButton setTag:DockRunningIndicatorModeNotRunningDots];
@@ -2279,28 +2490,81 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
   _settingsUseCellTileButton =
     [self settingsButtonWithTitle:@"Use common_Tile"
-                            frame:NSMakeRect(18, 88, 170, 24)
+                            frame:NSMakeRect(18, 240, 170, 24)
                        buttonType:NSSwitchButton
                            action:@selector(settingsUseCellTileChanged:)];
   [contentView addSubview:_settingsUseCellTileButton];
 
   _settingsShowBorderButton =
     [self settingsButtonWithTitle:@"Show Border"
-                            frame:NSMakeRect(18, 62, 140, 24)
+                            frame:NSMakeRect(18, 214, 140, 24)
                        buttonType:NSSwitchButton
                            action:@selector(settingsShowBorderChanged:)];
   [contentView addSubview:_settingsShowBorderButton];
 
+  label = [self settingsLabelWithTitle:@"App"
+                                 frame:NSMakeRect(18, 168, 110, 20)];
+  [contentView addSubview:label];
+
+  _settingsApplicationPopup =
+    [[NSPopUpButton alloc] initWithFrame:NSMakeRect(132, 164, 300, 26)
+                               pullsDown:NO];
+  [_settingsApplicationPopup setTarget:self];
+  [_settingsApplicationPopup setAction:@selector(settingsApplicationSelectionChanged:)];
+  [contentView addSubview:_settingsApplicationPopup];
+
+  label = [self settingsLabelWithTitle:@"Arguments"
+                                 frame:NSMakeRect(18, 126, 110, 20)];
+  [contentView addSubview:label];
+
+  _settingsApplicationArgumentsField =
+    [[NSTextField alloc] initWithFrame:NSMakeRect(132, 124, 300, 24)];
+  [_settingsApplicationArgumentsField setTarget:self];
+  [_settingsApplicationArgumentsField setAction:@selector(settingsApplyApplicationArguments:)];
+  [contentView addSubview:_settingsApplicationArgumentsField];
+
+  _settingsApplyApplicationButton =
+    [self settingsButtonWithTitle:@"Apply"
+                            frame:NSMakeRect(132, 88, 72, 28)
+                       buttonType:NSMomentaryPushInButton
+                           action:@selector(settingsApplyApplicationArguments:)];
+  [_settingsApplyApplicationButton setBezelStyle:NSRoundedBezelStyle];
+  [contentView addSubview:_settingsApplyApplicationButton];
+
+  _settingsMoveApplicationUpButton =
+    [self settingsButtonWithTitle:@"Move Up"
+                            frame:NSMakeRect(212, 88, 84, 28)
+                       buttonType:NSMomentaryPushInButton
+                           action:@selector(settingsMoveApplicationUp:)];
+  [_settingsMoveApplicationUpButton setBezelStyle:NSRoundedBezelStyle];
+  [contentView addSubview:_settingsMoveApplicationUpButton];
+
+  _settingsMoveApplicationDownButton =
+    [self settingsButtonWithTitle:@"Move Down"
+                            frame:NSMakeRect(304, 88, 96, 28)
+                       buttonType:NSMomentaryPushInButton
+                           action:@selector(settingsMoveApplicationDown:)];
+  [_settingsMoveApplicationDownButton setBezelStyle:NSRoundedBezelStyle];
+  [contentView addSubview:_settingsMoveApplicationDownButton];
+
+  _settingsDeleteApplicationButton =
+    [self settingsButtonWithTitle:@"Delete"
+                            frame:NSMakeRect(132, 54, 72, 28)
+                       buttonType:NSMomentaryPushInButton
+                           action:@selector(settingsDeleteApplication:)];
+  [_settingsDeleteApplicationButton setBezelStyle:NSRoundedBezelStyle];
+  [contentView addSubview:_settingsDeleteApplicationButton];
+
   _settingsEmptyRecyclerButton =
     [self settingsButtonWithTitle:@"Empty Recycler"
-                            frame:NSMakeRect(18, 24, 120, 28)
+                            frame:NSMakeRect(18, 16, 120, 28)
                        buttonType:NSMomentaryPushInButton
                            action:@selector(emptyRecycler:)];
   [_settingsEmptyRecyclerButton setBezelStyle:NSRoundedBezelStyle];
   [contentView addSubview:_settingsEmptyRecyclerButton];
 
   closeButton = [self settingsButtonWithTitle:@"Close"
-                                        frame:NSMakeRect(214, 24, 88, 28)
+                                        frame:NSMakeRect(344, 16, 88, 28)
                                    buttonType:NSMomentaryPushInButton
                                        action:@selector(closeSettingsPanel:)];
   [closeButton setBezelStyle:NSRoundedBezelStyle];
@@ -2313,10 +2577,20 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 - (void) updateSettingsPanelControls
 {
   NSColor *color;
+  DockItem *selectedItem = nil;
+  NSUInteger selectedIndex = NSNotFound;
+  NSUInteger i;
+  NSUInteger selectedPopupIndex = NSNotFound;
 
   if (!_settingsPanel)
     {
       return;
+    }
+
+  selectedIndex = [self selectedSettingsApplicationIndex];
+  if (selectedIndex != NSNotFound)
+    {
+      selectedItem = [_items objectAtIndex:selectedIndex];
     }
 
   [_settingsPlacementPopup selectItemWithTag:(NSInteger)_dockPlacement];
@@ -2333,6 +2607,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
        NSOnState : NSOffState)];
   [_settingsUseCellTileButton setState:
       (_useCellTileBackground ? NSOnState : NSOffState)];
+  [_settingsTransparencySlider setFloatValue:_windowAlpha];
   if (![_settingsPanel isVisible])
     {
       color = DockCalibratedBackgroundColor(_backgroundColor);
@@ -2340,6 +2615,57 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     }
   [_settingsShowBorderButton setState:(_showDockBorder ? NSOnState : NSOffState)];
   [_settingsEmptyRecyclerButton setEnabled:[self recyclerHasContents]];
+
+  [_settingsApplicationPopup removeAllItems];
+  for (i = 0; i < [_items count]; i++)
+    {
+      DockItem *item = [_items objectAtIndex:i];
+
+      if ([item kind] == DockItemApplication && [item isPinned] &&
+	  ![self applicationBundlePathIsDockWM:[item path]])
+	{
+	  [_settingsApplicationPopup addItemWithTitle:[item title]];
+	  [[_settingsApplicationPopup lastItem]
+	    setRepresentedObject:[NSNumber numberWithUnsignedInteger:i]];
+	  if (item == selectedItem)
+	    {
+	      selectedPopupIndex = [_settingsApplicationPopup numberOfItems] - 1;
+	    }
+	}
+    }
+
+  if (selectedPopupIndex != NSNotFound)
+    {
+      [_settingsApplicationPopup selectItemAtIndex:selectedPopupIndex];
+    }
+  else if ([_settingsApplicationPopup numberOfItems] > 0)
+    {
+      [_settingsApplicationPopup selectItemAtIndex:0];
+    }
+
+  selectedIndex = [self selectedSettingsApplicationIndex];
+  if (selectedIndex != NSNotFound)
+    {
+      DockItem *item = [_items objectAtIndex:selectedIndex];
+      NSUInteger pinnedCount = [self pinnedApplicationCount];
+
+      [_settingsApplicationArgumentsField setStringValue:
+	  ([item launchArguments] ? [item launchArguments] : @"")];
+      [_settingsApplicationArgumentsField setEnabled:YES];
+      [_settingsApplyApplicationButton setEnabled:YES];
+      [_settingsMoveApplicationUpButton setEnabled:(selectedIndex > 0)];
+      [_settingsMoveApplicationDownButton setEnabled:(selectedIndex + 1 < pinnedCount)];
+      [_settingsDeleteApplicationButton setEnabled:YES];
+    }
+  else
+    {
+      [_settingsApplicationArgumentsField setStringValue:@""];
+      [_settingsApplicationArgumentsField setEnabled:NO];
+      [_settingsApplyApplicationButton setEnabled:NO];
+      [_settingsMoveApplicationUpButton setEnabled:NO];
+      [_settingsMoveApplicationDownButton setEnabled:NO];
+      [_settingsDeleteApplicationButton setEnabled:NO];
+    }
 }
 
 - (void) showSettingsPanel: (id)sender
@@ -2389,6 +2715,24 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [_dockView setBackgroundColor:_backgroundColor];
   [_settingsBackgroundColorWell setColor:_backgroundColor];
   [self saveBackgroundColor];
+}
+
+- (void) settingsTransparencyChanged: (id)sender
+{
+  _windowAlpha = [(NSSlider *)sender floatValue];
+  if (_windowAlpha < 0.2)
+    {
+      _windowAlpha = 0.2;
+    }
+  else if (_windowAlpha > 1.0)
+    {
+      _windowAlpha = 1.0;
+    }
+
+  [_window setAlphaValue:_windowAlpha];
+  [_dockView setBackgroundAlpha:_windowAlpha];
+  [_settingsTransparencySlider setFloatValue:_windowAlpha];
+  [self saveWindowAlpha];
 }
 
 - (void) settingsShowBorderChanged: (id)sender
@@ -2447,6 +2791,151 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [self updateSettingsPanelControls];
 }
 
+- (NSUInteger) selectedSettingsApplicationIndex
+{
+  id selectedItem;
+  id representedObject;
+
+  if (!_settingsApplicationPopup ||
+      [_settingsApplicationPopup numberOfItems] == 0)
+    {
+      return NSNotFound;
+    }
+
+  selectedItem = [_settingsApplicationPopup selectedItem];
+  representedObject = [selectedItem representedObject];
+  if ([representedObject respondsToSelector:@selector(unsignedIntegerValue)])
+    {
+      NSUInteger index = [representedObject unsignedIntegerValue];
+
+      if (index < [_items count])
+	{
+	  return index;
+	}
+    }
+
+  return NSNotFound;
+}
+
+- (void) selectSettingsApplicationItem: (DockItem *)item
+{
+  NSInteger i;
+
+  if (!_settingsApplicationPopup || !item)
+    {
+      return;
+    }
+
+  for (i = 0; i < [_settingsApplicationPopup numberOfItems]; i++)
+    {
+      id representedObject = [[_settingsApplicationPopup itemAtIndex:i]
+			       representedObject];
+
+      if ([representedObject respondsToSelector:@selector(unsignedIntegerValue)] &&
+	  [representedObject unsignedIntegerValue] < [_items count] &&
+	  [_items objectAtIndex:[representedObject unsignedIntegerValue]] == item)
+	{
+	  [_settingsApplicationPopup selectItemAtIndex:i];
+	  break;
+	}
+    }
+}
+
+- (void) settingsApplicationSelectionChanged: (id)sender
+{
+  [self updateSettingsPanelControls];
+}
+
+- (void) settingsApplyApplicationArguments: (id)sender
+{
+  NSUInteger index = [self selectedSettingsApplicationIndex];
+  DockItem *item;
+
+  if (index == NSNotFound)
+    {
+      return;
+    }
+
+  item = [_items objectAtIndex:index];
+  [item setLaunchArguments:[_settingsApplicationArgumentsField stringValue]];
+  [self savePersistedApplications];
+  [self updateSettingsPanelControls];
+}
+
+- (void) settingsMoveApplicationUp: (id)sender
+{
+  NSUInteger index = [self selectedSettingsApplicationIndex];
+  DockItem *item;
+
+  if (index == NSNotFound || index == 0)
+    {
+      return;
+    }
+
+  item = RETAIN([_items objectAtIndex:index]);
+  [_items removeObjectAtIndex:index];
+  [_items insertObject:item atIndex:index - 1];
+  [self savePersistedApplications];
+  [self refreshDock];
+  [self updateSettingsPanelControls];
+  [self selectSettingsApplicationItem:item];
+  [self updateSettingsPanelControls];
+  DESTROY(item);
+}
+
+- (void) settingsMoveApplicationDown: (id)sender
+{
+  NSUInteger index = [self selectedSettingsApplicationIndex];
+  NSUInteger pinnedCount = [self pinnedApplicationCount];
+  DockItem *item;
+
+  if (index == NSNotFound || index + 1 >= pinnedCount)
+    {
+      return;
+    }
+
+  item = RETAIN([_items objectAtIndex:index]);
+  [_items removeObjectAtIndex:index];
+  [_items insertObject:item atIndex:index + 1];
+  [self savePersistedApplications];
+  [self refreshDock];
+  [self updateSettingsPanelControls];
+  [self selectSettingsApplicationItem:item];
+  [self updateSettingsPanelControls];
+  DESTROY(item);
+}
+
+- (void) settingsDeleteApplication: (id)sender
+{
+  NSUInteger index = [self selectedSettingsApplicationIndex];
+  DockItem *item;
+
+  if (index == NSNotFound || index >= [_items count])
+    {
+      return;
+    }
+
+  item = [_items objectAtIndex:index];
+  if ([item kind] == DockItemApplication && [[item path] length])
+    {
+      [self setApplicationPath:[item path] openAtLogin:NO];
+    }
+  [_items removeObjectAtIndex:index];
+  [self savePersistedApplications];
+  [self refreshDock];
+  [self updateSettingsPanelControls];
+}
+
+- (void) showSettingsForDockItem: (DockItem *)item
+{
+  [self createSettingsPanel];
+  [self updateSettingsPanelControls];
+  [self selectSettingsApplicationItem:item];
+  [self updateSettingsPanelControls];
+  [_settingsPanel center];
+  [_settingsPanel makeKeyAndOrderFront:self];
+}
+
 - (void) applyDockPlacement
 {
   [[NSUserDefaults standardUserDefaults] setInteger:_dockPlacement forKey:@"DockPlacement"];
@@ -2465,6 +2954,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 - (void) updateDockBackground
 {
   [_dockView setBackgroundColor:_backgroundColor];
+  [_dockView setBackgroundAlpha:_windowAlpha];
   [_dockView setUsesCellBackgroundTile:_useCellTileBackground];
   [_dockView setShowsBorder:_showDockBorder];
   [_dockView setRunningIndicatorMode:_runningIndicatorMode];
@@ -2822,6 +3312,21 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     }
 }
 
+- (BOOL) dockView: (id)dockView canShowSettingsForItem: (DockItem *)item
+{
+  return [item kind] == DockItemApplication &&
+    [[item path] length] &&
+    ![self applicationBundlePathIsDockWM:[item path]];
+}
+
+- (void) dockView: (id)dockView didShowSettingsForItem: (DockItem *)item
+{
+  if ([self dockView:dockView canShowSettingsForItem:item])
+    {
+      [self showSettingsForDockItem:item];
+    }
+}
+
 - (void) dockViewDidActivateItem: (DockItem *)item
 {
   if ([item kind] == DockItemApplication)
@@ -2860,7 +3365,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 	}
 
       [self rememberLaunchedApplicationPath:path];
-      launched = [self launchApplicationAtPath:path];
+      launched = [self launchApplicationItem:item];
       [_x11 drainTransientIconEvents];
 
       if (launched)
@@ -2902,7 +3407,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
     }
 }
 
-- (BOOL) launchDesktopFile: (NSString *)path
+- (BOOL) launchDesktopFile: (NSString *)path arguments: (NSArray *)arguments
 {
   NSString *contents = [NSString stringWithContentsOfFile:path];
   NSArray *lines = [contents componentsSeparatedByCharactersInSet:
@@ -2924,9 +3429,16 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 	  if ([command length])
 	    {
 	      NSString *shellPath = [self pathForExecutableCommand:@"sh"];
+	      NSUInteger j;
 
 	      if ([shellPath length])
 		{
+		  for (j = 0; j < [arguments count]; j++)
+		    {
+		      command = [command stringByAppendingFormat:@" %@",
+				 [self shellQuotedArgument:
+					 [arguments objectAtIndex:j]]];
+		    }
 		  [NSTask launchedTaskWithLaunchPath:shellPath
 					   arguments:[NSArray arrayWithObjects:@"-lc", command, nil]];
 		  return YES;
