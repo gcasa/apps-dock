@@ -112,7 +112,7 @@ jobs:
           LIBS_GUI_BRANCH: ${{github.event.inputs.libs_gui_branch}}
         run: ./.github/scripts/dependencies.sh
 
-      - name: Build source for Gorm
+      - name: Build source for DockWM
         run: . $INSTALL_PATH/share/GNUstep/Makefiles/GNUstep.sh && make && make install
 
       - name: Upload logs

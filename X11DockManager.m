@@ -44,6 +44,16 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   return 0;
 }
 
+@interface X11DockManager (Private)
+- (void) registerIconManager;
+- (NSRect) x11FrameForDockPlacement: (DockPlacement)placement;
+- (NSString *) classNameForWindow: (Window)window;
+- (BOOL) rememberApplicationIconWindow: (Window)window
+                     processIdentifier: (int)processIdentifier
+                                 title: (NSString *)title;
+- (NSRect) hiddenIconWindowFrame;
+@end
+
 @implementation X11DockManager
 
 - (id) initWithDockView: (DockView *)view

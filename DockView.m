@@ -38,6 +38,15 @@ static NSInteger DockHoverNone = -1;
 static NSInteger DockHoverTopIcon = -2;
 static NSInteger DockHoverRecycler = -3;
 
+@interface DockView (Private)
+- (NSImage *) loadGNUstepIcon;
+- (NSImage *) loadRecyclerIcon;
+- (NSImage *) loadCellBackgroundImage;
+- (void) hideTooltip;
+- (void) addPathsFromPasteboardObject: (id)object toArray: (NSMutableArray *)paths;
+- (void) addPathsFromPasteboardString: (NSString *)string toArray: (NSMutableArray *)paths;
+@end
+
 static NSColor *
 DockViewCalibratedBackgroundColor (NSColor *color)
 {
