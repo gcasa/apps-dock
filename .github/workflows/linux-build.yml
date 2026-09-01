@@ -46,7 +46,6 @@ jobs:
           sudo apt-get install -y \
             build-essential \
             cmake \
-            curl \
             libffi-dev \
             libgnutls28-dev \
             libicu-dev \
@@ -88,21 +87,20 @@ jobs:
           mkdir -p "$PREFIX" "$RUNNER_TEMP/gnustep-src"
           cd "$RUNNER_TEMP/gnustep-src"
 
-          curl -L -o tools-make.tar.gz https://github.com/gnustep/tools-make/archive/refs/tags/make-2_9_3.tar.gz
-          curl -L -o libobjc2.tar.gz https://github.com/gnustep/libobjc2/archive/refs/tags/v2.2.tar.gz
-          curl -L -o libs-base.tar.gz https://github.com/gnustep/libs-base/archive/refs/tags/base-1_30_0.tar.gz
-          curl -L -o libs-gui.tar.gz https://github.com/gnustep/libs-gui/archive/refs/tags/gui-0_31_1.tar.gz
+          git clone --depth 1 --branch make-2_9_3 https://github.com/gnustep/tools-make.git tools-make
+          git clone --depth 1 --branch v2.2 https://github.com/gnustep/libobjc2.git libobjc2
+          git clone --depth 1 --branch base-1_30_0 https://github.com/gnustep/libs-base.git libs-base
+          git clone --depth 1 --branch gui-0_31_1 https://github.com/gnustep/libs-gui.git libs-gui
 
-          tar -xf tools-make.tar.gz
-          tar -xf libobjc2.tar.gz
-          tar -xf libs-base.tar.gz
-          tar -xf libs-gui.tar.gz
+          cd libobjc2
+          git submodule sync
+          git submodule update --init --depth 1
 
-          cd tools-make-make-2_9_3
+          cd "$RUNNER_TEMP/gnustep-src/tools-make"
           ./configure --prefix="$PREFIX" --with-layout=fhs
           make -j"$(nproc)" install
 
-          cd "$RUNNER_TEMP/gnustep-src/libobjc2-2.2"
+          cd "$RUNNER_TEMP/gnustep-src/libobjc2"
           cmake -S . -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX="$PREFIX" \
@@ -114,7 +112,7 @@ jobs:
           cmake --build build
           cmake --install build
 
-          cd "$RUNNER_TEMP/gnustep-src/tools-make-make-2_9_3"
+          cd "$RUNNER_TEMP/gnustep-src/tools-make"
           make distclean
           ./configure \
             --prefix="$PREFIX" \
@@ -128,11 +126,11 @@ jobs:
           . "$PREFIX/share/GNUstep/Makefiles/GNUstep.sh"
           set -u
 
-          cd "$RUNNER_TEMP/gnustep-src/libs-base-base-1_30_0"
+          cd "$RUNNER_TEMP/gnustep-src/libs-base"
           ./configure --prefix="$PREFIX" --disable-mixedabi
           make -j"$(nproc)" install
 
-          cd "$RUNNER_TEMP/gnustep-src/libs-gui-gui-0_31_1"
+          cd "$RUNNER_TEMP/gnustep-src/libs-gui"
           ./configure --prefix="$PREFIX"
           make -j"$(nproc)" install
 
