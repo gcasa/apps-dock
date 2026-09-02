@@ -18,91 +18,15 @@
  */
 
 #import "AppController.h"
+#import "ApplicationIconManager.h"
+#import "DockApplicationStore.h"
 #import "DockItem.h"
+#import "DockPreferences.h"
+#import "RecyclerController.h"
+#import "RunningApplicationScanner.h"
 #import <GNUstepBase/GNUstep.h>
-#import <ctype.h>
-#import <dirent.h>
-#import <limits.h>
-#import <mntent.h>
-#import <paths.h>
 #import <signal.h>
-#import <stdlib.h>
-#import <string.h>
 #import <unistd.h>
-
-static CGFloat DockCell = 64.0;
-static CGFloat DockGap = 2.0;
-static CGFloat DockCompactGap = 1.0;
-static CGFloat DockPad = 10.0;
-static CGFloat DockCompactPad = 0.0;
-static NSString *DockApplicationsDefaultsKey = @"DockApplications";
-static NSString *DockApplicationPathKey = @"Path";
-static NSString *DockApplicationArgumentsKey = @"Arguments";
-static NSString *DockOpenAtLoginApplicationsDefaultsKey = @"DockOpenAtLoginApplications";
-static NSString *DockBackgroundColorDefaultsKey = @"DockBackgroundColor";
-static NSString *DockWindowAlphaDefaultsKey = @"DockWindowAlpha";
-static NSString *DockShowBorderDefaultsKey = @"DockShowBorder";
-static NSString *DockCellSizeModeDefaultsKey = @"DockCellSizeMode";
-static NSString *DockUseCellTileBackgroundDefaultsKey = @"DockUseCellTileBackground";
-static NSString *DockRunningIndicatorModeDefaultsKey = @"DockRunningIndicatorMode";
-
-enum
-{
-  DockCellSizeModeCurrent = 0,
-  DockCellSizeMode64 = 1
-};
-
-static NSColor *
-DockCalibratedBackgroundColor (NSColor *color)
-{
-  NSColor *rgbColor = nil;
-  CGFloat red = 0.0;
-  CGFloat green = 0.0;
-  CGFloat blue = 0.0;
-  CGFloat alpha = 1.0;
-
-  if (!color)
-    {
-      return [NSColor blackColor];
-    }
-
-  NS_DURING
-    rgbColor = [color colorUsingColorSpaceName:NSCalibratedRGBColorSpace];
-  if (!rgbColor)
-    {
-      rgbColor = [color colorUsingColorSpaceName:NSDeviceRGBColorSpace];
-    }
-  if (rgbColor)
-    {
-      [rgbColor getRed:&red green:&green blue:&blue alpha:&alpha];
-    }
-  NS_HANDLER
-    rgbColor = nil;
-  NS_ENDHANDLER
-
-    if (!rgbColor)
-      {
-	return [NSColor blackColor];
-      }
-
-  return [NSColor colorWithCalibratedRed:red
-                                   green:green
-                                    blue:blue
-                                   alpha:alpha];
-}
-
-static NSString *
-DockLargerCellSizeTitle(void)
-{
-  CGFloat tileSize = DockCell + DockPad * 2.0;
-
-  return [NSString stringWithFormat:@"%.0f x %.0f", tileSize, tileSize];
-}
-
-static BOOL DockPlacementIsHorizontal(DockPlacement placement)
-{
-  return placement == DockPlacementTopCenter || placement == DockPlacementBottomCenter;
-}
 
 @implementation AppController
 
@@ -111,9 +35,14 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   NSRect frame;
 
   _items = [NSMutableArray new];
+  _recyclerController = [RecyclerController new];
+  _preferences = [DockPreferences new];
+  _applicationScanner = [RunningApplicationScanner new];
+  _applicationStore = [[DockApplicationStore alloc]
+			initWithScanner:_applicationScanner];
+  _applicationIconManager = [[ApplicationIconManager alloc]
+			      initWithScanner:_applicationScanner];
   _launchedApplicationPaths = [NSMutableSet new];
-  _applicationIconWindowItems = [NSMutableDictionary new];
-  _applicationIconUpdatesByProcessID = [NSMutableDictionary new];
   _dockPlacement = [self savedDockPlacement];
   _dockCellSizeMode = [self savedDockCellSizeMode];
   _runningIndicatorMode = [self savedRunningIndicatorMode];
@@ -138,7 +67,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
                                                          NSWidth(frame),
                                                          NSHeight(frame))];
   [_dockView setDelegate:self];
-  [_dockView setHorizontal:DockPlacementIsHorizontal(_dockPlacement)];
+  [_dockView setHorizontal:[DockPreferences placementIsHorizontal:_dockPlacement]];
   [self applyDockCellSizeToView];
   [_dockView setBackgroundColor:_backgroundColor];
   [_dockView setBackgroundAlpha:_windowAlpha];
@@ -172,12 +101,15 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [_scanTimer invalidate];
   [_processScanTimer invalidate];
   DESTROY(_settingsController);
+  DESTROY(_recyclerController);
+  DESTROY(_preferences);
   DESTROY(_dockMenu);
   DESTROY(_x11);
   DESTROY(_dockView);
   DESTROY(_window);
-  DESTROY(_applicationIconWindowItems);
-  DESTROY(_applicationIconUpdatesByProcessID);
+  DESTROY(_applicationStore);
+  DESTROY(_applicationIconManager);
+  DESTROY(_applicationScanner);
   DESTROY(_launchedApplicationPaths);
   DESTROY(_backgroundColor);
   DESTROY(_items);
@@ -197,197 +129,89 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
 - (DockPlacement) savedDockPlacement
 {
-  NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-  id savedPlacement = [defaults objectForKey:@"DockPlacement"];
-
-  if (savedPlacement)
-    {
-      NSInteger placement = [defaults integerForKey:@"DockPlacement"];
-      if (placement >= DockPlacementLeftTop && placement <= DockPlacementBottomCenter)
-	{
-	  return (DockPlacement)placement;
-	}
-    }
-
-  if ([defaults boolForKey:@"DockOnRight"])
-    {
-      return [defaults boolForKey:@"DockCentered"] ? DockPlacementRightCenter : DockPlacementRightTop;
-    }
-
-  return [defaults boolForKey:@"DockCentered"] ? DockPlacementLeftCenter : DockPlacementLeftTop;
+  return [_preferences savedDockPlacement];
 }
 
 - (NSColor *) savedBackgroundColor
 {
-  id savedColor = [[NSUserDefaults standardUserDefaults]
-		    objectForKey:DockBackgroundColorDefaultsKey];
-  NSColor *color = nil;
-
-  if ([savedColor isKindOfClass:[NSDictionary class]])
-    {
-      NSNumber *red = [savedColor objectForKey:@"Red"];
-      NSNumber *green = [savedColor objectForKey:@"Green"];
-      NSNumber *blue = [savedColor objectForKey:@"Blue"];
-      NSNumber *alpha = [savedColor objectForKey:@"Alpha"];
-
-      if (red && green && blue)
-        {
-          color = [NSColor colorWithCalibratedRed:[red doubleValue]
-                                            green:[green doubleValue]
-                                             blue:[blue doubleValue]
-                                            alpha:alpha ? [alpha doubleValue] : 1.0];
-        }
-    }
-  else if ([savedColor isKindOfClass:[NSData class]])
-    {
-      NS_DURING
-        color = [NSUnarchiver unarchiveObjectWithData:savedColor];
-      NS_HANDLER
-        color = nil;
-      NS_ENDHANDLER
-	}
-
-  return DockCalibratedBackgroundColor(color);
+  return [_preferences savedBackgroundColor];
 }
 
 - (void) saveBackgroundColor
 {
-  NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-  NSColor *color = DockCalibratedBackgroundColor(_backgroundColor);
-  NSMutableDictionary *components = [NSMutableDictionary dictionary];
-  CGFloat red = 0.0;
-  CGFloat green = 0.0;
-  CGFloat blue = 0.0;
-  CGFloat alpha = 1.0;
-
-  [color getRed:&red green:&green blue:&blue alpha:&alpha];
-  [components setObject:[NSNumber numberWithDouble:red] forKey:@"Red"];
-  [components setObject:[NSNumber numberWithDouble:green] forKey:@"Green"];
-  [components setObject:[NSNumber numberWithDouble:blue] forKey:@"Blue"];
-  [components setObject:[NSNumber numberWithDouble:alpha] forKey:@"Alpha"];
-  [defaults setObject:components forKey:DockBackgroundColorDefaultsKey];
+  [_preferences saveBackgroundColor:_backgroundColor];
 }
 
 - (CGFloat) savedWindowAlpha
 {
-  NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-  id savedAlpha = [defaults objectForKey:DockWindowAlphaDefaultsKey];
-  CGFloat alpha;
-
-  if (!savedAlpha)
-    {
-      return 1.0;
-    }
-
-  alpha = [defaults floatForKey:DockWindowAlphaDefaultsKey];
-  if (alpha < 0.2)
-    {
-      alpha = 0.2;
-    }
-  else if (alpha > 1.0)
-    {
-      alpha = 1.0;
-    }
-
-  return alpha;
+  return [_preferences savedWindowAlpha];
 }
 
 - (void) saveWindowAlpha
 {
-  [[NSUserDefaults standardUserDefaults] setFloat:_windowAlpha
-					   forKey:DockWindowAlphaDefaultsKey];
+  [_preferences saveWindowAlpha:_windowAlpha];
 }
 
 - (BOOL) savedShowDockBorder
 {
-  return [[NSUserDefaults standardUserDefaults]
-	   boolForKey:DockShowBorderDefaultsKey];
+  return [_preferences savedShowDockBorder];
 }
 
 - (void) saveShowDockBorder
 {
-  [[NSUserDefaults standardUserDefaults] setBool:_showDockBorder
-					  forKey:DockShowBorderDefaultsKey];
+  [_preferences saveShowDockBorder:_showDockBorder];
 }
 
 - (NSInteger) savedDockCellSizeMode
 {
-  NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-  id savedMode = [defaults objectForKey:DockCellSizeModeDefaultsKey];
-
-  if (savedMode)
-    {
-      NSInteger mode = [defaults integerForKey:DockCellSizeModeDefaultsKey];
-      if (mode == DockCellSizeModeCurrent || mode == DockCellSizeMode64)
-	{
-	  return mode;
-	}
-    }
-
-  return DockCellSizeMode64;
+  return [_preferences savedDockCellSizeMode];
 }
 
 - (void) saveDockCellSizeMode
 {
-  [[NSUserDefaults standardUserDefaults] setInteger:_dockCellSizeMode
-					     forKey:DockCellSizeModeDefaultsKey];
+  [_preferences saveDockCellSizeMode:_dockCellSizeMode];
 }
 
 - (DockRunningIndicatorMode) savedRunningIndicatorMode
 {
-  NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-  id savedMode = [defaults objectForKey:DockRunningIndicatorModeDefaultsKey];
-
-  if (savedMode)
-    {
-      NSInteger mode = [defaults integerForKey:DockRunningIndicatorModeDefaultsKey];
-      if (mode == DockRunningIndicatorModeNotRunningDots)
-	{
-	  return DockRunningIndicatorModeNotRunningDots;
-	}
-    }
-
-  return DockRunningIndicatorModeRunningDot;
+  return [_preferences savedRunningIndicatorMode];
 }
 
 - (void) saveRunningIndicatorMode
 {
-  [[NSUserDefaults standardUserDefaults] setInteger:_runningIndicatorMode
-					     forKey:DockRunningIndicatorModeDefaultsKey];
+  [_preferences saveRunningIndicatorMode:_runningIndicatorMode];
 }
 
 - (BOOL) savedUseCellTileBackground
 {
-  return [[NSUserDefaults standardUserDefaults]
-	   boolForKey:DockUseCellTileBackgroundDefaultsKey];
+  return [_preferences savedUseCellTileBackground];
 }
 
 - (void) saveUseCellTileBackground
 {
-  [[NSUserDefaults standardUserDefaults] setBool:_useCellTileBackground
-					  forKey:DockUseCellTileBackgroundDefaultsKey];
+  [_preferences saveUseCellTileBackground:_useCellTileBackground];
 }
 
 - (CGFloat) activeDockPad
 {
-  return _dockCellSizeMode == DockCellSizeMode64 ? DockCompactPad : DockPad;
+  return [DockPreferences padForCellSizeMode:_dockCellSizeMode];
 }
 
 - (CGFloat) activeDockGap
 {
-  return _dockCellSizeMode == DockCellSizeMode64 ? DockCompactGap : DockGap;
+  return [DockPreferences gapForCellSizeMode:_dockCellSizeMode];
 }
 
 - (CGFloat) activeDockWindowWidth
 {
-  return DockCell + [self activeDockPad] * 2.0;
+  return [DockPreferences windowWidthForCellSizeMode:_dockCellSizeMode];
 }
 
 - (void) applyDockCellSizeToView
 {
   if (_dockView)
     {
-      [_dockView setIconCellSize:DockCell
+      [_dockView setIconCellSize:[DockPreferences dockCellSize]
 			      gap:[self activeDockGap]
 			  padding:[self activeDockPad]];
     }
@@ -395,157 +219,32 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
 - (void) loadPersistedApplications
 {
-  NSArray *paths = [[NSUserDefaults standardUserDefaults]
-		     objectForKey:DockApplicationsDefaultsKey];
-  NSUInteger i;
-
-  if (![paths isKindOfClass:[NSArray class]])
-    {
-      return;
-    }
-
-  for (i = 0; i < [paths count]; i++)
-    {
-      id record = [paths objectAtIndex:i];
-      NSString *path = [self persistedApplicationPathFromRecord:record];
-      NSString *arguments = [self persistedApplicationArgumentsFromRecord:record];
-      NSString *bundlePath;
-      NSString *applicationPath;
-      DockItem *transientItem;
-      BOOL isDir = NO;
-
-      if (![path length])
-	{
-	  continue;
-	}
-
-      bundlePath = [DockItem applicationBundlePathForPath:path];
-      applicationPath = [bundlePath length] ? bundlePath : path;
-
-      if ([[NSFileManager defaultManager] fileExistsAtPath:applicationPath
-					       isDirectory:&isDir] &&
-	  ![self dockHasApplicationPath:applicationPath])
-	{
-	  transientItem =
-	    [self transientApplicationItemMatchingBundlePath:applicationPath];
-	  if (transientItem)
-	    {
-	      [_items removeObject:transientItem];
-	    }
-	  {
-	    DockItem *item = [DockItem applicationItemWithPath:applicationPath];
-	    [item setLaunchArguments:arguments];
-	    [_items addObject:item];
-	  }
-	}
-    }
+  [_applicationStore loadPersistedApplicationsIntoItems:_items];
 }
 
 - (void) savePersistedApplications
 {
-  NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-  NSMutableArray *paths = [NSMutableArray array];
-  NSMutableSet *savedPaths = [NSMutableSet set];
-  NSUInteger i;
-
-  for (i = 0; i < [_items count]; i++)
-    {
-      DockItem *item = [_items objectAtIndex:i];
-      NSString *path = [item path];
-      NSString *normalizedPath = [self normalizedPath:path];
-
-      if (![normalizedPath length])
-	{
-	  normalizedPath = path;
-	}
-
-      if ([item kind] == DockItemApplication &&
-	  [item isPinned] &&
-	  [path length] &&
-	  ![savedPaths containsObject:normalizedPath])
-	{
-	  if ([normalizedPath length])
-	    {
-	      [savedPaths addObject:normalizedPath];
-	    }
-	  [paths addObject:[self persistedApplicationRecordForItem:item]];
-	}
-    }
-
-  [defaults setObject:paths forKey:DockApplicationsDefaultsKey];
-  [defaults synchronize];
+  [_applicationStore savePersistedApplicationsFromItems:_items];
 }
 
 - (id) persistedApplicationRecordForItem: (DockItem *)item
 {
-  NSString *path = [item path];
-  NSString *arguments = [item launchArguments];
-
-  if (![arguments length])
-    {
-      return path;
-    }
-
-  return [NSDictionary dictionaryWithObjectsAndKeys:
-			 path, DockApplicationPathKey,
-			 arguments, DockApplicationArgumentsKey,
-			 nil];
+  return [_applicationStore persistedApplicationRecordForItem:item];
 }
 
 - (NSString *) persistedApplicationPathFromRecord: (id)record
 {
-  if ([record isKindOfClass:[NSString class]])
-    {
-      return record;
-    }
-  if ([record isKindOfClass:[NSDictionary class]])
-    {
-      id path = [record objectForKey:DockApplicationPathKey];
-
-      if ([path isKindOfClass:[NSString class]])
-	{
-	  return path;
-	}
-    }
-  return nil;
+  return [_applicationStore persistedApplicationPathFromRecord:record];
 }
 
 - (NSString *) persistedApplicationArgumentsFromRecord: (id)record
 {
-  if ([record isKindOfClass:[NSDictionary class]])
-    {
-      id arguments = [record objectForKey:DockApplicationArgumentsKey];
-
-      if ([arguments isKindOfClass:[NSString class]])
-	{
-	  return arguments;
-	}
-    }
-  return nil;
+  return [_applicationStore persistedApplicationArgumentsFromRecord:record];
 }
 
 - (BOOL) dockHasApplicationPath: (NSString *)path
 {
-  NSString *normalizedPath = [self normalizedPath:path];
-  NSUInteger i;
-
-  if (![normalizedPath length])
-    {
-      return NO;
-    }
-
-  for (i = 0; i < [_items count]; i++)
-    {
-      DockItem *item = [_items objectAtIndex:i];
-      if ([item kind] == DockItemApplication &&
-	  [item isPinned] &&
-	  [[self normalizedPath:[item path]] isEqualToString:normalizedPath])
-	{
-	  return YES;
-	}
-    }
-
-  return NO;
+  return [_applicationStore items:_items haveApplicationPath:path];
 }
 
 - (NSUInteger) pinnedApplicationCount
@@ -568,459 +267,80 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
 - (NSString *) normalizedPath: (NSString *)path
 {
-  if (![path length])
-    {
-      return nil;
-    }
-
-  return [path stringByResolvingSymlinksInPath];
+  return [_applicationScanner normalizedPath:path];
 }
 
 - (NSArray *) commandSearchPathComponents
 {
-  NSString *pathEnvironment = [[[NSProcessInfo processInfo] environment]
-				objectForKey:@"PATH"];
-  NSMutableArray *components = [NSMutableArray array];
-
-  if ([pathEnvironment length])
-    {
-      return [pathEnvironment componentsSeparatedByString:@":"];
-    }
-
-  {
-    size_t length = confstr(_CS_PATH, NULL, 0);
-
-    if (length > 0)
-      {
-	char *buffer = malloc(length);
-
-	if (buffer)
-	  {
-	    if (confstr(_CS_PATH, buffer, length) > 0)
-	      {
-		NSString *fallbackPath =
-		  [NSString stringWithUTF8String:buffer];
-
-		if ([fallbackPath length])
-		  {
-		    [components addObjectsFromArray:
-				  [fallbackPath componentsSeparatedByString:@":"]];
-		  }
-	      }
-	    free(buffer);
-	  }
-      }
-  }
-
-  return components;
+  return [_applicationScanner commandSearchPathComponents];
 }
 
 - (NSString *) procFilesystemPath
 {
-  FILE *mounts;
-  struct mntent *entry;
-  NSString *path = nil;
-
-  mounts = setmntent(_PATH_MOUNTED, "r");
-  if (!mounts)
-    {
-      return nil;
-    }
-
-  while ((entry = getmntent(mounts)) != NULL)
-    {
-      if (entry->mnt_type && strcmp(entry->mnt_type, "proc") == 0 &&
-	  entry->mnt_dir)
-	{
-	  path = [NSString stringWithUTF8String:entry->mnt_dir];
-	  break;
-	}
-    }
-
-  endmntent(mounts);
-  return [path length] ? path : nil;
+  return [_applicationScanner procFilesystemPath];
 }
 
 - (NSString *) procPathForProcessIdentifierString: (NSString *)identifier
 {
-  NSString *procPath = [self procFilesystemPath];
-
-  if (![procPath length] || ![identifier length])
-    {
-      return nil;
-    }
-
-  return [procPath stringByAppendingPathComponent:identifier];
+  return [_applicationScanner procPathForProcessIdentifierString:identifier];
 }
 
 - (BOOL) path: (NSString *)path isEqualToOrDescendantOfPath: (NSString *)parentPath
 {
-  NSArray *pathComponents;
-  NSArray *parentComponents;
-  NSUInteger i;
-
-  path = [self normalizedPath:path];
-  parentPath = [self normalizedPath:parentPath];
-  if (![path length] || ![parentPath length])
-    {
-      return NO;
-    }
-  if ([path isEqualToString:parentPath])
-    {
-      return YES;
-    }
-
-  pathComponents = [path pathComponents];
-  parentComponents = [parentPath pathComponents];
-  if ([pathComponents count] <= [parentComponents count])
-    {
-      return NO;
-    }
-
-  for (i = 0; i < [parentComponents count]; i++)
-    {
-      if (![[pathComponents objectAtIndex:i]
-	     isEqualToString:[parentComponents objectAtIndex:i]])
-	{
-	  return NO;
-	}
-    }
-
-  return YES;
+  return [_applicationScanner path:path isEqualToOrDescendantOfPath:parentPath];
 }
 
 - (NSString *) executablePathForApplicationPath: (NSString *)path
 {
-  NSString *extension = [[path pathExtension] lowercaseString];
-  BOOL isDir = NO;
-
-  if (![path length])
-    {
-      return nil;
-    }
-
-  [[NSFileManager defaultManager] fileExistsAtPath:path isDirectory:&isDir];
-  if ([extension isEqualToString:@"app"] && isDir)
-    {
-      NSBundle *bundle = [NSBundle bundleWithPath:path];
-      NSString *executablePath = [bundle executablePath];
-      NSString *fallbackPath;
-
-      if ([executablePath length])
-	{
-	  return [self normalizedPath:executablePath];
-	}
-
-      fallbackPath = [path stringByAppendingPathComponent:
-			     [[path lastPathComponent] stringByDeletingPathExtension]];
-      if ([[NSFileManager defaultManager] fileExistsAtPath:fallbackPath])
-	{
-	  return [self normalizedPath:fallbackPath];
-	}
-    }
-
-  if ([extension isEqualToString:@"desktop"])
-    {
-      NSString *desktopExecutable = [self executablePathForDesktopFile:path];
-      if ([desktopExecutable length])
-	{
-	  return desktopExecutable;
-	}
-    }
-
-  if (!isDir && [[NSFileManager defaultManager] isExecutableFileAtPath:path])
-    {
-      return [self normalizedPath:path];
-    }
-
-  return [self normalizedPath:path];
+  return [_applicationScanner executablePathForApplicationPath:path];
 }
 
 - (NSString *) firstCommandTokenFromString: (NSString *)string
 {
-  NSMutableString *token = [NSMutableString string];
-  NSUInteger i;
-  BOOL quoted = NO;
-  unichar quote = 0;
-
-  for (i = 0; i < [string length]; i++)
-    {
-      unichar ch = [string characterAtIndex:i];
-
-      if (quoted)
-	{
-	  if (ch == quote)
-	    {
-	      quoted = NO;
-	    }
-	  else
-	    {
-	      [token appendFormat:@"%C", ch];
-	    }
-	}
-      else if (ch == '"' || ch == '\'')
-	{
-	  quoted = YES;
-	  quote = ch;
-	}
-      else if ([[NSCharacterSet whitespaceAndNewlineCharacterSet]
-		     characterIsMember:ch])
-	{
-	  if ([token length])
-	    {
-	      break;
-	    }
-	}
-      else
-	{
-	  [token appendFormat:@"%C", ch];
-	}
-    }
-
-  return [token length] ? token : nil;
+  return [_applicationScanner firstCommandTokenFromString:string];
 }
 
 - (NSString *) pathForExecutableCommand: (NSString *)command
 {
-  NSArray *pathComponents;
-  NSUInteger i;
-
-  if (![command length])
-    {
-      return nil;
-    }
-
-  if ([command isAbsolutePath] &&
-      [[NSFileManager defaultManager] fileExistsAtPath:command])
-    {
-      return [self normalizedPath:command];
-    }
-
-  pathComponents = [self commandSearchPathComponents];
-
-  for (i = 0; i < [pathComponents count]; i++)
-    {
-      NSString *candidate = [[pathComponents objectAtIndex:i]
-				 stringByAppendingPathComponent:command];
-      if ([[NSFileManager defaultManager] isExecutableFileAtPath:candidate])
-	{
-	  return [self normalizedPath:candidate];
-	}
-    }
-
-  return command;
+  return [_applicationScanner pathForExecutableCommand:command];
 }
 
 - (NSString *) executablePathForDesktopFile: (NSString *)path
 {
-  NSString *contents = [NSString stringWithContentsOfFile:path];
-  NSArray *lines = [contents componentsSeparatedByCharactersInSet:
-			       [NSCharacterSet newlineCharacterSet]];
-  NSUInteger i;
-
-  for (i = 0; i < [lines count]; i++)
-    {
-      NSString *line = [lines objectAtIndex:i];
-      if ([line hasPrefix:@"Exec="])
-	{
-	  NSString *command = [line substringFromIndex:5];
-	  command = [[command componentsSeparatedByString:@"%"] objectAtIndex:0];
-	  return [self pathForExecutableCommand:
-			 [self firstCommandTokenFromString:command]];
-	}
-    }
-
-  return nil;
+  return [_applicationScanner executablePathForDesktopFile:path];
 }
 
 - (BOOL) stringIsProcessIdentifier: (NSString *)string
 {
-  const char *chars = [string UTF8String];
-  NSUInteger i;
-
-  if (!chars || !chars[0])
-    {
-      return NO;
-    }
-
-  for (i = 0; chars[i]; i++)
-    {
-      if (!isdigit((unsigned char)chars[i]))
-	{
-	  return NO;
-	}
-    }
-
-  return YES;
+  return [_applicationScanner stringIsProcessIdentifier:string];
 }
 
 - (NSArray *) runningProcessExecutablePaths
 {
-  NSString *procPath = [self procFilesystemPath];
-  NSArray *entries;
-  NSMutableArray *paths = [NSMutableArray array];
-  NSMutableSet *seenPaths = [NSMutableSet set];
-  NSUInteger i;
-
-  if (![procPath length])
-    {
-      return paths;
-    }
-  entries = [[NSFileManager defaultManager] directoryContentsAtPath:procPath];
-
-  for (i = 0; i < [entries count]; i++)
-    {
-      NSString *entry = [entries objectAtIndex:i];
-      NSString *linkPath;
-      char target[PATH_MAX];
-      ssize_t length;
-
-      if (![self stringIsProcessIdentifier:entry])
-	{
-	  continue;
-	}
-
-      linkPath = [[procPath stringByAppendingPathComponent:entry]
-		   stringByAppendingPathComponent:@"exe"];
-      length = readlink([linkPath fileSystemRepresentation],
-			target,
-			sizeof(target) - 1);
-      if (length <= 0)
-	{
-	  continue;
-	}
-
-      target[length] = '\0';
-      {
-	NSString *path = [self normalizedPath:
-				 [NSString stringWithUTF8String:target]];
-	if ([path length] && ![seenPaths containsObject:path])
-	  {
-	    [seenPaths addObject:path];
-	    [paths addObject:path];
-	  }
-      }
-    }
-
-  return paths;
+  return [_applicationScanner runningProcessExecutablePaths];
 }
 
 - (NSString *) executablePathForProcessIdentifier: (NSNumber *)processIdentifier
 {
-  NSString *linkPath;
-  char target[PATH_MAX];
-  ssize_t length;
-
-  if (![processIdentifier isKindOfClass:[NSNumber class]])
-    {
-      return nil;
-    }
-
-  linkPath = [[self procPathForProcessIdentifierString:
-		      [processIdentifier stringValue]]
-	       stringByAppendingPathComponent:@"exe"];
-  length = readlink([linkPath fileSystemRepresentation],
-		    target,
-		    sizeof(target) - 1);
-  if (length <= 0)
-    {
-      return nil;
-    }
-
-  target[length] = '\0';
-  return [self normalizedPath:[NSString stringWithUTF8String:target]];
+  return [_applicationScanner executablePathForProcessIdentifier:processIdentifier];
 }
 
 - (NSArray *) runningProcessIdentifiersForApplicationItem: (DockItem *)item
 {
-  NSString *procPath = [self procFilesystemPath];
-  NSArray *entries;
-  NSMutableArray *processIds = [NSMutableArray array];
-  NSUInteger i;
-
-  if (![procPath length])
-    {
-      return processIds;
-    }
-  entries = [[NSFileManager defaultManager] directoryContentsAtPath:procPath];
-
-  for (i = 0; i < [entries count]; i++)
-    {
-      NSString *entry = [entries objectAtIndex:i];
-      NSString *linkPath;
-      char target[PATH_MAX];
-      ssize_t length;
-      NSString *processPath;
-
-      if (![self stringIsProcessIdentifier:entry])
-	{
-	  continue;
-	}
-
-      linkPath = [[procPath stringByAppendingPathComponent:entry]
-		   stringByAppendingPathComponent:@"exe"];
-      length = readlink([linkPath fileSystemRepresentation],
-			target,
-			sizeof(target) - 1);
-      if (length <= 0)
-	{
-	  continue;
-	}
-
-      target[length] = '\0';
-      processPath = [self normalizedPath:[NSString stringWithUTF8String:target]];
-      if ([self applicationItem:item matchesRunningProcessPath:processPath])
-	{
-	  [processIds addObject:[NSNumber numberWithInt:[entry intValue]]];
-	}
-    }
-
-  return processIds;
+  return [_applicationScanner runningProcessIdentifiersForApplicationItem:item];
 }
 
 - (BOOL) applicationItem: (DockItem *)item matchesRunningProcessPath: (NSString *)processPath
 {
-  NSString *itemPath = [self normalizedPath:[item path]];
-  NSString *executablePath = [self executablePathForApplicationPath:[item path]];
-  NSString *processName = [[processPath lastPathComponent] lowercaseString];
-  NSString *itemName = [[[[item path] lastPathComponent]
-			  stringByDeletingPathExtension] lowercaseString];
-  NSString *executableName = [[executablePath lastPathComponent] lowercaseString];
-
-  if (![processPath length])
-    {
-      return NO;
-    }
-
-  if (([itemPath length] && [processPath isEqualToString:itemPath]) ||
-      ([executablePath length] && [processPath isEqualToString:executablePath]) ||
-      ([processName length] && [processName isEqualToString:itemName]) ||
-      ([processName length] && [processName isEqualToString:executableName]) ||
-      ([itemPath length] &&
-       [[[itemPath pathExtension] lowercaseString] isEqualToString:@"app"] &&
-       [self path:processPath isEqualToOrDescendantOfPath:itemPath]))
-    {
-      return YES;
-    }
-
-  return NO;
+  return [_applicationScanner applicationItem:item
+		   matchesRunningProcessPath:processPath];
 }
 
 - (BOOL) applicationItemHasRunningProcess: (DockItem *)item
 				    paths: (NSArray *)processPaths
 {
-  NSUInteger i;
-
-  for (i = 0; i < [processPaths count]; i++)
-    {
-      if ([self applicationItem:item
-		matchesRunningProcessPath:[processPaths objectAtIndex:i]])
-	{
-	  return YES;
-	}
-    }
-
-  return NO;
+  return [_applicationScanner applicationItemHasRunningProcess:item
+							paths:processPaths];
 }
 
 - (DockItem *) transientApplicationItemMatchingBundlePath: (NSString *)path
@@ -1123,234 +443,59 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
 - (BOOL) item: (DockItem *)item iconMatchesImage: (NSImage *)image
 {
-  return [item icon] == image;
+  return [_applicationIconManager item:item iconMatchesImage:image];
 }
 
 - (NSString *) x11IconCacheDirectory
 {
-  NSArray *libraryPaths =
-    NSSearchPathForDirectoriesInDomains(NSLibraryDirectory,
-					NSUserDomainMask,
-					YES);
-  NSString *libraryPath = [libraryPaths count] ? [libraryPaths objectAtIndex:0] : nil;
-  NSString *cachePath;
-
-  if (![libraryPath length])
-    {
-      libraryPath = NSHomeDirectory();
-    }
-  if (![libraryPath length])
-    {
-      return nil;
-    }
-
-  cachePath = [[libraryPath stringByAppendingPathComponent:@"DockWM"]
-			   stringByAppendingPathComponent:@"X11Icons"];
-  if ([[NSFileManager defaultManager] createDirectoryAtPath:cachePath
-				withIntermediateDirectories:YES
-						 attributes:nil
-						      error:NULL])
-    {
-      return cachePath;
-    }
-
-  return nil;
+  return [_applicationIconManager x11IconCacheDirectory];
 }
 
 - (NSString *) x11IconCacheFileNameForIdentifier: (NSString *)identifier
 {
-  NSMutableString *name = [NSMutableString string];
-  NSUInteger i;
-
-  if (![identifier length])
-    {
-      identifier = @"x11-window";
-    }
-
-  for (i = 0; i < [identifier length] && [name length] < 80; i++)
-    {
-      unichar c = [identifier characterAtIndex:i];
-
-      if ((c >= 'a' && c <= 'z') ||
-	  (c >= 'A' && c <= 'Z') ||
-	  (c >= '0' && c <= '9') ||
-	  c == '.' || c == '_' || c == '-')
-	{
-	  [name appendFormat:@"%C", c];
-	}
-      else
-	{
-	  [name appendString:@"_"];
-	}
-    }
-
-  if (![name length])
-    {
-      [name appendString:@"x11-window"];
-    }
-
-  return [NSString stringWithFormat:@"%@-%lx.tiff",
-		   name,
-		   (unsigned long)[identifier hash]];
+  return [_applicationIconManager x11IconCacheFileNameForIdentifier:identifier];
 }
 
 - (NSString *) storeX11Icon: (NSImage *)icon
 		 identifier: (NSString *)identifier
 {
-  NSString *directory;
-  NSString *fileName;
-  NSString *path;
-  NSData *data;
-
-  if (!icon)
-    {
-      return nil;
-    }
-
-  data = [icon TIFFRepresentation];
-  if (![data length])
-    {
-      return nil;
-    }
-
-  directory = [self x11IconCacheDirectory];
-  if (![directory length])
-    {
-      return nil;
-    }
-
-  fileName = [self x11IconCacheFileNameForIdentifier:identifier];
-  path = [directory stringByAppendingPathComponent:fileName];
-  if ([data writeToFile:path atomically:YES])
-    {
-      return path;
-    }
-
-  return nil;
+  return [_applicationIconManager storeX11Icon:icon identifier:identifier];
 }
 
 - (NSString *) x11IconIdentifierForTitle: (NSString *)title
 				    path: (NSString *)path
 				  window: (unsigned long)xWindow
 {
-  if ([path length])
-    {
-      return path;
-    }
-  if ([title length])
-    {
-      return title;
-    }
-  return [NSString stringWithFormat:@"0x%lx", xWindow];
+  return [_applicationIconManager x11IconIdentifierForTitle:title
+						       path:path
+						     window:xWindow];
 }
 
 - (void) applyX11Icon: (NSImage *)icon
 	       toItem: (DockItem *)item
 	   identifier: (NSString *)identifier
 {
-  NSString *iconPath;
-  NSString *bundlePath;
-
-  if (![self shouldApplyX11Icon:icon toItem:item])
-    {
-      return;
-    }
-
-  iconPath = [self storeX11Icon:icon identifier:identifier];
-  [item setIcon:icon];
-  if ([iconPath length])
-    {
-      [item setIconPath:iconPath];
-    }
-
-  bundlePath = [DockItem applicationBundlePathForPath:[item path]];
-  if ([item kind] == DockItemApplication && ![bundlePath length])
-    {
-      [item setOriginalIcon:icon];
-    }
+  [_applicationIconManager applyX11Icon:icon toItem:item identifier:identifier];
 }
 
 - (void) rememberApplicationIcon: (NSImage *)icon
 		       badgeLabel: (NSString *)badgeLabel
 	processIdentifier: (NSNumber *)processIdentifier
 {
-  NSMutableDictionary *update;
-
-  if (![processIdentifier isKindOfClass:[NSNumber class]])
-    {
-      return;
-    }
-
-  update = [NSMutableDictionary dictionary];
-  if (icon)
-    {
-      NSString *iconPath = [self storeX11Icon:icon
-				   identifier:[NSString stringWithFormat:@"pid-%@",
-							    processIdentifier]];
-      [update setObject:icon forKey:@"icon"];
-      if ([iconPath length])
-	{
-	  [update setObject:iconPath forKey:@"iconPath"];
-	}
-    }
-  [update setObject:([badgeLabel length] ? badgeLabel : (id)[NSNull null])
-	     forKey:@"badgeLabel"];
-  [_applicationIconUpdatesByProcessID setObject:update
-					 forKey:processIdentifier];
+  [_applicationIconManager rememberApplicationIcon:icon
+				       badgeLabel:badgeLabel
+				processIdentifier:processIdentifier];
 }
 
 - (BOOL) applyApplicationIconUpdate: (NSDictionary *)update
 			     toItem: (DockItem *)item
 {
-  id icon = [update objectForKey:@"icon"];
-  id iconPath = [update objectForKey:@"iconPath"];
-  id badgeObject = [update objectForKey:@"badgeLabel"];
-  NSString *badgeLabel = badgeObject == [NSNull null] ? nil : badgeObject;
-  BOOL changed = NO;
-
-  if ([icon isKindOfClass:[NSImage class]] &&
-      ![self item:item iconMatchesImage:icon])
-    {
-      [item setIcon:icon];
-      changed = YES;
-    }
-  if ([iconPath isKindOfClass:[NSString class]] && [iconPath length] &&
-      !([[item iconPath] isEqualToString:iconPath]))
-    {
-      [item setIconPath:iconPath];
-      changed = YES;
-    }
-
-  if (([badgeLabel length] || [[item badgeLabel] length]) &&
-      !(([item badgeLabel] == badgeLabel) ||
-	([item badgeLabel] && badgeLabel &&
-	 [[item badgeLabel] isEqualToString:badgeLabel])))
-    {
-      [item setBadgeLabel:badgeLabel];
-      changed = YES;
-    }
-
-  return changed;
+  return [_applicationIconManager applyApplicationIconUpdate:update toItem:item];
 }
 
 - (BOOL) applyStoredApplicationIconUpdateForItem: (DockItem *)item
 {
-  NSArray *processIdentifiers = [self runningProcessIdentifiersForApplicationItem:item];
-  BOOL changed = NO;
-  NSUInteger i;
-
-  for (i = 0; i < [processIdentifiers count]; i++)
-    {
-      NSDictionary *update = [_applicationIconUpdatesByProcessID
-			       objectForKey:[processIdentifiers objectAtIndex:i]];
-
-      if (update)
-	{
-	  changed = [self applyApplicationIconUpdate:update toItem:item] || changed;
-	}
-    }
-
-  return changed;
+  return [_applicationIconManager applyStoredApplicationIconUpdateForItem:item];
 }
 
 - (BOOL) activateRunningApplicationWithProcessIdentifiers: (NSArray *)processIdentifiers
@@ -1384,38 +529,12 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
 - (BOOL) shouldApplyX11Icon: (NSImage *)icon toItem: (DockItem *)item
 {
-  NSString *bundlePath;
-
-  if (!icon || !item)
-    {
-      return NO;
-    }
-  if ([item kind] != DockItemApplication)
-    {
-      return YES;
-    }
-
-  bundlePath = [DockItem applicationBundlePathForPath:[item path]];
-  return ![bundlePath length];
+  return [_applicationIconManager shouldApplyX11Icon:icon toItem:item];
 }
 
 - (void) pruneApplicationIconUpdatesForExitedProcesses
 {
-  NSArray *processIdentifiers = [_applicationIconUpdatesByProcessID allKeys];
-  NSUInteger i;
-
-  for (i = 0; i < [processIdentifiers count]; i++)
-    {
-      NSNumber *processIdentifier = [processIdentifiers objectAtIndex:i];
-      NSString *processPath = [self procPathForProcessIdentifierString:
-				      [processIdentifier stringValue]];
-
-      if (![processPath length] ||
-	  ![[NSFileManager defaultManager] fileExistsAtPath:processPath])
-	{
-	  [_applicationIconUpdatesByProcessID removeObjectForKey:processIdentifier];
-	}
-    }
+  [_applicationIconManager pruneApplicationIconUpdatesForExitedProcesses];
 }
 
 - (void) x11DockManagerDidUpdateApplicationIcon: (NSImage *)icon
@@ -1448,8 +567,8 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   if (item && processIdentifierNumber)
     {
       if ([self applyApplicationIconUpdate:
-		  [_applicationIconUpdatesByProcessID
-		    objectForKey:processIdentifierNumber]
+		  [_applicationIconManager
+		    applicationIconUpdateForProcessIdentifier:processIdentifierNumber]
 				       toItem:item])
 	{
 	  [_dockView setNeedsDisplay:YES];
@@ -1501,8 +620,8 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   if (item)
     {
       if ([self applyApplicationIconUpdate:
-		  [_applicationIconUpdatesByProcessID
-		    objectForKey:processIdentifierNumber]
+		  [_applicationIconManager
+		    applicationIconUpdateForProcessIdentifier:processIdentifierNumber]
 				       toItem:item])
 	{
 	  [_dockView setNeedsDisplay:YES];
@@ -1573,74 +692,17 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
 - (NSArray *) openAtLoginApplicationPaths
 {
-  NSArray *paths = [[NSUserDefaults standardUserDefaults]
-		     objectForKey:DockOpenAtLoginApplicationsDefaultsKey];
-
-  return [paths isKindOfClass:[NSArray class]] ? paths : [NSArray array];
+  return [_applicationStore openAtLoginApplicationPaths];
 }
 
 - (BOOL) applicationPathIsOpenAtLogin: (NSString *)path
 {
-  NSArray *paths = [self openAtLoginApplicationPaths];
-  NSString *normalizedPath = [self normalizedPath:path];
-  NSUInteger i;
-
-  if (![normalizedPath length])
-    {
-      return NO;
-    }
-
-  for (i = 0; i < [paths count]; i++)
-    {
-      if ([normalizedPath isEqualToString:
-		     [self normalizedPath:[paths objectAtIndex:i]]])
-	{
-	  return YES;
-	}
-    }
-
-  return NO;
+  return [_applicationStore applicationPathIsOpenAtLogin:path];
 }
 
 - (void) setApplicationPath: (NSString *)path openAtLogin: (BOOL)openAtLogin
 {
-  NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-  NSArray *savedPaths = [self openAtLoginApplicationPaths];
-  NSMutableArray *paths = [NSMutableArray array];
-  NSString *normalizedPath = [self normalizedPath:path];
-  NSUInteger i;
-  BOOL found = NO;
-
-  if (![normalizedPath length])
-    {
-      return;
-    }
-
-  for (i = 0; i < [savedPaths count]; i++)
-    {
-      NSString *savedPath = [savedPaths objectAtIndex:i];
-
-      if ([[self normalizedPath:savedPath] isEqualToString:normalizedPath])
-	{
-	  found = YES;
-	  if (openAtLogin)
-	    {
-	      [paths addObject:savedPath];
-	    }
-	}
-      else
-	{
-	  [paths addObject:savedPath];
-	}
-    }
-
-  if (openAtLogin && !found)
-    {
-      [paths addObject:path];
-    }
-
-  [defaults setObject:paths forKey:DockOpenAtLoginApplicationsDefaultsKey];
-  [defaults synchronize];
+  [_applicationStore setApplicationPath:path openAtLogin:openAtLogin];
 }
 
 - (BOOL) launchApplicationAtPath: (NSString *)path
@@ -1951,183 +1013,36 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
 - (NSArray *) recyclerPaths
 {
-  NSMutableArray *paths = [NSMutableArray array];
-  NSString *homeTrashPath = [NSHomeDirectory()
-			      stringByAppendingPathComponent:@".Trash"];
-  NSArray *searchPaths;
-  NSUInteger i;
-
-  if ([homeTrashPath length])
-    {
-      [paths addObject:homeTrashPath];
-    }
-
-  searchPaths = NSSearchPathForDirectoriesInDomains(NSTrashDirectory,
-						    NSAllDomainsMask,
-						    YES);
-  for (i = 0; i < [searchPaths count]; i++)
-    {
-      NSString *path = [searchPaths objectAtIndex:i];
-
-      if ([path length] && ![paths containsObject:path])
-	{
-	  [paths addObject:path];
-	}
-    }
-
-  return paths;
+  return [_recyclerController recyclerPaths];
 }
 
 - (BOOL) directoryHasVisibleContentsAtPath: (NSString *)path
 {
-  DIR *directory;
-  struct dirent *entry;
-
-  if (![path length])
-    {
-      return NO;
-    }
-
-  directory = opendir([path fileSystemRepresentation]);
-  if (!directory)
-    {
-      return NO;
-    }
-
-  while ((entry = readdir(directory)) != NULL)
-    {
-      if (strcmp(entry->d_name, ".") == 0 ||
-	  strcmp(entry->d_name, "..") == 0 ||
-	  strcmp(entry->d_name, ".gwdir") == 0)
-	{
-	  continue;
-	}
-
-      closedir(directory);
-      return YES;
-    }
-
-  closedir(directory);
-  return NO;
+  return [_recyclerController directoryHasVisibleContentsAtPath:path];
 }
 
 - (BOOL) recyclerHasContents
 {
-  NSArray *paths = [self recyclerPaths];
-  NSUInteger i;
-
-  for (i = 0; i < [paths count]; i++)
-    {
-      if ([self directoryHasVisibleContentsAtPath:[paths objectAtIndex:i]])
-	{
-	  return YES;
-	}
-    }
-
-  return NO;
+  return [_recyclerController recyclerHasContents];
 }
 
 - (NSString *) recyclerPathForDropping
 {
-  NSArray *paths = [self recyclerPaths];
-  NSFileManager *fileManager = [NSFileManager defaultManager];
-  NSUInteger i;
-
-  for (i = 0; i < [paths count]; i++)
-    {
-      NSString *path = [paths objectAtIndex:i];
-      BOOL isDir = NO;
-
-      if ([fileManager fileExistsAtPath:path isDirectory:&isDir] && isDir)
-	{
-	  return path;
-	}
-    }
-
-  for (i = 0; i < [paths count]; i++)
-    {
-      NSString *path = [paths objectAtIndex:i];
-      if ([fileManager createDirectoryAtPath:path
-		 withIntermediateDirectories:YES
-				  attributes:nil
-				       error:NULL])
-	{
-	  return path;
-	}
-    }
-
-  return nil;
+  return [_recyclerController recyclerPathForDropping];
 }
 
 - (NSString *) recyclerDestinationPathForPath: (NSString *)path
 				 recyclerPath: (NSString *)recyclerPath
 {
-  NSFileManager *fileManager = [NSFileManager defaultManager];
-  NSString *name = [path lastPathComponent];
-  NSString *base;
-  NSString *extension;
-  NSString *candidate;
-  NSUInteger i = 2;
-
-  if (![name length])
-    {
-      return nil;
-    }
-
-  candidate = [recyclerPath stringByAppendingPathComponent:name];
-  if (![fileManager fileExistsAtPath:candidate])
-    {
-      return candidate;
-    }
-
-  extension = [name pathExtension];
-  base = [extension length] ? [name stringByDeletingPathExtension] : name;
-
-  while (1)
-    {
-      NSString *numberedName = [NSString stringWithFormat:@"%@ %lu",
-					 base, (unsigned long)i];
-      if ([extension length])
-	{
-	  numberedName = [numberedName stringByAppendingPathExtension:extension];
-	}
-
-      candidate = [recyclerPath stringByAppendingPathComponent:numberedName];
-      if (![fileManager fileExistsAtPath:candidate])
-	{
-	  return candidate;
-	}
-      i++;
-    }
+  return [_recyclerController recyclerDestinationPathForPath:path
+						recyclerPath:recyclerPath];
 }
 
 - (BOOL) movePathToRecyclerFallback: (NSString *)path
                        recyclerPath: (NSString *)recyclerPath
 {
-  NSFileManager *fileManager = [NSFileManager defaultManager];
-  NSString *destination = [self recyclerDestinationPathForPath:path
-						  recyclerPath:recyclerPath];
-
-  if (![destination length])
-    {
-      return NO;
-    }
-
-  if ([fileManager movePath:path toPath:destination handler:nil])
-    {
-      return YES;
-    }
-
-  if ([fileManager copyPath:path toPath:destination handler:nil])
-    {
-      if ([fileManager removeFileAtPath:path handler:nil])
-	{
-	  return YES;
-	}
-      [fileManager removeFileAtPath:destination handler:nil];
-    }
-
-  return NO;
+  return [_recyclerController movePathToRecyclerFallback:path
+					    recyclerPath:recyclerPath];
 }
 
 - (void) dockViewDidReceivePathsInRecycler: (NSArray *)paths
@@ -2188,25 +1103,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
 - (void) emptyRecyclerPath: (NSString *)path
 {
-  NSFileManager *fileManager = [NSFileManager defaultManager];
-  NSArray *entries = [fileManager directoryContentsAtPath:path];
-  NSUInteger i;
-
-  for (i = 0; i < [entries count]; i++)
-    {
-      NSString *entry = [entries objectAtIndex:i];
-      NSString *entryPath;
-
-      if ([entry isEqualToString:@"."] ||
-	  [entry isEqualToString:@".."] ||
-	  [entry isEqualToString:@".gwdir"])
-	{
-	  continue;
-	}
-
-      entryPath = [path stringByAppendingPathComponent:entry];
-      [fileManager removeFileAtPath:entryPath handler:nil];
-    }
+  [_recyclerController emptyRecyclerPath:path];
 }
 
 - (void) emptyRecycler: (id)sender
@@ -2242,10 +1139,10 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   NSUInteger cellCount = [_items count] + 2;
   CGFloat pad = [self activeDockPad];
   CGFloat gap = [self activeDockGap];
-  CGFloat length = pad * 2.0 + cellCount * DockCell + (cellCount - 1) * gap;
+  CGFloat length = pad * 2.0 + cellCount * [DockPreferences dockCellSize] + (cellCount - 1) * gap;
   CGFloat thickness = [self activeDockWindowWidth];
-  CGFloat width = DockPlacementIsHorizontal(placement) ? length : thickness;
-  CGFloat height = DockPlacementIsHorizontal(placement) ? thickness : length;
+  CGFloat width = [DockPreferences placementIsHorizontal:placement] ? length : thickness;
+  CGFloat height = [DockPreferences placementIsHorizontal:placement] ? thickness : length;
   CGFloat x;
   CGFloat y;
 
@@ -2356,7 +1253,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
 - (NSString *) settingsControllerCurrentDockCellSizeTitle: (SettingsController *)controller
 {
-  return DockLargerCellSizeTitle();
+  return [DockPreferences largerCellSizeTitle];
 }
 
 - (NSInteger) settingsControllerDockCellSizeMode: (SettingsController *)controller
@@ -2371,7 +1268,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
 - (NSColor *) settingsControllerBackgroundColor: (SettingsController *)controller
 {
-  return DockCalibratedBackgroundColor(_backgroundColor);
+  return [DockPreferences calibratedBackgroundColor:_backgroundColor];
 }
 
 - (CGFloat) settingsControllerWindowAlpha: (SettingsController *)controller
@@ -2426,7 +1323,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 - (void) settingsController: (SettingsController *)controller
    didChangeBackgroundColor: (NSColor *)color
 {
-  ASSIGN(_backgroundColor, DockCalibratedBackgroundColor(color));
+  ASSIGN(_backgroundColor, [DockPreferences calibratedBackgroundColor:color]);
   [_dockView setBackgroundColor:_backgroundColor];
   [self saveBackgroundColor];
 }
@@ -2572,7 +1469,7 @@ didChangeRunningIndicatorMode: (DockRunningIndicatorMode)mode
 {
   [[NSUserDefaults standardUserDefaults] setInteger:_dockPlacement forKey:@"DockPlacement"];
   [self applyDockCellSizeToView];
-  [_dockView setHorizontal:DockPlacementIsHorizontal(_dockPlacement)];
+  [_dockView setHorizontal:[DockPreferences placementIsHorizontal:_dockPlacement]];
   [_window setFrame:[self dockWindowFrameForPlacement:_dockPlacement]
             display:YES];
   [_dockView setFrame:NSMakeRect(0, 0,
@@ -2623,30 +1520,17 @@ didChangeRunningIndicatorMode: (DockRunningIndicatorMode)mode
 
 - (DockItem *) itemForApplicationIconWindow: (unsigned long)xWindow
 {
-  return [_applicationIconWindowItems objectForKey:
-				       [NSNumber numberWithUnsignedLong:xWindow]];
+  return [_applicationIconManager itemForApplicationIconWindow:xWindow];
 }
 
 - (void) setApplicationIconWindow: (unsigned long)xWindow forItem: (DockItem *)item
 {
-  if (!item || !xWindow)
-    {
-      return;
-    }
-
-  [_applicationIconWindowItems setObject:item
-				  forKey:[NSNumber numberWithUnsignedLong:xWindow]];
+  [_applicationIconManager setApplicationIconWindow:xWindow forItem:item];
 }
 
 - (void) removeApplicationIconWindowsForItem: (DockItem *)item
 {
-  NSArray *keys = [_applicationIconWindowItems allKeysForObject:item];
-  NSUInteger i;
-
-  for (i = 0; i < [keys count]; i++)
-    {
-      [_applicationIconWindowItems removeObjectForKey:[keys objectAtIndex:i]];
-    }
+  [_applicationIconManager removeApplicationIconWindowsForItem:item];
 }
 
 - (void) restoreApplicationItemAfterExit: (DockItem *)item

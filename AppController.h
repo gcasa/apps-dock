@@ -22,17 +22,25 @@
 #import "SettingsController.h"
 #import "X11DockManager.h"
 
+@class ApplicationIconManager;
+@class DockApplicationStore;
 @class DockItem;
+@class DockPreferences;
+@class RecyclerController;
+@class RunningApplicationScanner;
 
 @interface AppController : NSObject <DockViewDelegate, SettingsControllerDelegate, X11DockManagerDelegate>
 {
   NSWindow *_window;
   SettingsController *_settingsController;
+  RecyclerController *_recyclerController;
+  DockPreferences *_preferences;
   DockView *_dockView;
+  RunningApplicationScanner *_applicationScanner;
+  DockApplicationStore *_applicationStore;
+  ApplicationIconManager *_applicationIconManager;
   NSMutableArray *_items;
   NSMutableSet *_launchedApplicationPaths;
-  NSMutableDictionary *_applicationIconWindowItems;
-  NSMutableDictionary *_applicationIconUpdatesByProcessID;
   X11DockManager *_x11;
   NSTimer *_x11EventTimer;
   NSTimer *_scanTimer;
@@ -46,114 +54,5 @@
   BOOL _useCellTileBackground;
   BOOL _showDockBorder;
 }
-
-- (DockPlacement) savedDockPlacement;
-- (NSColor *) savedBackgroundColor;
-- (void) saveBackgroundColor;
-- (CGFloat) savedWindowAlpha;
-- (void) saveWindowAlpha;
-- (BOOL) savedShowDockBorder;
-- (void) saveShowDockBorder;
-- (NSInteger) savedDockCellSizeMode;
-- (void) saveDockCellSizeMode;
-- (DockRunningIndicatorMode) savedRunningIndicatorMode;
-- (void) saveRunningIndicatorMode;
-- (BOOL) savedUseCellTileBackground;
-- (void) saveUseCellTileBackground;
-- (CGFloat) activeDockPad;
-- (CGFloat) activeDockGap;
-- (CGFloat) activeDockWindowWidth;
-- (void) applyDockCellSizeToView;
-- (void) loadPersistedApplications;
-- (void) savePersistedApplications;
-- (id) persistedApplicationRecordForItem: (DockItem *)item;
-- (NSString *) persistedApplicationPathFromRecord: (id)record;
-- (NSString *) persistedApplicationArgumentsFromRecord: (id)record;
-- (BOOL) dockHasApplicationPath: (NSString *)path;
-- (NSUInteger) pinnedApplicationCount;
-- (NSString *) normalizedPath: (NSString *)path;
-- (NSArray *) commandSearchPathComponents;
-- (NSString *) procFilesystemPath;
-- (NSString *) procPathForProcessIdentifierString: (NSString *)identifier;
-- (BOOL) path: (NSString *)path isEqualToOrDescendantOfPath: (NSString *)parentPath;
-- (NSString *) executablePathForApplicationPath: (NSString *)path;
-- (NSString *) firstCommandTokenFromString: (NSString *)string;
-- (NSString *) pathForExecutableCommand: (NSString *)command;
-- (NSString *) executablePathForDesktopFile: (NSString *)path;
-- (BOOL) stringIsProcessIdentifier: (NSString *)string;
-- (NSArray *) runningProcessExecutablePaths;
-- (NSString *) executablePathForProcessIdentifier: (NSNumber *)processIdentifier;
-- (NSArray *) runningProcessIdentifiersForApplicationItem: (DockItem *)item;
-- (BOOL) applicationItem: (DockItem *)item
-matchesRunningProcessPath: (NSString *)processPath;
-- (BOOL) applicationItemHasRunningProcess: (DockItem *)item
-                                    paths: (NSArray *)processPaths;
-- (DockItem *) transientApplicationItemMatchingBundlePath: (NSString *)path;
-- (DockItem *) applicationItemMatchingProcessIdentifier: (NSNumber *)processIdentifier;
-- (DockItem *) transientApplicationItemForProcessIdentifier: (NSNumber *)processIdentifier;
-- (BOOL) item: (DockItem *)item iconMatchesImage: (NSImage *)image;
-- (NSString *) x11IconCacheDirectory;
-- (NSString *) x11IconCacheFileNameForIdentifier: (NSString *)identifier;
-- (NSString *) storeX11Icon: (NSImage *)icon
-                 identifier: (NSString *)identifier;
-- (NSString *) x11IconIdentifierForTitle: (NSString *)title
-                                    path: (NSString *)path
-                                  window: (unsigned long)xWindow;
-- (void) applyX11Icon: (NSImage *)icon
-               toItem: (DockItem *)item
-           identifier: (NSString *)identifier;
-- (void) rememberApplicationIcon: (NSImage *)icon
-                      badgeLabel: (NSString *)badgeLabel
-               processIdentifier: (NSNumber *)processIdentifier;
-- (BOOL) applyApplicationIconUpdate: (NSDictionary *)update
-                             toItem: (DockItem *)item;
-- (BOOL) applyStoredApplicationIconUpdateForItem: (DockItem *)item;
-- (BOOL) activateRunningApplicationWithProcessIdentifiers: (NSArray *)processIdentifiers;
-- (BOOL) shouldApplyX11Icon: (NSImage *)icon toItem: (DockItem *)item;
-- (void) pruneApplicationIconUpdatesForExitedProcesses;
-- (BOOL) applicationBundlePathIsDockWM: (NSString *)path;
-- (void) rememberLaunchedApplicationPath: (NSString *)path;
-- (BOOL) windowPathMatchesLaunchedApplication: (NSString *)path;
-- (NSArray *) openAtLoginApplicationPaths;
-- (BOOL) applicationPathIsOpenAtLogin: (NSString *)path;
-- (void) setApplicationPath: (NSString *)path openAtLogin: (BOOL)openAtLogin;
-- (BOOL) launchApplicationAtPath: (NSString *)path;
-- (BOOL) launchApplicationItem: (DockItem *)item;
-- (NSArray *) launchArgumentsFromString: (NSString *)arguments;
-- (NSString *) shellQuotedArgument: (NSString *)argument;
-- (void) terminateApplicationItemProcesses: (DockItem *)item;
-- (void) launchOpenAtLoginApplications;
-- (void) performInitialApplicationScans;
-- (void) scanRunningApplications;
-- (NSArray *) recyclerPaths;
-- (BOOL) directoryHasVisibleContentsAtPath: (NSString *)path;
-- (BOOL) recyclerHasContents;
-- (NSString *) recyclerPathForDropping;
-- (NSString *) recyclerDestinationPathForPath: (NSString *)path
-                                 recyclerPath: (NSString *)recyclerPath;
-- (BOOL) movePathToRecyclerFallback: (NSString *)path
-                        recyclerPath: (NSString *)recyclerPath;
-- (void) updateRecyclerState;
-- (void) emptyRecyclerPath: (NSString *)path;
-- (void) emptyRecycler: (id)sender;
-- (NSRect) dockWindowFrameForPlacement: (DockPlacement)placement;
-- (void) updateDockMenu;
-- (NSMenu *) dockMenu;
-- (SettingsController *) settingsController;
-- (void) showSettingsPanel: (id)sender;
-- (void) showSettingsForDockItem: (DockItem *)item;
-- (void) applyDockPlacement;
-- (void) updateDockBackground;
-- (void) quitDock: (id)sender;
-- (void) refreshDock;
-- (DockItem *) itemForXWindow: (unsigned long)xWindow;
-- (DockItem *) itemForApplicationIconWindow: (unsigned long)xWindow;
-- (void) setApplicationIconWindow: (unsigned long)xWindow forItem: (DockItem *)item;
-- (void) removeApplicationIconWindowsForItem: (DockItem *)item;
-- (void) restoreApplicationItemAfterExit: (DockItem *)item;
-- (NSUInteger) indexForItem: (DockItem *)targetItem;
-- (DockItem *) applicationItemMatchingTitle: (NSString *)title;
-- (DockItem *) applicationItemMatchingExecutablePath: (NSString *)path;
-- (BOOL) launchDesktopFile: (NSString *)path arguments: (NSArray *)arguments;
 
 @end

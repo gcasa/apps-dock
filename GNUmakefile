@@ -6,6 +6,11 @@ DockWM_OBJC_FILES = \
 main.m \
 AppController.m \
 SettingsController.m \
+DockPreferences.m \
+RunningApplicationScanner.m \
+RecyclerController.m \
+DockApplicationStore.m \
+ApplicationIconManager.m \
 DockView.m \
 DockItem.m \
 X11DockManager.m
