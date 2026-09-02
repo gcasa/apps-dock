@@ -236,21 +236,72 @@ static NSString *DockOpenAtLoginApplicationsDefaultsKey = @"DockOpenAtLoginAppli
   return [paths isKindOfClass:[NSArray class]] ? paths : [NSArray array];
 }
 
+- (BOOL) path: (NSString *)path matchesOpenAtLoginPath: (NSString *)savedPath
+{
+  NSString *normalizedPath = [_scanner normalizedPath:path];
+  NSString *normalizedSavedPath = [_scanner normalizedPath:savedPath];
+  NSString *executablePath = [_scanner executablePathForApplicationPath:path];
+  NSString *savedExecutablePath = [_scanner executablePathForApplicationPath:savedPath];
+  NSString *bundlePath = [DockItem applicationBundlePathForPath:path];
+  NSString *savedBundlePath = [DockItem applicationBundlePathForPath:savedPath];
+
+  executablePath = [_scanner normalizedPath:executablePath];
+  savedExecutablePath = [_scanner normalizedPath:savedExecutablePath];
+  bundlePath = [_scanner normalizedPath:bundlePath];
+  savedBundlePath = [_scanner normalizedPath:savedBundlePath];
+
+  if ([normalizedPath length] &&
+      [normalizedPath isEqualToString:normalizedSavedPath])
+    {
+      return YES;
+    }
+  if ([executablePath length] &&
+      [executablePath isEqualToString:normalizedSavedPath])
+    {
+      return YES;
+    }
+  if ([savedExecutablePath length] &&
+      [savedExecutablePath isEqualToString:normalizedPath])
+    {
+      return YES;
+    }
+  if ([executablePath length] &&
+      [executablePath isEqualToString:savedExecutablePath])
+    {
+      return YES;
+    }
+  if ([bundlePath length] &&
+      [bundlePath isEqualToString:normalizedSavedPath])
+    {
+      return YES;
+    }
+  if ([savedBundlePath length] &&
+      [savedBundlePath isEqualToString:normalizedPath])
+    {
+      return YES;
+    }
+  if ([bundlePath length] &&
+      [bundlePath isEqualToString:savedBundlePath])
+    {
+      return YES;
+    }
+
+  return NO;
+}
+
 - (BOOL) applicationPathIsOpenAtLogin: (NSString *)path
 {
   NSArray *paths = [self openAtLoginApplicationPaths];
-  NSString *normalizedPath = [_scanner normalizedPath:path];
   NSUInteger i;
 
-  if (![normalizedPath length])
+  if (![path length])
     {
       return NO;
     }
 
   for (i = 0; i < [paths count]; i++)
     {
-      if ([normalizedPath isEqualToString:
-		     [_scanner normalizedPath:[paths objectAtIndex:i]]])
+      if ([self path:path matchesOpenAtLoginPath:[paths objectAtIndex:i]])
 	{
 	  return YES;
 	}
@@ -277,7 +328,7 @@ static NSString *DockOpenAtLoginApplicationsDefaultsKey = @"DockOpenAtLoginAppli
     {
       NSString *savedPath = [savedPaths objectAtIndex:i];
 
-      if ([[_scanner normalizedPath:savedPath] isEqualToString:normalizedPath])
+      if ([self path:path matchesOpenAtLoginPath:savedPath])
 	{
 	  found = YES;
 	  if (openAtLogin)

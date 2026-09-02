@@ -27,6 +27,7 @@
 - (NSString *) persistedApplicationArgumentsFromRecord: (id)record;
 - (BOOL) items: (NSArray *)items haveApplicationPath: (NSString *)path;
 - (NSArray *) openAtLoginApplicationPaths;
+- (BOOL) path: (NSString *)path matchesOpenAtLoginPath: (NSString *)savedPath;
 - (BOOL) applicationPathIsOpenAtLogin: (NSString *)path;
 - (void) setApplicationPath: (NSString *)path openAtLogin: (BOOL)openAtLogin;
 

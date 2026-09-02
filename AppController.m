@@ -441,6 +441,62 @@
   return item;
 }
 
+- (NSString *) executablePathForX11WindowTitle: (NSString *)title
+{
+  NSString *lowerTitle = [title lowercaseString];
+  NSArray *processPaths;
+  NSUInteger i;
+
+  if (![lowerTitle length])
+    {
+      return nil;
+    }
+
+  processPaths = [self runningProcessExecutablePaths];
+  for (i = 0; i < [processPaths count]; i++)
+    {
+      NSString *path = [processPaths objectAtIndex:i];
+      NSString *name = [[path lastPathComponent] lowercaseString];
+      NSString *nameWithoutExtension =
+	[[[path lastPathComponent] stringByDeletingPathExtension] lowercaseString];
+
+      if (([name length] && [name isEqualToString:lowerTitle]) ||
+	  ([nameWithoutExtension length] &&
+	   [nameWithoutExtension isEqualToString:lowerTitle]))
+	{
+	  return path;
+	}
+    }
+
+  return nil;
+}
+
+- (void) resolvePathForX11WindowItem: (DockItem *)item
+{
+  NSString *path;
+
+  if ([item kind] != DockItemX11Window || [[item path] length])
+    {
+      return;
+    }
+
+  path = [self executablePathForX11WindowTitle:[item title]];
+  if ([path length])
+    {
+      [item setPath:path];
+    }
+}
+
+- (void) resolvePathsForX11WindowItems
+{
+  NSUInteger i;
+
+  for (i = 0; i < [_items count]; i++)
+    {
+      [self resolvePathForX11WindowItem:[_items objectAtIndex:i]];
+    }
+}
+
 - (BOOL) item: (DockItem *)item iconMatchesImage: (NSImage *)image
 {
   return [_applicationIconManager item:item iconMatchesImage:image];
@@ -1293,6 +1349,7 @@
 
 - (NSArray *) settingsControllerDockItems: (SettingsController *)controller
 {
+  [self resolvePathsForX11WindowItems];
   return _items;
 }
 
@@ -1310,6 +1367,12 @@
 - (BOOL) settingsController: (SettingsController *)controller
 	 itemIsOpenAtLogin: (DockItem *)item
 {
+  [self resolvePathForX11WindowItem:item];
+  if (![[item path] length])
+    {
+      return NO;
+    }
+
   return [self applicationPathIsOpenAtLogin:[item path]];
 }
 
@@ -1402,7 +1465,10 @@ didChangeRunningIndicatorMode: (DockRunningIndicatorMode)mode
        didChangeOpenAtLogin: (BOOL)openAtLogin
 		    forItem: (DockItem *)item
 {
-  if ([item kind] != DockItemApplication || ![[item path] length])
+  [self resolvePathForX11WindowItem:item];
+  if (!([item kind] == DockItemApplication ||
+	[item kind] == DockItemX11Window) ||
+      ![[item path] length])
     {
       return;
     }
@@ -1451,7 +1517,9 @@ didChangeRunningIndicatorMode: (DockRunningIndicatorMode)mode
     }
 
   item = [_items objectAtIndex:index];
-  if ([item kind] == DockItemApplication && [[item path] length])
+  if (([item kind] == DockItemApplication ||
+       [item kind] == DockItemX11Window) &&
+      [[item path] length])
     {
       [self setApplicationPath:[item path] openAtLogin:NO];
     }
@@ -1740,7 +1808,9 @@ didChangeRunningIndicatorMode: (DockRunningIndicatorMode)mode
     }
 
   item = [_items objectAtIndex:index];
-  if ([item kind] == DockItemApplication && [[item path] length])
+  if (([item kind] == DockItemApplication ||
+       [item kind] == DockItemX11Window) &&
+      [[item path] length])
     {
       [self setApplicationPath:[item path] openAtLogin:NO];
     }
@@ -1752,6 +1822,12 @@ didChangeRunningIndicatorMode: (DockRunningIndicatorMode)mode
 
 - (BOOL) dockView: (id)dockView itemIsOpenAtLogin: (DockItem *)item
 {
+  [self resolvePathForX11WindowItem:item];
+  if (![[item path] length])
+    {
+      return NO;
+    }
+
   return [self applicationPathIsOpenAtLogin:[item path]];
 }
 
@@ -1759,6 +1835,7 @@ didChangeRunningIndicatorMode: (DockRunningIndicatorMode)mode
 {
   BOOL openAtLogin;
 
+  [self resolvePathForX11WindowItem:item];
   if (![[item path] length])
     {
       return;
@@ -1976,44 +2053,59 @@ didChangeRunningIndicatorMode: (DockRunningIndicatorMode)mode
 {
   DockItem *item = [self itemForXWindow:xWindow];
   BOOL matchedApplication;
-  NSString *iconIdentifier = [self x11IconIdentifierForTitle:title
-							path:path
-						      window:xWindow];
+  NSString *iconIdentifier;
+
+  if (dockApp && ![path length])
+    {
+      path = [self executablePathForX11WindowTitle:title];
+    }
+  iconIdentifier = [self x11IconIdentifierForTitle:title
+					      path:path
+					    window:xWindow];
 
   if (!item)
     {
       item = [self itemForApplicationIconWindow:xWindow];
     }
-  if (!item)
+  if (!item && !dockApp)
     {
       item = [self applicationItemMatchingExecutablePath:path];
     }
-  if (!item && (!dockApp || [path length]))
+  if (!item && !dockApp)
     {
       item = [self applicationItemMatchingTitle:title];
     }
   matchedApplication = item && [item kind] == DockItemApplication;
 
-  if (dockApp &&
-      ([self applicationBundlePathIsDockWM:path] ||
-       [self windowPathMatchesLaunchedApplication:path]))
+  if (dockApp && [self applicationBundlePathIsDockWM:path])
     {
-      if (item)
+      return;
+    }
+
+  if (dockApp && item &&
+      [self windowPathMatchesLaunchedApplication:path])
+    {
+      [self setApplicationIconWindow:xWindow forItem:item];
+      [item setState:DockItemRunning];
+      if ([item kind] == DockItemX11Window && [path length])
 	{
-	  [self setApplicationIconWindow:xWindow forItem:item];
-	  [item setState:DockItemRunning];
-	  if ([self shouldApplyX11Icon:icon toItem:item])
-	    {
-	      [self applyX11Icon:icon toItem:item identifier:iconIdentifier];
-	    }
-	  [self applyStoredApplicationIconUpdateForItem:item];
-	  [self refreshDock];
+	  [item setPath:path];
 	}
+      if ([self shouldApplyX11Icon:icon toItem:item])
+	{
+	  [self applyX11Icon:icon toItem:item identifier:iconIdentifier];
+	}
+      [self applyStoredApplicationIconUpdateForItem:item];
+      [self refreshDock];
       return;
     }
 
   if (item)
     {
+      if ([item kind] == DockItemX11Window && [path length])
+	{
+	  [item setPath:path];
+	}
       [item setState: (hidden ? DockItemHidden : DockItemRunning)];
       if (!(dockApp && matchedApplication))
 	{
@@ -2030,7 +2122,7 @@ didChangeRunningIndicatorMode: (DockRunningIndicatorMode)mode
     }
   else
     {
-      if ([path length] && ![self applicationBundlePathIsDockWM:path])
+      if (!dockApp && [path length] && ![self applicationBundlePathIsDockWM:path])
 	{
 	  NSString *bundlePath = [DockItem applicationBundlePathForPath:path];
 	  NSString *applicationPath = [bundlePath length] ? bundlePath : path;
@@ -2048,6 +2140,10 @@ didChangeRunningIndicatorMode: (DockRunningIndicatorMode)mode
       else
 	{
 	  item = [DockItem x11ItemWithTitle:title window:xWindow icon:icon hidden:hidden];
+	  if ([path length])
+	    {
+	      [item setPath:path];
+	    }
 	  [self applyX11Icon:icon toItem:item identifier:iconIdentifier];
 	}
       [_items addObject:item];

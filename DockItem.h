@@ -60,6 +60,7 @@ typedef enum
 - (void) setState: (DockItemState)state;
 - (NSString *) title;
 - (NSString *) path;
+- (void) setPath: (NSString *)path;
 - (NSString *) launchArguments;
 - (void) setLaunchArguments: (NSString *)arguments;
 - (NSString *) iconPath;

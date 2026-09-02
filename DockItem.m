@@ -676,6 +676,15 @@
   return _path;
 }
 
+- (void) setPath: (NSString *)path
+{
+  if (_path != path &&
+      !(_path && path && [_path isEqualToString:path]))
+    {
+      ASSIGNCOPY(_path, path);
+    }
+}
+
 - (NSString *) launchArguments
 {
   return _launchArguments;

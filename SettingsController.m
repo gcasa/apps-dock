@@ -481,13 +481,16 @@ SettingsClampedWindowAlpha(CGFloat alpha)
       BOOL openAtLogin = [_delegate settingsController:self itemIsOpenAtLogin:item];
       BOOL hasApplicationPath = [item kind] == DockItemApplication &&
 	[[item path] length] > 0;
+      BOOL hasOpenAtLoginPath =
+	([item kind] == DockItemApplication || [item kind] == DockItemX11Window) &&
+	[[item path] length] > 0;
 
       [_applicationArgumentsField setStringValue:
 	  ([item launchArguments] ? [item launchArguments] : @"")];
       [_applicationArgumentsField setEnabled:hasApplicationPath];
       [_applyApplicationButton setEnabled:hasApplicationPath];
       [_openAtLoginButton setState:(openAtLogin ? NSOnState : NSOffState)];
-      [_openAtLoginButton setEnabled:hasApplicationPath];
+      [_openAtLoginButton setEnabled:hasOpenAtLoginPath];
       [_moveApplicationUpButton setEnabled:(selectedIndex > 0)];
       [_moveApplicationDownButton setEnabled:
 	  (selectedIndex + 1 < [items count] &&

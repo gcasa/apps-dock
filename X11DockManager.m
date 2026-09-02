@@ -1878,10 +1878,10 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 			     [NSNumber numberWithUnsignedLong:
 					       (unsigned long)reportedWindow]];
 	}
-    }
+  }
   hidden = [self windowIsHidden:window];
   title = [self titleForWindow:window];
-  path = dockApp ? nil : [self executablePathForWindow:window];
+  path = [self executablePathForWindow:window];
 
   if (!dockApp && ![title length] && ![path length])
     {
