@@ -5,6 +5,7 @@ APP_NAME = DockWM
 DockWM_OBJC_FILES = \
 main.m \
 AppController.m \
+SettingsController.m \
 DockView.m \
 DockItem.m \
 X11DockManager.m

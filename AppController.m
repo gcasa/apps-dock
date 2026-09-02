@@ -171,24 +171,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [_x11EventTimer invalidate];
   [_scanTimer invalidate];
   [_processScanTimer invalidate];
-  DESTROY(_settingsEmptyRecyclerButton);
-  DESTROY(_settingsDeleteApplicationButton);
-  DESTROY(_settingsMoveApplicationDownButton);
-  DESTROY(_settingsMoveApplicationUpButton);
-  DESTROY(_settingsOpenAtLoginButton);
-  DESTROY(_settingsApplyApplicationButton);
-  DESTROY(_settingsApplicationArgumentsField);
-  DESTROY(_settingsApplicationPopup);
-  DESTROY(_settingsShowBorderButton);
-  DESTROY(_settingsUseCellTileButton);
-  DESTROY(_settingsNotRunningDotsButton);
-  DESTROY(_settingsRunningDotButton);
-  DESTROY(_settings64CellSizeButton);
-  DESTROY(_settingsCurrentCellSizeButton);
-  DESTROY(_settingsTransparencySlider);
-  DESTROY(_settingsBackgroundColorWell);
-  DESTROY(_settingsPlacementPopup);
-  DESTROY(_settingsPanel);
+  DESTROY(_settingsController);
   DESTROY(_dockMenu);
   DESTROY(_x11);
   DESTROY(_dockView);
@@ -2200,7 +2183,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 - (void) updateRecyclerState
 {
   [_dockView setRecyclerHasContents:[self recyclerHasContents]];
-  [self updateSettingsPanelControls];
+  [_settingsController updateControls];
 }
 
 - (void) emptyRecyclerPath: (NSString *)path
@@ -2314,7 +2297,7 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
 
 - (void) updateDockMenu
 {
-  [self updateSettingsPanelControls];
+  [_settingsController updateControls];
 }
 
 - (NSMenu *) dockMenu
@@ -2346,446 +2329,136 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   return _dockMenu;
 }
 
-- (NSTextField *) settingsLabelWithTitle: (NSString *)title
-                                   frame: (NSRect)frame
+- (SettingsController *) settingsController
 {
-  NSTextField *label = AUTORELEASE([[NSTextField alloc] initWithFrame:frame]);
-
-  [label setStringValue:title];
-  [label setEditable:NO];
-  [label setSelectable:NO];
-  [label setBordered:NO];
-  [label setDrawsBackground:NO];
-  [label setFont:[NSFont boldSystemFontOfSize:[NSFont systemFontSize]]];
-  return label;
-}
-
-- (NSButton *) settingsButtonWithTitle: (NSString *)title
-                                 frame: (NSRect)frame
-                            buttonType: (NSButtonType)buttonType
-                                action: (SEL)action
-{
-  NSButton *button = [[NSButton alloc] initWithFrame:frame];
-
-  [button setTitle:title];
-  [button setButtonType:buttonType];
-  [button setTarget:self];
-  [button setAction:action];
-  return button;
-}
-
-- (void) createSettingsPanel
-{
-  NSView *contentView;
-  NSTextField *label;
-  NSButton *closeButton;
-  NSColorPanel *colorPanel;
-  NSArray *placements;
-  NSUInteger i;
-
-  if (_settingsPanel)
+  if (!_settingsController)
     {
-      return;
+      _settingsController = [[SettingsController alloc] initWithDelegate:self];
     }
 
-  _settingsPanel = [[NSPanel alloc]
-		     initWithContentRect:NSMakeRect(0, 0, 460, 520)
-			       styleMask:NSTitledWindowMask | NSClosableWindowMask
-				 backing:NSBackingStoreBuffered
-				   defer:NO];
-  [_settingsPanel setTitle:@"Dock Settings"];
-  [_settingsPanel setReleasedWhenClosed:NO];
-  [_settingsPanel setDelegate:self];
-
-  contentView = [_settingsPanel contentView];
-
-  label = [self settingsLabelWithTitle:@"Placement"
-                                 frame:NSMakeRect(18, 476, 110, 20)];
-  [contentView addSubview:label];
-
-  _settingsPlacementPopup =
-    [[NSPopUpButton alloc] initWithFrame:NSMakeRect(132, 472, 170, 26)
-                               pullsDown:NO];
-  placements = [NSArray arrayWithObjects:
-			  @"Left Top",
-			@"Left Center",
-			@"Right Top",
-			@"Right Center",
-			@"Top Center",
-			@"Bottom Center",
-			nil];
-  for (i = 0; i < [placements count]; i++)
-    {
-      [_settingsPlacementPopup addItemWithTitle:[placements objectAtIndex:i]];
-      [[_settingsPlacementPopup itemAtIndex:i] setTag:(NSInteger)i];
-    }
-  [_settingsPlacementPopup setTarget:self];
-  [_settingsPlacementPopup setAction:@selector(settingsPlacementChanged:)];
-  [contentView addSubview:_settingsPlacementPopup];
-
-  label = [self settingsLabelWithTitle:@"Color"
-                                 frame:NSMakeRect(18, 432, 110, 20)];
-  [contentView addSubview:label];
-
-  _settingsBackgroundColorWell =
-    [[NSColorWell alloc] initWithFrame:NSMakeRect(132, 426, 58, 32)];
-  [_settingsBackgroundColorWell setTarget:self];
-  [_settingsBackgroundColorWell setAction:@selector(settingsBackgroundColorChanged:)];
-  [contentView addSubview:_settingsBackgroundColorWell];
-  colorPanel = [NSColorPanel sharedColorPanel];
-  [colorPanel setShowsAlpha:NO];
-  [colorPanel setContinuous:YES];
-
-  label = [self settingsLabelWithTitle:@"Transparency"
-                                 frame:NSMakeRect(18, 398, 110, 20)];
-  [contentView addSubview:label];
-
-  _settingsTransparencySlider =
-    [[NSSlider alloc] initWithFrame:NSMakeRect(132, 394, 300, 24)];
-  [_settingsTransparencySlider setMinValue:0.2];
-  [_settingsTransparencySlider setMaxValue:1.0];
-  [_settingsTransparencySlider setContinuous:YES];
-  [_settingsTransparencySlider setTarget:self];
-  [_settingsTransparencySlider setAction:@selector(settingsTransparencyChanged:)];
-  [contentView addSubview:_settingsTransparencySlider];
-
-  label = [self settingsLabelWithTitle:@"Icon Cells"
-                                 frame:NSMakeRect(18, 376, 110, 20)];
-  [contentView addSubview:label];
-
-  _settings64CellSizeButton =
-    [self settingsButtonWithTitle:@"64 x 64"
-                            frame:NSMakeRect(132, 374, 160, 24)
-                       buttonType:NSRadioButton
-                           action:@selector(settingsDockCellSizeChanged:)];
-  [_settings64CellSizeButton setTag:DockCellSizeMode64];
-  [contentView addSubview:_settings64CellSizeButton];
-
-  _settingsCurrentCellSizeButton =
-    [self settingsButtonWithTitle:DockLargerCellSizeTitle()
-                            frame:NSMakeRect(132, 350, 160, 24)
-                       buttonType:NSRadioButton
-                           action:@selector(settingsDockCellSizeChanged:)];
-  [_settingsCurrentCellSizeButton setTag:DockCellSizeModeCurrent];
-  [contentView addSubview:_settingsCurrentCellSizeButton];
-
-  label = [self settingsLabelWithTitle:@"State Dots"
-                                 frame:NSMakeRect(18, 304, 110, 20)];
-  [contentView addSubview:label];
-
-  _settingsRunningDotButton =
-    [self settingsButtonWithTitle:@"Dot when running"
-                            frame:NSMakeRect(132, 302, 170, 24)
-                       buttonType:NSRadioButton
-                           action:@selector(settingsRunningIndicatorModeChanged:)];
-  [_settingsRunningDotButton setTag:DockRunningIndicatorModeRunningDot];
-  [contentView addSubview:_settingsRunningDotButton];
-
-  _settingsNotRunningDotsButton =
-    [self settingsButtonWithTitle:@"Dots when stopped"
-                            frame:NSMakeRect(132, 278, 170, 24)
-                       buttonType:NSRadioButton
-                           action:@selector(settingsRunningIndicatorModeChanged:)];
-  [_settingsNotRunningDotsButton setTag:DockRunningIndicatorModeNotRunningDots];
-  [contentView addSubview:_settingsNotRunningDotsButton];
-
-  _settingsUseCellTileButton =
-    [self settingsButtonWithTitle:@"Use common_Tile"
-                            frame:NSMakeRect(18, 240, 170, 24)
-                       buttonType:NSSwitchButton
-                           action:@selector(settingsUseCellTileChanged:)];
-  [contentView addSubview:_settingsUseCellTileButton];
-
-  _settingsShowBorderButton =
-    [self settingsButtonWithTitle:@"Show Border"
-                            frame:NSMakeRect(18, 214, 140, 24)
-                       buttonType:NSSwitchButton
-                           action:@selector(settingsShowBorderChanged:)];
-  [contentView addSubview:_settingsShowBorderButton];
-
-  label = [self settingsLabelWithTitle:@"App"
-                                 frame:NSMakeRect(18, 168, 110, 20)];
-  [contentView addSubview:label];
-
-  _settingsApplicationPopup =
-    [[NSPopUpButton alloc] initWithFrame:NSMakeRect(132, 164, 300, 26)
-                               pullsDown:NO];
-  [_settingsApplicationPopup setTarget:self];
-  [_settingsApplicationPopup setAction:@selector(settingsApplicationSelectionChanged:)];
-  [contentView addSubview:_settingsApplicationPopup];
-
-  label = [self settingsLabelWithTitle:@"Arguments"
-                                 frame:NSMakeRect(18, 126, 110, 20)];
-  [contentView addSubview:label];
-
-  _settingsApplicationArgumentsField =
-    [[NSTextField alloc] initWithFrame:NSMakeRect(132, 124, 300, 24)];
-  [_settingsApplicationArgumentsField setTarget:self];
-  [_settingsApplicationArgumentsField setAction:@selector(settingsApplyApplicationArguments:)];
-  [contentView addSubview:_settingsApplicationArgumentsField];
-
-  _settingsApplyApplicationButton =
-    [self settingsButtonWithTitle:@"Apply"
-                            frame:NSMakeRect(132, 88, 72, 28)
-                       buttonType:NSMomentaryPushInButton
-                           action:@selector(settingsApplyApplicationArguments:)];
-  [_settingsApplyApplicationButton setBezelStyle:NSRoundedBezelStyle];
-  [contentView addSubview:_settingsApplyApplicationButton];
-
-  _settingsOpenAtLoginButton =
-    [self settingsButtonWithTitle:@"Open At Login"
-                            frame:NSMakeRect(212, 56, 160, 24)
-                       buttonType:NSSwitchButton
-                           action:@selector(settingsOpenAtLoginChanged:)];
-  [contentView addSubview:_settingsOpenAtLoginButton];
-
-  _settingsMoveApplicationUpButton =
-    [self settingsButtonWithTitle:@"Move Up"
-                            frame:NSMakeRect(212, 88, 84, 28)
-                       buttonType:NSMomentaryPushInButton
-                           action:@selector(settingsMoveApplicationUp:)];
-  [_settingsMoveApplicationUpButton setBezelStyle:NSRoundedBezelStyle];
-  [contentView addSubview:_settingsMoveApplicationUpButton];
-
-  _settingsMoveApplicationDownButton =
-    [self settingsButtonWithTitle:@"Move Down"
-                            frame:NSMakeRect(304, 88, 96, 28)
-                       buttonType:NSMomentaryPushInButton
-                           action:@selector(settingsMoveApplicationDown:)];
-  [_settingsMoveApplicationDownButton setBezelStyle:NSRoundedBezelStyle];
-  [contentView addSubview:_settingsMoveApplicationDownButton];
-
-  _settingsDeleteApplicationButton =
-    [self settingsButtonWithTitle:@"Delete"
-                            frame:NSMakeRect(132, 54, 72, 28)
-                       buttonType:NSMomentaryPushInButton
-                           action:@selector(settingsDeleteApplication:)];
-  [_settingsDeleteApplicationButton setBezelStyle:NSRoundedBezelStyle];
-  [contentView addSubview:_settingsDeleteApplicationButton];
-
-  _settingsEmptyRecyclerButton =
-    [self settingsButtonWithTitle:@"Empty Recycler"
-                            frame:NSMakeRect(18, 16, 120, 28)
-                       buttonType:NSMomentaryPushInButton
-                           action:@selector(emptyRecycler:)];
-  [_settingsEmptyRecyclerButton setBezelStyle:NSRoundedBezelStyle];
-  [contentView addSubview:_settingsEmptyRecyclerButton];
-
-  closeButton = [self settingsButtonWithTitle:@"Close"
-                                        frame:NSMakeRect(344, 16, 88, 28)
-                                   buttonType:NSMomentaryPushInButton
-                                       action:@selector(closeSettingsPanel:)];
-  [closeButton setBezelStyle:NSRoundedBezelStyle];
-  [contentView addSubview:closeButton];
-  DESTROY(closeButton);
-
-  [self updateSettingsPanelControls];
-}
-
-- (void) updateSettingsPanelControls
-{
-  NSColor *color;
-  DockItem *selectedItem = nil;
-  NSUInteger selectedIndex = NSNotFound;
-  NSUInteger i;
-  NSUInteger selectedPopupIndex = NSNotFound;
-
-  if (!_settingsPanel)
-    {
-      return;
-    }
-
-  selectedIndex = [self selectedSettingsApplicationIndex];
-  if (selectedIndex != NSNotFound)
-    {
-      selectedItem = [_items objectAtIndex:selectedIndex];
-    }
-
-  [_settingsPlacementPopup selectItemWithTag:(NSInteger)_dockPlacement];
-  [_settingsCurrentCellSizeButton setTitle:DockLargerCellSizeTitle()];
-  [_settingsCurrentCellSizeButton setState:
-      (_dockCellSizeMode == DockCellSizeModeCurrent ? NSOnState : NSOffState)];
-  [_settings64CellSizeButton setState:
-      (_dockCellSizeMode == DockCellSizeMode64 ? NSOnState : NSOffState)];
-  [_settingsRunningDotButton setState:
-      (_runningIndicatorMode == DockRunningIndicatorModeRunningDot ?
-       NSOnState : NSOffState)];
-  [_settingsNotRunningDotsButton setState:
-      (_runningIndicatorMode == DockRunningIndicatorModeNotRunningDots ?
-       NSOnState : NSOffState)];
-  [_settingsUseCellTileButton setState:
-      (_useCellTileBackground ? NSOnState : NSOffState)];
-  [_settingsTransparencySlider setFloatValue:_windowAlpha];
-  if (![_settingsPanel isVisible])
-    {
-      color = DockCalibratedBackgroundColor(_backgroundColor);
-      [_settingsBackgroundColorWell setColor:color];
-    }
-  [_settingsShowBorderButton setState:(_showDockBorder ? NSOnState : NSOffState)];
-  [_settingsEmptyRecyclerButton setEnabled:[self recyclerHasContents]];
-
-  [_settingsApplicationPopup removeAllItems];
-  for (i = 0; i < [_items count]; i++)
-    {
-      DockItem *item = [_items objectAtIndex:i];
-
-      if (([item kind] == DockItemApplication ||
-	   [item kind] == DockItemX11Window) &&
-	  ![self applicationBundlePathIsDockWM:[item path]])
-	{
-	  NSString *title = [item title];
-
-	  if (![item isPinned])
-	    {
-	      title = [NSString stringWithFormat:@"%@ (Not Docked)", title];
-	    }
-	  if ([item kind] == DockItemX11Window)
-	    {
-	      title = [NSString stringWithFormat:@"%@ (WindowMaker)", title];
-	    }
-
-	  [_settingsApplicationPopup addItemWithTitle:title];
-	  [[_settingsApplicationPopup lastItem]
-	    setRepresentedObject:[NSNumber numberWithUnsignedInteger:i]];
-	  if (item == selectedItem)
-	    {
-	      selectedPopupIndex = [_settingsApplicationPopup numberOfItems] - 1;
-	    }
-	}
-    }
-
-  if (selectedPopupIndex != NSNotFound)
-    {
-      [_settingsApplicationPopup selectItemAtIndex:selectedPopupIndex];
-    }
-  else if ([_settingsApplicationPopup numberOfItems] > 0)
-    {
-      [_settingsApplicationPopup selectItemAtIndex:0];
-    }
-
-  selectedIndex = [self selectedSettingsApplicationIndex];
-  if (selectedIndex != NSNotFound)
-    {
-      DockItem *item = [_items objectAtIndex:selectedIndex];
-      NSUInteger pinnedCount = [self pinnedApplicationCount];
-      BOOL openAtLogin = [self applicationPathIsOpenAtLogin:[item path]];
-      BOOL hasApplicationPath = [item kind] == DockItemApplication &&
-	[[item path] length] > 0;
-
-      [_settingsApplicationArgumentsField setStringValue:
-	  ([item launchArguments] ? [item launchArguments] : @"")];
-      [_settingsApplicationArgumentsField setEnabled:hasApplicationPath];
-      [_settingsApplyApplicationButton setEnabled:hasApplicationPath];
-      [_settingsOpenAtLoginButton setState:(openAtLogin ? NSOnState : NSOffState)];
-      [_settingsOpenAtLoginButton setEnabled:hasApplicationPath];
-      [_settingsMoveApplicationUpButton setEnabled:(selectedIndex > 0)];
-      [_settingsMoveApplicationDownButton setEnabled:
-	  (selectedIndex + 1 < [_items count] &&
-	   (![item isPinned] || selectedIndex + 1 < pinnedCount))];
-      [_settingsDeleteApplicationButton setEnabled:YES];
-    }
-  else
-    {
-      [_settingsApplicationArgumentsField setStringValue:@""];
-      [_settingsApplicationArgumentsField setEnabled:NO];
-      [_settingsApplyApplicationButton setEnabled:NO];
-      [_settingsOpenAtLoginButton setState:NSOffState];
-      [_settingsOpenAtLoginButton setEnabled:NO];
-      [_settingsMoveApplicationUpButton setEnabled:NO];
-      [_settingsMoveApplicationDownButton setEnabled:NO];
-      [_settingsDeleteApplicationButton setEnabled:NO];
-    }
+  return _settingsController;
 }
 
 - (void) showSettingsPanel: (id)sender
 {
-  [self createSettingsPanel];
-  [self updateSettingsPanelControls];
-  [_settingsPanel center];
-  [_settingsPanel makeKeyAndOrderFront:sender];
+  [[self settingsController] showWindow:sender];
 }
 
-- (void) closeSettingsPanel: (id)sender
+- (void) showSettingsForDockItem: (DockItem *)item
 {
-  [[NSUserDefaults standardUserDefaults] synchronize];
-  [_settingsPanel orderOut:sender];
+  [[self settingsController] showWindowForItem:item];
 }
 
-- (BOOL) windowShouldClose: (id)sender
+- (DockPlacement) settingsControllerDockPlacement: (SettingsController *)controller
 {
-  if (sender == _settingsPanel)
-    {
-      [self closeSettingsPanel:sender];
-      return NO;
-    }
-
-  return YES;
+  return _dockPlacement;
 }
 
-- (void) windowWillClose: (NSNotification *)notification
+- (NSString *) settingsControllerCurrentDockCellSizeTitle: (SettingsController *)controller
 {
+  return DockLargerCellSizeTitle();
 }
 
-- (void) settingsPlacementChanged: (id)sender
+- (NSInteger) settingsControllerDockCellSizeMode: (SettingsController *)controller
 {
-  _dockPlacement = (DockPlacement)[sender selectedTag];
+  return _dockCellSizeMode;
+}
+
+- (DockRunningIndicatorMode) settingsControllerRunningIndicatorMode: (SettingsController *)controller
+{
+  return _runningIndicatorMode;
+}
+
+- (NSColor *) settingsControllerBackgroundColor: (SettingsController *)controller
+{
+  return DockCalibratedBackgroundColor(_backgroundColor);
+}
+
+- (CGFloat) settingsControllerWindowAlpha: (SettingsController *)controller
+{
+  return _windowAlpha;
+}
+
+- (BOOL) settingsControllerUsesCellTileBackground: (SettingsController *)controller
+{
+  return _useCellTileBackground;
+}
+
+- (BOOL) settingsControllerShowsDockBorder: (SettingsController *)controller
+{
+  return _showDockBorder;
+}
+
+- (BOOL) settingsControllerRecyclerHasContents: (SettingsController *)controller
+{
+  return [self recyclerHasContents];
+}
+
+- (NSArray *) settingsControllerDockItems: (SettingsController *)controller
+{
+  return _items;
+}
+
+- (NSUInteger) settingsControllerPinnedItemCount: (SettingsController *)controller
+{
+  return [self pinnedApplicationCount];
+}
+
+- (BOOL) settingsController: (SettingsController *)controller
+	       itemIsDockWM: (DockItem *)item
+{
+  return [self applicationBundlePathIsDockWM:[item path]];
+}
+
+- (BOOL) settingsController: (SettingsController *)controller
+	 itemIsOpenAtLogin: (DockItem *)item
+{
+  return [self applicationPathIsOpenAtLogin:[item path]];
+}
+
+- (void) settingsController: (SettingsController *)controller
+     didChangeDockPlacement: (DockPlacement)placement
+{
+  _dockPlacement = placement;
   [self applyDockPlacement];
 }
 
-- (void) settingsBackgroundColorChanged: (id)sender
+- (void) settingsController: (SettingsController *)controller
+   didChangeBackgroundColor: (NSColor *)color
 {
-  if (!_settingsBackgroundColorWell)
-    {
-      return;
-    }
-
-  ASSIGN(_backgroundColor,
-         DockCalibratedBackgroundColor([_settingsBackgroundColorWell color]));
+  ASSIGN(_backgroundColor, DockCalibratedBackgroundColor(color));
   [_dockView setBackgroundColor:_backgroundColor];
-  [_settingsBackgroundColorWell setColor:_backgroundColor];
   [self saveBackgroundColor];
 }
 
-- (void) settingsTransparencyChanged: (id)sender
+- (void) settingsController: (SettingsController *)controller
+       didChangeWindowAlpha: (CGFloat)alpha
 {
-  _windowAlpha = [(NSSlider *)sender floatValue];
-  if (_windowAlpha < 0.2)
-    {
-      _windowAlpha = 0.2;
-    }
-  else if (_windowAlpha > 1.0)
-    {
-      _windowAlpha = 1.0;
-    }
-
+  _windowAlpha = alpha;
   [_window setAlphaValue:_windowAlpha];
   [_dockView setBackgroundAlpha:_windowAlpha];
-  [_settingsTransparencySlider setFloatValue:_windowAlpha];
   [self saveWindowAlpha];
 }
 
-- (void) settingsShowBorderChanged: (id)sender
+- (void) settingsController: (SettingsController *)controller
+    didChangeShowDockBorder: (BOOL)showBorder
 {
-  NSButton *button = (NSButton *)sender;
-
-  _showDockBorder = [button state] == NSOnState;
+  _showDockBorder = showBorder;
   [_dockView setShowsBorder:_showDockBorder];
   [self saveShowDockBorder];
 }
 
-- (void) settingsUseCellTileChanged: (id)sender
+- (void) settingsController: (SettingsController *)controller
+didChangeUseCellTileBackground: (BOOL)useCellTileBackground
 {
-  NSButton *button = (NSButton *)sender;
-
-  _useCellTileBackground = [button state] == NSOnState;
+  _useCellTileBackground = useCellTileBackground;
   [_dockView setUsesCellBackgroundTile:_useCellTileBackground];
   [self saveUseCellTileBackground];
 }
 
-- (void) settingsDockCellSizeChanged: (id)sender
+- (void) settingsController: (SettingsController *)controller
+  didChangeDockCellSizeMode: (NSInteger)mode
 {
-  NSInteger mode = [sender tag];
-
   if (mode != DockCellSizeMode64)
     {
       mode = DockCellSizeModeCurrent;
@@ -2797,189 +2470,85 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
       [self saveDockCellSizeMode];
       [self applyDockPlacement];
     }
-
-  [self updateSettingsPanelControls];
 }
 
-- (void) settingsRunningIndicatorModeChanged: (id)sender
+- (void) settingsController: (SettingsController *)controller
+didChangeRunningIndicatorMode: (DockRunningIndicatorMode)mode
 {
-  NSInteger mode = [sender tag];
-
   if (mode != DockRunningIndicatorModeNotRunningDots)
     {
       mode = DockRunningIndicatorModeRunningDot;
     }
 
-  if (_runningIndicatorMode != (DockRunningIndicatorMode)mode)
+  if (_runningIndicatorMode != mode)
     {
-      _runningIndicatorMode = (DockRunningIndicatorMode)mode;
+      _runningIndicatorMode = mode;
       [_dockView setRunningIndicatorMode:_runningIndicatorMode];
       [self saveRunningIndicatorMode];
     }
-
-  [self updateSettingsPanelControls];
 }
 
-- (NSUInteger) selectedSettingsApplicationIndex
+- (void) settingsController: (SettingsController *)controller
+   didChangeLaunchArguments: (NSString *)arguments
+		    forItem: (DockItem *)item
 {
-  id selectedItem;
-  id representedObject;
-
-  if (!_settingsApplicationPopup ||
-      [_settingsApplicationPopup numberOfItems] == 0)
-    {
-      return NSNotFound;
-    }
-
-  selectedItem = [_settingsApplicationPopup selectedItem];
-  representedObject = [selectedItem representedObject];
-  if ([representedObject respondsToSelector:@selector(unsignedIntegerValue)])
-    {
-      NSUInteger index = [representedObject unsignedIntegerValue];
-
-      if (index < [_items count])
-	{
-	  return index;
-	}
-    }
-
-  return NSNotFound;
-}
-
-- (void) selectSettingsApplicationItem: (DockItem *)item
-{
-  NSInteger i;
-
-  if (!_settingsApplicationPopup || !item)
-    {
-      return;
-    }
-
-  for (i = 0; i < [_settingsApplicationPopup numberOfItems]; i++)
-    {
-      id representedObject = [[_settingsApplicationPopup itemAtIndex:i]
-			       representedObject];
-
-      if ([representedObject respondsToSelector:@selector(unsignedIntegerValue)] &&
-	  [representedObject unsignedIntegerValue] < [_items count] &&
-	  [_items objectAtIndex:[representedObject unsignedIntegerValue]] == item)
-	{
-	  [_settingsApplicationPopup selectItemAtIndex:i];
-	  break;
-	}
-    }
-}
-
-- (void) settingsApplicationSelectionChanged: (id)sender
-{
-  [self updateSettingsPanelControls];
-}
-
-- (void) settingsApplyApplicationArguments: (id)sender
-{
-  NSUInteger index = [self selectedSettingsApplicationIndex];
-  DockItem *item;
-
-  if (index == NSNotFound)
-    {
-      return;
-    }
-
-  item = [_items objectAtIndex:index];
-  [item setLaunchArguments:[_settingsApplicationArgumentsField stringValue]];
-  [self savePersistedApplications];
-  [self updateSettingsPanelControls];
-}
-
-- (void) settingsOpenAtLoginChanged: (id)sender
-{
-  NSUInteger index = [self selectedSettingsApplicationIndex];
-  DockItem *item;
-
-  if (index == NSNotFound)
-    {
-      return;
-    }
-
-  item = [_items objectAtIndex:index];
   if ([item kind] != DockItemApplication || ![[item path] length])
     {
       return;
     }
 
-  [self setApplicationPath:[item path]
-	       openAtLogin:[_settingsOpenAtLoginButton state] == NSOnState];
-  [self updateSettingsPanelControls];
-}
-
-- (void) settingsMoveApplicationUp: (id)sender
-{
-  NSUInteger index = [self selectedSettingsApplicationIndex];
-  NSUInteger pinnedCount = [self pinnedApplicationCount];
-  NSUInteger targetIndex;
-  DockItem *item;
-
-  if (index == NSNotFound || index == 0)
-    {
-      return;
-    }
-
-  targetIndex = index - 1;
-  item = RETAIN([_items objectAtIndex:index]);
-  [_items removeObjectAtIndex:index];
-  if (![item isPinned] && targetIndex < pinnedCount)
-    {
-      [item setPinned:YES];
-    }
-  [_items insertObject:item atIndex:targetIndex];
+  [item setLaunchArguments:arguments];
   [self savePersistedApplications];
-  [self refreshDock];
-  [self updateSettingsPanelControls];
-  [self selectSettingsApplicationItem:item];
-  [self updateSettingsPanelControls];
-  DESTROY(item);
 }
 
-- (void) settingsMoveApplicationDown: (id)sender
+- (void) settingsController: (SettingsController *)controller
+       didChangeOpenAtLogin: (BOOL)openAtLogin
+		    forItem: (DockItem *)item
 {
-  NSUInteger index = [self selectedSettingsApplicationIndex];
-  NSUInteger pinnedCount = [self pinnedApplicationCount];
-  NSUInteger targetIndex;
-  DockItem *item;
-
-  if (index == NSNotFound || index + 1 >= [_items count])
+  if ([item kind] != DockItemApplication || ![[item path] length])
     {
       return;
     }
 
-  item = RETAIN([_items objectAtIndex:index]);
-  if ([item isPinned] && index + 1 >= pinnedCount)
+  [self setApplicationPath:[item path] openAtLogin:openAtLogin];
+}
+
+- (void) settingsController: (SettingsController *)controller
+       didMoveItemFromIndex: (NSUInteger)fromIndex
+		    toIndex: (NSUInteger)toIndex
+{
+  NSUInteger pinnedCount = [self pinnedApplicationCount];
+  DockItem *item;
+
+  if (fromIndex >= [_items count] || toIndex >= [_items count])
+    {
+      return;
+    }
+
+  item = RETAIN([_items objectAtIndex:fromIndex]);
+  if ([item isPinned] && toIndex >= pinnedCount)
     {
       DESTROY(item);
       return;
     }
 
-  targetIndex = index + 1;
-  [_items removeObjectAtIndex:index];
-  if (![item isPinned] && targetIndex < pinnedCount)
+  [_items removeObjectAtIndex:fromIndex];
+  if (![item isPinned] && toIndex < pinnedCount)
     {
       [item setPinned:YES];
     }
-  [_items insertObject:item atIndex:targetIndex];
+  [_items insertObject:item atIndex:toIndex];
   [self savePersistedApplications];
   [self refreshDock];
-  [self updateSettingsPanelControls];
-  [self selectSettingsApplicationItem:item];
-  [self updateSettingsPanelControls];
   DESTROY(item);
 }
 
-- (void) settingsDeleteApplication: (id)sender
+- (void) settingsController: (SettingsController *)controller
+       didDeleteItemAtIndex: (NSUInteger)index
 {
-  NSUInteger index = [self selectedSettingsApplicationIndex];
   DockItem *item;
 
-  if (index == NSNotFound || index >= [_items count])
+  if (index >= [_items count])
     {
       return;
     }
@@ -2992,17 +2561,11 @@ static BOOL DockPlacementIsHorizontal(DockPlacement placement)
   [_items removeObjectAtIndex:index];
   [self savePersistedApplications];
   [self refreshDock];
-  [self updateSettingsPanelControls];
 }
 
-- (void) showSettingsForDockItem: (DockItem *)item
+- (void) settingsControllerDidEmptyRecycler: (SettingsController *)controller
 {
-  [self createSettingsPanel];
-  [self updateSettingsPanelControls];
-  [self selectSettingsApplicationItem:item];
-  [self updateSettingsPanelControls];
-  [_settingsPanel center];
-  [_settingsPanel makeKeyAndOrderFront:self];
+  [self emptyRecycler:self];
 }
 
 - (void) applyDockPlacement

@@ -19,31 +19,15 @@
 
 #import <AppKit/AppKit.h>
 #import "DockView.h"
+#import "SettingsController.h"
 #import "X11DockManager.h"
 
 @class DockItem;
 
-@interface AppController : NSObject <DockViewDelegate, X11DockManagerDelegate, NSWindowDelegate>
+@interface AppController : NSObject <DockViewDelegate, SettingsControllerDelegate, X11DockManagerDelegate>
 {
   NSWindow *_window;
-  NSPanel *_settingsPanel;
-  NSPopUpButton *_settingsPlacementPopup;
-  NSColorWell *_settingsBackgroundColorWell;
-  NSSlider *_settingsTransparencySlider;
-  NSButton *_settingsCurrentCellSizeButton;
-  NSButton *_settings64CellSizeButton;
-  NSButton *_settingsRunningDotButton;
-  NSButton *_settingsNotRunningDotsButton;
-  NSButton *_settingsUseCellTileButton;
-  NSButton *_settingsShowBorderButton;
-  NSButton *_settingsEmptyRecyclerButton;
-  NSPopUpButton *_settingsApplicationPopup;
-  NSTextField *_settingsApplicationArgumentsField;
-  NSButton *_settingsApplyApplicationButton;
-  NSButton *_settingsOpenAtLoginButton;
-  NSButton *_settingsMoveApplicationUpButton;
-  NSButton *_settingsMoveApplicationDownButton;
-  NSButton *_settingsDeleteApplicationButton;
+  SettingsController *_settingsController;
   DockView *_dockView;
   NSMutableArray *_items;
   NSMutableSet *_launchedApplicationPaths;
@@ -155,32 +139,9 @@ matchesRunningProcessPath: (NSString *)processPath;
 - (NSRect) dockWindowFrameForPlacement: (DockPlacement)placement;
 - (void) updateDockMenu;
 - (NSMenu *) dockMenu;
-- (NSTextField *) settingsLabelWithTitle: (NSString *)title
-                                   frame: (NSRect)frame;
-- (NSButton *) settingsButtonWithTitle: (NSString *)title
-                                 frame: (NSRect)frame
-                            buttonType: (NSButtonType)buttonType
-                                action: (SEL)action;
-- (void) createSettingsPanel;
-- (void) updateSettingsPanelControls;
+- (SettingsController *) settingsController;
 - (void) showSettingsPanel: (id)sender;
-- (void) closeSettingsPanel: (id)sender;
-- (void) settingsPlacementChanged: (id)sender;
-- (void) settingsBackgroundColorChanged: (id)sender;
-- (void) settingsTransparencyChanged: (id)sender;
-- (void) settingsShowBorderChanged: (id)sender;
-- (void) settingsUseCellTileChanged: (id)sender;
-- (void) settingsDockCellSizeChanged: (id)sender;
-- (void) settingsRunningIndicatorModeChanged: (id)sender;
-- (void) settingsApplicationSelectionChanged: (id)sender;
-- (void) settingsApplyApplicationArguments: (id)sender;
-- (void) settingsOpenAtLoginChanged: (id)sender;
-- (void) settingsMoveApplicationUp: (id)sender;
-- (void) settingsMoveApplicationDown: (id)sender;
-- (void) settingsDeleteApplication: (id)sender;
 - (void) showSettingsForDockItem: (DockItem *)item;
-- (NSUInteger) selectedSettingsApplicationIndex;
-- (void) selectSettingsApplicationItem: (DockItem *)item;
 - (void) applyDockPlacement;
 - (void) updateDockBackground;
 - (void) quitDock: (id)sender;
