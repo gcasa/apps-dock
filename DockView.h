@@ -61,8 +61,10 @@ typedef enum
   CGFloat _cellSize;
   CGFloat _dockGap;
   CGFloat _dockPad;
+  CGFloat _hoverIconScale;
   BOOL _usesCellBackgroundTile;
   BOOL _showsBorder;
+  BOOL _magnifiesHoveredIcons;
   DockRunningIndicatorMode _runningIndicatorMode;
   BOOL _recyclerHasContents;
   BOOL _horizontal;
@@ -97,6 +99,10 @@ typedef enum
 - (void) setIconCellSize: (CGFloat)cellSize
 		     gap: (CGFloat)gap
 		 padding: (CGFloat)padding;
+- (void) setMagnifiesHoveredIcons: (BOOL)magnifies;
+- (BOOL) magnifiesHoveredIcons;
+- (void) setHoverIconScale: (CGFloat)scale;
+- (CGFloat) hoverIconScale;
 - (void) setUsesCellBackgroundTile: (BOOL)usesTile;
 - (BOOL) usesCellBackgroundTile;
 - (void) startWiggleForItem: (DockItem *)item;

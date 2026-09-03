@@ -51,8 +51,10 @@
   DockRunningIndicatorMode _runningIndicatorMode;
   NSColor *_backgroundColor;
   CGFloat _windowAlpha;
+  CGFloat _hoverIconScale;
   BOOL _useCellTileBackground;
   BOOL _showDockBorder;
+  BOOL _magnifiesHoveredIcons;
 }
 
 @end

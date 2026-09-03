@@ -50,6 +50,8 @@
   _windowAlpha = [self savedWindowAlpha];
   _useCellTileBackground = [self savedUseCellTileBackground];
   _showDockBorder = [self savedShowDockBorder];
+  _magnifiesHoveredIcons = [_preferences savedMagnifiesHoveredIcons];
+  _hoverIconScale = [_preferences savedHoverIconScale];
   frame = [self dockWindowFrameForPlacement:_dockPlacement];
 
   _window = [[NSWindow alloc] initWithContentRect:frame
@@ -73,6 +75,8 @@
   [_dockView setBackgroundAlpha:_windowAlpha];
   [_dockView setShowsBorder:_showDockBorder];
   [_dockView setRunningIndicatorMode:_runningIndicatorMode];
+  [_dockView setMagnifiesHoveredIcons:_magnifiesHoveredIcons];
+  [_dockView setHoverIconScale:_hoverIconScale];
   [_dockView setItems:_items];
   [_dockView setPinnedItemCount:[self pinnedApplicationCount]];
   [_dockView setMenu:[self dockMenu]];
@@ -1342,6 +1346,16 @@
   return _showDockBorder;
 }
 
+- (BOOL) settingsControllerMagnifiesHoveredIcons: (SettingsController *)controller
+{
+  return _magnifiesHoveredIcons;
+}
+
+- (CGFloat) settingsControllerHoverIconScale: (SettingsController *)controller
+{
+  return _hoverIconScale;
+}
+
 - (BOOL) settingsControllerRecyclerHasContents: (SettingsController *)controller
 {
   return [self recyclerHasContents];
@@ -1414,6 +1428,31 @@ didChangeUseCellTileBackground: (BOOL)useCellTileBackground
   _useCellTileBackground = useCellTileBackground;
   [_dockView setUsesCellBackgroundTile:_useCellTileBackground];
   [self saveUseCellTileBackground];
+}
+
+- (void) settingsController: (SettingsController *)controller
+didChangeMagnifiesHoveredIcons: (BOOL)magnifiesHoveredIcons
+{
+  _magnifiesHoveredIcons = magnifiesHoveredIcons;
+  [_dockView setMagnifiesHoveredIcons:_magnifiesHoveredIcons];
+  [_preferences saveMagnifiesHoveredIcons:_magnifiesHoveredIcons];
+}
+
+- (void) settingsController: (SettingsController *)controller
+didChangeHoverIconScale: (CGFloat)scale
+{
+  if (scale < 1.0)
+    {
+      scale = 1.0;
+    }
+  else if (scale > 1.5)
+    {
+      scale = 1.5;
+    }
+
+  _hoverIconScale = scale;
+  [_dockView setHoverIconScale:_hoverIconScale];
+  [_preferences saveHoverIconScale:_hoverIconScale];
 }
 
 - (void) settingsController: (SettingsController *)controller
@@ -1555,6 +1594,8 @@ didChangeRunningIndicatorMode: (DockRunningIndicatorMode)mode
   [_dockView setUsesCellBackgroundTile:_useCellTileBackground];
   [_dockView setShowsBorder:_showDockBorder];
   [_dockView setRunningIndicatorMode:_runningIndicatorMode];
+  [_dockView setMagnifiesHoveredIcons:_magnifiesHoveredIcons];
+  [_dockView setHoverIconScale:_hoverIconScale];
 }
 
 - (void) quitDock: (id)sender

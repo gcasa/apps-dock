@@ -33,6 +33,8 @@
 - (CGFloat) settingsControllerWindowAlpha: (SettingsController *)controller;
 - (BOOL) settingsControllerUsesCellTileBackground: (SettingsController *)controller;
 - (BOOL) settingsControllerShowsDockBorder: (SettingsController *)controller;
+- (BOOL) settingsControllerMagnifiesHoveredIcons: (SettingsController *)controller;
+- (CGFloat) settingsControllerHoverIconScale: (SettingsController *)controller;
 - (BOOL) settingsControllerRecyclerHasContents: (SettingsController *)controller;
 - (NSArray *) settingsControllerDockItems: (SettingsController *)controller;
 - (NSUInteger) settingsControllerPinnedItemCount: (SettingsController *)controller;
@@ -50,6 +52,10 @@
     didChangeShowDockBorder: (BOOL)showBorder;
 - (void) settingsController: (SettingsController *)controller
 didChangeUseCellTileBackground: (BOOL)useCellTileBackground;
+- (void) settingsController: (SettingsController *)controller
+didChangeMagnifiesHoveredIcons: (BOOL)magnifiesHoveredIcons;
+- (void) settingsController: (SettingsController *)controller
+didChangeHoverIconScale: (CGFloat)scale;
 - (void) settingsController: (SettingsController *)controller
   didChangeDockCellSizeMode: (NSInteger)mode;
 - (void) settingsController: (SettingsController *)controller
@@ -81,6 +87,8 @@ didChangeRunningIndicatorMode: (DockRunningIndicatorMode)mode;
   NSButton *_notRunningDotsButton;
   NSButton *_useCellTileButton;
   NSButton *_showBorderButton;
+  NSButton *_magnifyHoveredIconsButton;
+  NSSlider *_hoverIconScaleSlider;
   NSButton *_emptyRecyclerButton;
   NSPopUpButton *_applicationPopup;
   NSTextField *_applicationArgumentsField;

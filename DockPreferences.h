@@ -42,5 +42,9 @@ enum
 - (void) saveRunningIndicatorMode: (DockRunningIndicatorMode)mode;
 - (BOOL) savedUseCellTileBackground;
 - (void) saveUseCellTileBackground: (BOOL)useCellTileBackground;
+- (BOOL) savedMagnifiesHoveredIcons;
+- (void) saveMagnifiesHoveredIcons: (BOOL)magnifiesHoveredIcons;
+- (CGFloat) savedHoverIconScale;
+- (void) saveHoverIconScale: (CGFloat)scale;
 
 @end

@@ -22,6 +22,8 @@ static NSString *DockShowBorderDefaultsKey = @"DockShowBorder";
 static NSString *DockCellSizeModeDefaultsKey = @"DockCellSizeMode";
 static NSString *DockUseCellTileBackgroundDefaultsKey = @"DockUseCellTileBackground";
 static NSString *DockRunningIndicatorModeDefaultsKey = @"DockRunningIndicatorMode";
+static NSString *DockMagnifiesHoveredIconsDefaultsKey = @"DockMagnifiesHoveredIcons";
+static NSString *DockHoverIconScaleDefaultsKey = @"DockHoverIconScale";
 
 @implementation DockPreferences
 
@@ -266,6 +268,57 @@ static NSString *DockRunningIndicatorModeDefaultsKey = @"DockRunningIndicatorMod
 {
   [[NSUserDefaults standardUserDefaults] setBool:useCellTileBackground
 					  forKey:DockUseCellTileBackgroundDefaultsKey];
+}
+
+- (BOOL) savedMagnifiesHoveredIcons
+{
+  return [[NSUserDefaults standardUserDefaults]
+	   boolForKey:DockMagnifiesHoveredIconsDefaultsKey];
+}
+
+- (void) saveMagnifiesHoveredIcons: (BOOL)magnifiesHoveredIcons
+{
+  [[NSUserDefaults standardUserDefaults] setBool:magnifiesHoveredIcons
+					  forKey:DockMagnifiesHoveredIconsDefaultsKey];
+}
+
+- (CGFloat) savedHoverIconScale
+{
+  NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+  id savedScale = [defaults objectForKey:DockHoverIconScaleDefaultsKey];
+  CGFloat scale;
+
+  if (!savedScale)
+    {
+      return 1.2;
+    }
+
+  scale = [defaults floatForKey:DockHoverIconScaleDefaultsKey];
+  if (scale < 1.0)
+    {
+      scale = 1.0;
+    }
+  else if (scale > 1.5)
+    {
+      scale = 1.5;
+    }
+
+  return scale;
+}
+
+- (void) saveHoverIconScale: (CGFloat)scale
+{
+  if (scale < 1.0)
+    {
+      scale = 1.0;
+    }
+  else if (scale > 1.5)
+    {
+      scale = 1.5;
+    }
+
+  [[NSUserDefaults standardUserDefaults] setFloat:scale
+					   forKey:DockHoverIconScaleDefaultsKey];
 }
 
 @end

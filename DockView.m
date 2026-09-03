@@ -110,6 +110,7 @@ DockViewCalibratedBackgroundColor (NSColor *color)
       _cellSize = DockCell;
       _dockGap = DockGap;
       _dockPad = DockPad;
+      _hoverIconScale = 1.2;
       _runningIndicatorMode = DockRunningIndicatorModeRunningDot;
       _gnustepIcon = RETAIN([self loadGNUstepIcon]);
       _recyclerIcon = RETAIN([self loadRecyclerIcon]);
@@ -414,6 +415,43 @@ DockViewCalibratedBackgroundColor (NSColor *color)
       _dockPad = padding;
       [self setNeedsDisplay:YES];
     }
+}
+
+- (void) setMagnifiesHoveredIcons: (BOOL)magnifies
+{
+  if (_magnifiesHoveredIcons != magnifies)
+    {
+      _magnifiesHoveredIcons = magnifies;
+      [self setNeedsDisplay:YES];
+    }
+}
+
+- (BOOL) magnifiesHoveredIcons
+{
+  return _magnifiesHoveredIcons;
+}
+
+- (void) setHoverIconScale: (CGFloat)scale
+{
+  if (scale < 1.0)
+    {
+      scale = 1.0;
+    }
+  else if (scale > 1.5)
+    {
+      scale = 1.5;
+    }
+
+  if (_hoverIconScale != scale)
+    {
+      _hoverIconScale = scale;
+      [self setNeedsDisplay:YES];
+    }
+}
+
+- (CGFloat) hoverIconScale
+{
+  return _hoverIconScale;
 }
 
 - (void) setUsesCellBackgroundTile: (BOOL)usesTile
@@ -1084,10 +1122,7 @@ DockViewCalibratedBackgroundColor (NSColor *color)
     }
 
   sourceRect = NSMakeRect(0, 0, imageSize.width, imageSize.height);
-  destRect = NSMakeRect(NSMidX(cell) - size / 2.0,
-                        NSMidY(cell) - size / 2.0,
-                        size,
-                        size);
+  destRect = [self iconRectInCell:cell size:size];
 
   if (angle != 0.0)
     {
@@ -1109,6 +1144,60 @@ DockViewCalibratedBackgroundColor (NSColor *color)
       [NSGraphicsContext restoreGraphicsState];
     }
   return YES;
+}
+
+- (NSRect) iconRectInCell: (NSRect)cell size: (CGFloat)size
+{
+  NSRect bounds = [self bounds];
+  NSRect rect = NSMakeRect(NSMidX(cell) - size / 2.0,
+			   NSMidY(cell) - size / 2.0,
+			   size,
+			   size);
+
+  if (NSWidth(rect) > NSWidth(bounds))
+    {
+      rect.origin.x = NSMinX(bounds);
+      rect.size.width = NSWidth(bounds);
+    }
+  else if (NSMinX(rect) < NSMinX(bounds))
+    {
+      rect.origin.x = NSMinX(bounds);
+    }
+  else if (NSMaxX(rect) > NSMaxX(bounds))
+    {
+      rect.origin.x = NSMaxX(bounds) - NSWidth(rect);
+    }
+
+  if (NSHeight(rect) > NSHeight(bounds))
+    {
+      rect.origin.y = NSMinY(bounds);
+      rect.size.height = NSHeight(bounds);
+    }
+  else if (NSMinY(rect) < NSMinY(bounds))
+    {
+      rect.origin.y = NSMinY(bounds);
+    }
+  else if (NSMaxY(rect) > NSMaxY(bounds))
+    {
+      rect.origin.y = NSMaxY(bounds) - NSHeight(rect);
+    }
+
+  return rect;
+}
+
+- (CGFloat) iconSizeForItemAtIndex: (NSUInteger)index
+{
+  CGFloat size = 46.0;
+
+  if (_magnifiesHoveredIcons &&
+      _hoveredItemIndex == (NSInteger)index &&
+      !_draggingPaths &&
+      _draggedItemIndex == NSNotFound)
+    {
+      size *= _hoverIconScale;
+    }
+
+  return MIN(size, _cellSize);
 }
 
 - (void) drawCellBackgroundInCell: (NSRect)cell
@@ -1188,10 +1277,7 @@ DockViewCalibratedBackgroundColor (NSColor *color)
 
   pad = MAX(4.0, size / 10.0);
   minSide = MAX(14.0, size / 3.2);
-  iconRect = NSMakeRect(NSMidX(cell) - size / 2.0,
-                        NSMidY(cell) - size / 2.0,
-                        size,
-                        size);
+  iconRect = [self iconRectInCell:cell size:size];
 
   attrs = [NSDictionary dictionaryWithObjectsAndKeys:
 			[NSFont boldSystemFontOfSize:MAX(9.0, size / 5.0)],
@@ -1554,7 +1640,9 @@ DockViewCalibratedBackgroundColor (NSColor *color)
       NSRect cell = NSMakeRect(origin.x, origin.y, _cellSize, _cellSize);
 
       [self drawCellBackgroundInCell:cell];
-      [self drawDockTileForItem:item inCell:cell size:46.0];
+      [self drawDockTileForItem:item
+			 inCell:cell
+			   size:[self iconSizeForItemAtIndex:i]];
       [self drawStateForItem:item inCell:cell];
     }
 
@@ -1573,6 +1661,7 @@ DockViewCalibratedBackgroundColor (NSColor *color)
     {
       _hoveredItemIndex = hoverIndex;
       [self scheduleTooltipForHoverIndex:hoverIndex];
+      [self setNeedsDisplay:YES];
     }
 }
 
@@ -1580,6 +1669,7 @@ DockViewCalibratedBackgroundColor (NSColor *color)
 {
   _hoveredItemIndex = DockHoverNone;
   [self hideTooltip];
+  [self setNeedsDisplay:YES];
 }
 
 - (void) rightMouseDown: (NSEvent *)event
