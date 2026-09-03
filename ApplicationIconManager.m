@@ -203,6 +203,65 @@
   return ![bundlePath length];
 }
 
+- (BOOL) imageHasVisiblePixels: (NSImage *)image
+{
+  NSData *data;
+  NSBitmapImageRep *rep;
+  NSInteger width;
+  NSInteger height;
+  NSInteger x;
+  NSInteger y;
+
+  if (!image)
+    {
+      return NO;
+    }
+
+  data = [image TIFFRepresentation];
+  if (![data length])
+    {
+      return YES;
+    }
+
+  rep = [NSBitmapImageRep imageRepWithData:data];
+  if (!rep)
+    {
+      return YES;
+    }
+
+  width = [rep pixelsWide];
+  height = [rep pixelsHigh];
+  if (width <= 0 || height <= 0)
+    {
+      return NO;
+    }
+
+  for (y = 0; y < height; y++)
+    {
+      for (x = 0; x < width; x++)
+	{
+	  NSColor *color = [rep colorAtX:x y:y];
+	  CGFloat alpha = 1.0;
+
+	  if (color)
+	    {
+	      NS_DURING
+		[color getRed:NULL green:NULL blue:NULL alpha:&alpha];
+	      NS_HANDLER
+		alpha = 1.0;
+	      NS_ENDHANDLER
+
+	      if (alpha > 0.01)
+		{
+		  return YES;
+		}
+	    }
+	}
+    }
+
+  return NO;
+}
+
 - (void) applyX11Icon: (NSImage *)icon
 	       toItem: (DockItem *)item
 	   identifier: (NSString *)identifier
@@ -242,7 +301,7 @@
     }
 
   update = [NSMutableDictionary dictionary];
-  if (icon && !updateHasBadge)
+  if (icon && !updateHasBadge && [self imageHasVisiblePixels:icon])
     {
       NSString *iconPath = [self storeX11Icon:icon
 				   identifier:[NSString stringWithFormat:@"pid-%@",
@@ -271,9 +330,10 @@
   id badgeObject = [update objectForKey:@"badgeLabel"];
   NSString *badgeLabel = badgeObject == [NSNull null] ? nil : badgeObject;
   BOOL updateHasBadge = [badgeLabel length] > 0;
+  BOOL updateClearsBadge = !updateHasBadge && [[item badgeLabel] length] > 0;
   BOOL changed = NO;
 
-  if (updateHasBadge)
+  if (updateHasBadge || updateClearsBadge)
     {
       NSImage *currentIcon = [item icon];
 
@@ -285,13 +345,16 @@
     }
 
   if (!updateHasBadge &&
+      !updateClearsBadge &&
       [icon isKindOfClass:[NSImage class]] &&
+      [self imageHasVisiblePixels:icon] &&
       ![self item:item iconMatchesImage:icon])
     {
       [item setIcon:icon];
       changed = YES;
     }
   if (!updateHasBadge &&
+      !updateClearsBadge &&
       [iconPath isKindOfClass:[NSString class]] && [iconPath length] &&
       !([[item iconPath] isEqualToString:iconPath]))
     {
