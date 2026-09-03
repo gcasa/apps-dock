@@ -2016,6 +2016,9 @@ didChangeRunningIndicatorMode: (DockRunningIndicatorMode)mode
 	{
 	  if ([self activateRunningApplicationWithProcessIdentifiers:processIds])
 	    {
+	      [_x11 drainTransientIconEvents];
+	      [_x11 activateApplicationWithProcessIdentifiers:processIds];
+	      [_x11 drainTransientIconEvents];
 	      [item setState:DockItemRunning];
 	      [self startActivationWiggleForItem:item];
 	      [self refreshDock];

@@ -63,6 +63,9 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 - (BOOL) windowIsKnownDockAppWindow: (Window)window;
 - (void) updateHostWindowShape;
 - (NSRect) hiddenIconWindowFrame;
+- (void) deiconifyWindow: (Window)window;
+- (NSUInteger) activateIconicWindowsForProcessIdentifiers: (NSArray *)processIdentifiers
+					      underWindow: (Window)parentWindow;
 @end
 
 @implementation X11DockManager
@@ -2157,6 +2160,8 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
       return;
     }
 
+  [self deiconifyWindow:(Window)xWindow];
+
   root = RootWindow(display, DefaultScreen(display));
   activeWindow = XInternAtom(display, "_NET_ACTIVE_WINDOW", False);
   memset(&event, 0, sizeof(event));
@@ -2172,6 +2177,109 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   XMapRaised(display, (Window)xWindow);
   XSetInputFocus(display, (Window)xWindow, RevertToParent, CurrentTime);
   XFlush(display);
+}
+
+- (void) deiconifyWindow: (Window)window
+{
+  Display *display = (Display *)_display;
+  Window root;
+  Atom changeState;
+  XEvent event;
+  long state = NormalState;
+
+  if (!display)
+    {
+      return;
+    }
+
+  if (![self wmStateForWindow:window state:&state] || state != IconicState)
+    {
+      return;
+    }
+
+  root = RootWindow(display, DefaultScreen(display));
+  changeState = XInternAtom(display, "WM_CHANGE_STATE", False);
+  memset(&event, 0, sizeof(event));
+  event.xclient.type = ClientMessage;
+  event.xclient.display = display;
+  event.xclient.window = window;
+  event.xclient.message_type = changeState;
+  event.xclient.format = 32;
+  event.xclient.data.l[0] = NormalState;
+  XSendEvent(display, root, False,
+	     SubstructureRedirectMask | SubstructureNotifyMask, &event);
+
+  XMapRaised(display, window);
+}
+
+- (NSUInteger) activateIconicWindowsForProcessIdentifiers: (NSArray *)processIdentifiers
+					      underWindow: (Window)parentWindow
+{
+  Display *display = (Display *)_display;
+  Window root, parent, *children = NULL;
+  unsigned int count = 0, i;
+  NSUInteger activated = 0;
+
+  if (!display)
+    {
+      return 0;
+    }
+
+  if (!XQueryTree(display, parentWindow, &root, &parent, &children, &count))
+    {
+      return 0;
+    }
+
+  for (i = count; i > 0; i--)
+    {
+      Window window = children[i - 1];
+      XWindowAttributes attr;
+      long state = NormalState;
+      BOOL hasState;
+      int processIdentifier;
+
+      if ([self windowIsRegisteredIconWindow:window])
+	{
+	  continue;
+	}
+      if ([self windowHasGNUstepMiniWindowStyle:window])
+	{
+	  continue;
+	}
+
+      [self clearX11Error];
+      if (!XGetWindowAttributes(display, window, &attr) ||
+	  [self x11ErrorOccurred])
+	{
+	  continue;
+	}
+
+      if (attr.override_redirect && attr.width <= 96 && attr.height <= 96)
+	{
+	  continue;
+	}
+
+      hasState = [self wmStateForWindow:window state:&state];
+      processIdentifier = [self processIdentifierForWindow:window];
+      if (hasState && state == IconicState &&
+	  processIdentifier > 0 &&
+	  [processIdentifiers containsObject:
+		     [NSNumber numberWithInt:processIdentifier]])
+	{
+	  [self activateWindow:(unsigned long)window];
+	  activated++;
+	}
+
+      activated += [self activateIconicWindowsForProcessIdentifiers:processIdentifiers
+							underWindow:window];
+    }
+
+  if (children)
+    {
+      XFree(children);
+    }
+
+  return activated;
 }
 
 - (Window) activatableWindowForProcessIdentifiers: (NSArray *)processIdentifiers
@@ -2259,6 +2367,7 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   Display *display = (Display *)_display;
   Window root;
   Window window;
+  BOOL activated = NO;
 
   if (!display || ![processIdentifiers count])
     {
@@ -2266,11 +2375,17 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
     }
 
   root = RootWindow(display, DefaultScreen(display));
+  if ([self activateIconicWindowsForProcessIdentifiers:processIdentifiers
+					   underWindow:root] > 0)
+    {
+      activated = YES;
+    }
+
   window = [self activatableWindowForProcessIdentifiers:processIdentifiers
                                             underWindow:root];
   if (window == None)
     {
-      return NO;
+      return activated;
     }
 
   [self activateWindow:(unsigned long)window];
