@@ -24,6 +24,8 @@ static NSString *DockUseCellTileBackgroundDefaultsKey = @"DockUseCellTileBackgro
 static NSString *DockRunningIndicatorModeDefaultsKey = @"DockRunningIndicatorMode";
 static NSString *DockMagnifiesHoveredIconsDefaultsKey = @"DockMagnifiesHoveredIcons";
 static NSString *DockHoverIconScaleDefaultsKey = @"DockHoverIconScale";
+static NSString *DockWigglesOnLaunchDefaultsKey = @"DockWigglesOnLaunch";
+static NSString *DockWigglesOnActivationDefaultsKey = @"DockWigglesOnActivation";
 
 @implementation DockPreferences
 
@@ -319,6 +321,42 @@ static NSString *DockHoverIconScaleDefaultsKey = @"DockHoverIconScale";
 
   [[NSUserDefaults standardUserDefaults] setFloat:scale
 					   forKey:DockHoverIconScaleDefaultsKey];
+}
+
+- (BOOL) savedWigglesOnLaunch
+{
+  NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+
+  if (![defaults objectForKey:DockWigglesOnLaunchDefaultsKey])
+    {
+      return YES;
+    }
+
+  return [defaults boolForKey:DockWigglesOnLaunchDefaultsKey];
+}
+
+- (void) saveWigglesOnLaunch: (BOOL)wiggles
+{
+  [[NSUserDefaults standardUserDefaults] setBool:wiggles
+					  forKey:DockWigglesOnLaunchDefaultsKey];
+}
+
+- (BOOL) savedWigglesOnActivation
+{
+  NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+
+  if (![defaults objectForKey:DockWigglesOnActivationDefaultsKey])
+    {
+      return YES;
+    }
+
+  return [defaults boolForKey:DockWigglesOnActivationDefaultsKey];
+}
+
+- (void) saveWigglesOnActivation: (BOOL)wiggles
+{
+  [[NSUserDefaults standardUserDefaults] setBool:wiggles
+					  forKey:DockWigglesOnActivationDefaultsKey];
 }
 
 @end

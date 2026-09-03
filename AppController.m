@@ -52,6 +52,8 @@
   _showDockBorder = [self savedShowDockBorder];
   _magnifiesHoveredIcons = [_preferences savedMagnifiesHoveredIcons];
   _hoverIconScale = [_preferences savedHoverIconScale];
+  _wigglesOnLaunch = [_preferences savedWigglesOnLaunch];
+  _wigglesOnActivation = [_preferences savedWigglesOnActivation];
   frame = [self dockWindowFrameForPlacement:_dockPlacement];
 
   _window = [[NSWindow alloc] initWithContentRect:frame
@@ -1356,6 +1358,16 @@
   return _hoverIconScale;
 }
 
+- (BOOL) settingsControllerWigglesOnLaunch: (SettingsController *)controller
+{
+  return _wigglesOnLaunch;
+}
+
+- (BOOL) settingsControllerWigglesOnActivation: (SettingsController *)controller
+{
+  return _wigglesOnActivation;
+}
+
 - (BOOL) settingsControllerRecyclerHasContents: (SettingsController *)controller
 {
   return [self recyclerHasContents];
@@ -1453,6 +1465,20 @@ didChangeHoverIconScale: (CGFloat)scale
   _hoverIconScale = scale;
   [_dockView setHoverIconScale:_hoverIconScale];
   [_preferences saveHoverIconScale:_hoverIconScale];
+}
+
+- (void) settingsController: (SettingsController *)controller
+  didChangeWigglesOnLaunch: (BOOL)wiggles
+{
+  _wigglesOnLaunch = wiggles;
+  [_preferences saveWigglesOnLaunch:_wigglesOnLaunch];
+}
+
+- (void) settingsController: (SettingsController *)controller
+didChangeWigglesOnActivation: (BOOL)wiggles
+{
+  _wigglesOnActivation = wiggles;
+  [_preferences saveWigglesOnActivation:_wigglesOnActivation];
 }
 
 - (void) settingsController: (SettingsController *)controller
@@ -1596,6 +1622,22 @@ didChangeRunningIndicatorMode: (DockRunningIndicatorMode)mode
   [_dockView setRunningIndicatorMode:_runningIndicatorMode];
   [_dockView setMagnifiesHoveredIcons:_magnifiesHoveredIcons];
   [_dockView setHoverIconScale:_hoverIconScale];
+}
+
+- (void) startLaunchWiggleForItem: (DockItem *)item
+{
+  if (_wigglesOnLaunch)
+    {
+      [_dockView startWiggleForItem:item];
+    }
+}
+
+- (void) startActivationWiggleForItem: (DockItem *)item
+{
+  if (_wigglesOnActivation)
+    {
+      [_dockView startWiggleForItem:item];
+    }
 }
 
 - (void) quitDock: (id)sender
@@ -1975,6 +2017,7 @@ didChangeRunningIndicatorMode: (DockRunningIndicatorMode)mode
 	  if ([self activateRunningApplicationWithProcessIdentifiers:processIds])
 	    {
 	      [item setState:DockItemRunning];
+	      [self startActivationWiggleForItem:item];
 	      [self refreshDock];
 	      return;
 	    }
@@ -1984,6 +2027,7 @@ didChangeRunningIndicatorMode: (DockRunningIndicatorMode)mode
 	    {
 	      [_x11 drainTransientIconEvents];
 	      [item setState:DockItemRunning];
+	      [self startActivationWiggleForItem:item];
 	      [self refreshDock];
 	      return;
 	    }
@@ -1995,6 +2039,7 @@ didChangeRunningIndicatorMode: (DockRunningIndicatorMode)mode
 	  [_x11 drainTransientIconEvents];
 	  [_x11 activateWindow:[item xWindow]];
 	  [_x11 drainTransientIconEvents];
+	  [self startActivationWiggleForItem:item];
 	  return;
 	}
 
@@ -2005,7 +2050,7 @@ didChangeRunningIndicatorMode: (DockRunningIndicatorMode)mode
       if (launched)
 	{
 	  [item setState:DockItemRunning];
-	  [_dockView startWiggleForItem:item];
+	  [self startLaunchWiggleForItem:item];
 	  [self refreshDock];
 	}
     }
@@ -2014,6 +2059,7 @@ didChangeRunningIndicatorMode: (DockRunningIndicatorMode)mode
       [_x11 drainTransientIconEvents];
       [_x11 activateWindow:[item xWindow]];
       [_x11 drainTransientIconEvents];
+      [self startActivationWiggleForItem:item];
     }
 }
 

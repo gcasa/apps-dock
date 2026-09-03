@@ -46,5 +46,9 @@ enum
 - (void) saveMagnifiesHoveredIcons: (BOOL)magnifiesHoveredIcons;
 - (CGFloat) savedHoverIconScale;
 - (void) saveHoverIconScale: (CGFloat)scale;
+- (BOOL) savedWigglesOnLaunch;
+- (void) saveWigglesOnLaunch: (BOOL)wiggles;
+- (BOOL) savedWigglesOnActivation;
+- (void) saveWigglesOnActivation: (BOOL)wiggles;
 
 @end

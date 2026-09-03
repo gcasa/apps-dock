@@ -63,6 +63,8 @@ SettingsClampedWindowAlpha(CGFloat alpha)
   DESTROY(_applyApplicationButton);
   DESTROY(_applicationArgumentsField);
   DESTROY(_applicationPopup);
+  DESTROY(_wiggleOnActivationButton);
+  DESTROY(_wiggleOnLaunchButton);
   DESTROY(_hoverIconScaleSlider);
   DESTROY(_magnifyHoveredIconsButton);
   DESTROY(_showBorderButton);
@@ -120,7 +122,7 @@ SettingsClampedWindowAlpha(CGFloat alpha)
     }
 
   _panel = [[NSPanel alloc]
-	     initWithContentRect:NSMakeRect(0, 0, 460, 570)
+	     initWithContentRect:NSMakeRect(0, 0, 460, 620)
 		       styleMask:NSTitledWindowMask | NSClosableWindowMask
 			 backing:NSBackingStoreBuffered
 			   defer:NO];
@@ -131,11 +133,11 @@ SettingsClampedWindowAlpha(CGFloat alpha)
   contentView = [_panel contentView];
 
   label = [self labelWithTitle:@"Placement"
-			 frame:NSMakeRect(18, 526, 110, 20)];
+			 frame:NSMakeRect(18, 576, 110, 20)];
   [contentView addSubview:label];
 
   _placementPopup =
-    [[NSPopUpButton alloc] initWithFrame:NSMakeRect(132, 472, 170, 26)
+    [[NSPopUpButton alloc] initWithFrame:NSMakeRect(132, 572, 170, 26)
 			       pullsDown:NO];
   placements = [NSArray arrayWithObjects:
 			  @"Left Top",
@@ -154,14 +156,14 @@ SettingsClampedWindowAlpha(CGFloat alpha)
   [_placementPopup setAction:@selector(placementChanged:)];
   [contentView addSubview:_placementPopup];
 
-  [_placementPopup setFrame:NSMakeRect(132, 522, 170, 26)];
+  [_placementPopup setFrame:NSMakeRect(132, 572, 170, 26)];
 
   label = [self labelWithTitle:@"Color"
-			 frame:NSMakeRect(18, 482, 110, 20)];
+			 frame:NSMakeRect(18, 532, 110, 20)];
   [contentView addSubview:label];
 
   _backgroundColorWell =
-    [[NSColorWell alloc] initWithFrame:NSMakeRect(132, 476, 58, 32)];
+    [[NSColorWell alloc] initWithFrame:NSMakeRect(132, 526, 58, 32)];
   [_backgroundColorWell setTarget:self];
   [_backgroundColorWell setAction:@selector(backgroundColorChanged:)];
   [contentView addSubview:_backgroundColorWell];
@@ -170,11 +172,11 @@ SettingsClampedWindowAlpha(CGFloat alpha)
   [colorPanel setContinuous:YES];
 
   label = [self labelWithTitle:@"Transparency"
-			 frame:NSMakeRect(18, 448, 110, 20)];
+			 frame:NSMakeRect(18, 498, 110, 20)];
   [contentView addSubview:label];
 
   _transparencySlider =
-    [[NSSlider alloc] initWithFrame:NSMakeRect(132, 444, 300, 24)];
+    [[NSSlider alloc] initWithFrame:NSMakeRect(132, 494, 300, 24)];
   [_transparencySlider setMinValue:0.2];
   [_transparencySlider setMaxValue:1.0];
   [_transparencySlider setContinuous:YES];
@@ -183,12 +185,12 @@ SettingsClampedWindowAlpha(CGFloat alpha)
   [contentView addSubview:_transparencySlider];
 
   label = [self labelWithTitle:@"Icon Cells"
-			 frame:NSMakeRect(18, 426, 110, 20)];
+			 frame:NSMakeRect(18, 476, 110, 20)];
   [contentView addSubview:label];
 
   _cellSize64Button =
     [self buttonWithTitle:@"64 x 64"
-		    frame:NSMakeRect(132, 424, 160, 24)
+		    frame:NSMakeRect(132, 474, 160, 24)
 	       buttonType:NSRadioButton
 		   action:@selector(dockCellSizeChanged:)];
   [_cellSize64Button setTag:SettingsDockCellSizeMode64];
@@ -196,19 +198,19 @@ SettingsClampedWindowAlpha(CGFloat alpha)
 
   _currentCellSizeButton =
     [self buttonWithTitle:[_delegate settingsControllerCurrentDockCellSizeTitle:self]
-		    frame:NSMakeRect(132, 400, 160, 24)
+		    frame:NSMakeRect(132, 450, 160, 24)
 	       buttonType:NSRadioButton
 		   action:@selector(dockCellSizeChanged:)];
   [_currentCellSizeButton setTag:SettingsDockCellSizeModeCurrent];
   [contentView addSubview:_currentCellSizeButton];
 
   label = [self labelWithTitle:@"State Dots"
-			 frame:NSMakeRect(18, 354, 110, 20)];
+			 frame:NSMakeRect(18, 404, 110, 20)];
   [contentView addSubview:label];
 
   _runningDotButton =
     [self buttonWithTitle:@"Dot when running"
-		    frame:NSMakeRect(132, 352, 170, 24)
+		    frame:NSMakeRect(132, 402, 170, 24)
 	       buttonType:NSRadioButton
 		   action:@selector(runningIndicatorModeChanged:)];
   [_runningDotButton setTag:DockRunningIndicatorModeRunningDot];
@@ -216,7 +218,7 @@ SettingsClampedWindowAlpha(CGFloat alpha)
 
   _notRunningDotsButton =
     [self buttonWithTitle:@"Dots when stopped"
-		    frame:NSMakeRect(132, 328, 170, 24)
+		    frame:NSMakeRect(132, 378, 170, 24)
 	       buttonType:NSRadioButton
 		   action:@selector(runningIndicatorModeChanged:)];
   [_notRunningDotsButton setTag:DockRunningIndicatorModeNotRunningDots];
@@ -224,37 +226,51 @@ SettingsClampedWindowAlpha(CGFloat alpha)
 
   _useCellTileButton =
     [self buttonWithTitle:@"Use common_Tile"
-		    frame:NSMakeRect(18, 290, 170, 24)
+		    frame:NSMakeRect(18, 340, 170, 24)
 	       buttonType:NSSwitchButton
 		   action:@selector(useCellTileChanged:)];
   [contentView addSubview:_useCellTileButton];
 
   _showBorderButton =
     [self buttonWithTitle:@"Show Border"
-		    frame:NSMakeRect(18, 264, 140, 24)
+		    frame:NSMakeRect(18, 314, 140, 24)
 	       buttonType:NSSwitchButton
 		   action:@selector(showBorderChanged:)];
   [contentView addSubview:_showBorderButton];
 
   _magnifyHoveredIconsButton =
     [self buttonWithTitle:@"Magnify Icons"
-		    frame:NSMakeRect(18, 226, 160, 24)
+		    frame:NSMakeRect(18, 284, 160, 24)
 	       buttonType:NSSwitchButton
 		   action:@selector(magnifyHoveredIconsChanged:)];
   [contentView addSubview:_magnifyHoveredIconsButton];
 
   label = [self labelWithTitle:@"Hover Size"
-			 frame:NSMakeRect(18, 194, 110, 20)];
+			 frame:NSMakeRect(18, 252, 110, 20)];
   [contentView addSubview:label];
 
   _hoverIconScaleSlider =
-    [[NSSlider alloc] initWithFrame:NSMakeRect(132, 190, 300, 24)];
+    [[NSSlider alloc] initWithFrame:NSMakeRect(132, 248, 300, 24)];
   [_hoverIconScaleSlider setMinValue:1.0];
   [_hoverIconScaleSlider setMaxValue:1.5];
   [_hoverIconScaleSlider setContinuous:YES];
   [_hoverIconScaleSlider setTarget:self];
   [_hoverIconScaleSlider setAction:@selector(hoverIconScaleChanged:)];
   [contentView addSubview:_hoverIconScaleSlider];
+
+  _wiggleOnLaunchButton =
+    [self buttonWithTitle:@"Wiggle On Launch"
+		    frame:NSMakeRect(18, 218, 180, 24)
+	       buttonType:NSSwitchButton
+		   action:@selector(wiggleOnLaunchChanged:)];
+  [contentView addSubview:_wiggleOnLaunchButton];
+
+  _wiggleOnActivationButton =
+    [self buttonWithTitle:@"Wiggle On Activate"
+		    frame:NSMakeRect(18, 192, 180, 24)
+	       buttonType:NSSwitchButton
+		   action:@selector(wiggleOnActivationChanged:)];
+  [contentView addSubview:_wiggleOnActivationButton];
 
   label = [self labelWithTitle:@"App"
 			 frame:NSMakeRect(18, 168, 110, 20)];
@@ -462,6 +478,12 @@ SettingsClampedWindowAlpha(CGFloat alpha)
       [_delegate settingsControllerHoverIconScale:self]];
   [_hoverIconScaleSlider setEnabled:
       [_delegate settingsControllerMagnifiesHoveredIcons:self]];
+  [_wiggleOnLaunchButton setState:
+      ([_delegate settingsControllerWigglesOnLaunch:self] ?
+       NSOnState : NSOffState)];
+  [_wiggleOnActivationButton setState:
+      ([_delegate settingsControllerWigglesOnActivation:self] ?
+       NSOnState : NSOffState)];
   [_emptyRecyclerButton setEnabled:
       [_delegate settingsControllerRecyclerHasContents:self]];
 
@@ -626,6 +648,18 @@ didChangeUseCellTileBackground:[(NSButton *)sender state] == NSOnState];
 {
   [_delegate settingsController:self
 	didChangeHoverIconScale:[(NSSlider *)sender floatValue]];
+}
+
+- (void) wiggleOnLaunchChanged: (id)sender
+{
+  [_delegate settingsController:self
+	didChangeWigglesOnLaunch:[(NSButton *)sender state] == NSOnState];
+}
+
+- (void) wiggleOnActivationChanged: (id)sender
+{
+  [_delegate settingsController:self
+     didChangeWigglesOnActivation:[(NSButton *)sender state] == NSOnState];
 }
 
 - (void) dockCellSizeChanged: (id)sender

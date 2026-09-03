@@ -55,6 +55,8 @@
   BOOL _useCellTileBackground;
   BOOL _showDockBorder;
   BOOL _magnifiesHoveredIcons;
+  BOOL _wigglesOnLaunch;
+  BOOL _wigglesOnActivation;
 }
 
 @end
