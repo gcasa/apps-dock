@@ -234,6 +234,7 @@
 	       processIdentifier: (NSNumber *)processIdentifier
 {
   NSMutableDictionary *update;
+  BOOL updateHasBadge = [badgeLabel length] > 0;
 
   if (![processIdentifier isKindOfClass:[NSNumber class]])
     {
@@ -241,7 +242,7 @@
     }
 
   update = [NSMutableDictionary dictionary];
-  if (icon)
+  if (icon && !updateHasBadge)
     {
       NSString *iconPath = [self storeX11Icon:icon
 				   identifier:[NSString stringWithFormat:@"pid-%@",
@@ -269,15 +270,29 @@
   id iconPath = [update objectForKey:@"iconPath"];
   id badgeObject = [update objectForKey:@"badgeLabel"];
   NSString *badgeLabel = badgeObject == [NSNull null] ? nil : badgeObject;
+  BOOL updateHasBadge = [badgeLabel length] > 0;
   BOOL changed = NO;
 
-  if ([icon isKindOfClass:[NSImage class]] &&
+  if (updateHasBadge)
+    {
+      NSImage *currentIcon = [item icon];
+
+      [item restoreOriginalIcon];
+      if ([item icon] != currentIcon)
+	{
+	  changed = YES;
+	}
+    }
+
+  if (!updateHasBadge &&
+      [icon isKindOfClass:[NSImage class]] &&
       ![self item:item iconMatchesImage:icon])
     {
       [item setIcon:icon];
       changed = YES;
     }
-  if ([iconPath isKindOfClass:[NSString class]] && [iconPath length] &&
+  if (!updateHasBadge &&
+      [iconPath isKindOfClass:[NSString class]] && [iconPath length] &&
       !([[item iconPath] isEqualToString:iconPath]))
     {
       [item setIconPath:iconPath];
