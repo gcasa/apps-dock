@@ -48,6 +48,8 @@ typedef enum
 - (void) x11DockManagerDidUpdateApplicationIcon: (NSImage *)icon
                                      badgeLabel: (NSString *)badgeLabel
                               processIdentifier: (int)processIdentifier;
+- (void) x11DockManagerDidRequestUserAttentionForProcessIdentifier: (int)processIdentifier
+						       requestType: (NSInteger)requestType;
 @end
 
 @interface X11DockManager : NSObject
@@ -70,6 +72,7 @@ typedef enum
 - (void) setDelegate: (id)delegate;
 - (BOOL) start;
 - (void) setDockPlacement: (DockPlacement)placement;
+- (void) makeWindowSticky: (unsigned long)xWindow;
 - (void) processPendingEvents;
 - (void) drainTransientIconEvents;
 - (void) scanForDockApps;

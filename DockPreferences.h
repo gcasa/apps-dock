@@ -50,5 +50,7 @@ enum
 - (void) saveWigglesOnLaunch: (BOOL)wiggles;
 - (BOOL) savedWigglesOnActivation;
 - (void) saveWigglesOnActivation: (BOOL)wiggles;
+- (BOOL) savedWigglesOnAttentionRequest;
+- (void) saveWigglesOnAttentionRequest: (BOOL)wiggles;
 
 @end

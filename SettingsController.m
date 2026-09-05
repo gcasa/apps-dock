@@ -63,6 +63,7 @@ SettingsClampedWindowAlpha(CGFloat alpha)
   DESTROY(_applyApplicationButton);
   DESTROY(_applicationArgumentsField);
   DESTROY(_applicationPopup);
+  DESTROY(_wiggleOnAttentionRequestButton);
   DESTROY(_wiggleOnActivationButton);
   DESTROY(_wiggleOnLaunchButton);
   DESTROY(_hoverIconScaleSlider);
@@ -271,6 +272,13 @@ SettingsClampedWindowAlpha(CGFloat alpha)
 	       buttonType:NSSwitchButton
 		   action:@selector(wiggleOnActivationChanged:)];
   [contentView addSubview:_wiggleOnActivationButton];
+
+  _wiggleOnAttentionRequestButton =
+    [self buttonWithTitle:@"Wiggle On Attention"
+		    frame:NSMakeRect(212, 192, 200, 24)
+	       buttonType:NSSwitchButton
+		   action:@selector(wiggleOnAttentionRequestChanged:)];
+  [contentView addSubview:_wiggleOnAttentionRequestButton];
 
   label = [self labelWithTitle:@"App"
 			 frame:NSMakeRect(18, 168, 110, 20)];
@@ -484,6 +492,9 @@ SettingsClampedWindowAlpha(CGFloat alpha)
   [_wiggleOnActivationButton setState:
       ([_delegate settingsControllerWigglesOnActivation:self] ?
        NSOnState : NSOffState)];
+  [_wiggleOnAttentionRequestButton setState:
+      ([_delegate settingsControllerWigglesOnAttentionRequest:self] ?
+       NSOnState : NSOffState)];
   [_emptyRecyclerButton setEnabled:
       [_delegate settingsControllerRecyclerHasContents:self]];
 
@@ -660,6 +671,12 @@ didChangeUseCellTileBackground:[(NSButton *)sender state] == NSOnState];
 {
   [_delegate settingsController:self
      didChangeWigglesOnActivation:[(NSButton *)sender state] == NSOnState];
+}
+
+- (void) wiggleOnAttentionRequestChanged: (id)sender
+{
+  [_delegate settingsController:self
+didChangeWigglesOnAttentionRequest:[(NSButton *)sender state] == NSOnState];
 }
 
 - (void) dockCellSizeChanged: (id)sender

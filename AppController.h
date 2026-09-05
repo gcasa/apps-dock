@@ -57,6 +57,7 @@
   BOOL _magnifiesHoveredIcons;
   BOOL _wigglesOnLaunch;
   BOOL _wigglesOnActivation;
+  BOOL _wigglesOnAttentionRequest;
 }
 
 @end

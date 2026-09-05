@@ -26,6 +26,7 @@ static NSString *DockMagnifiesHoveredIconsDefaultsKey = @"DockMagnifiesHoveredIc
 static NSString *DockHoverIconScaleDefaultsKey = @"DockHoverIconScale";
 static NSString *DockWigglesOnLaunchDefaultsKey = @"DockWigglesOnLaunch";
 static NSString *DockWigglesOnActivationDefaultsKey = @"DockWigglesOnActivation";
+static NSString *DockWigglesOnAttentionRequestDefaultsKey = @"DockWigglesOnAttentionRequest";
 
 @implementation DockPreferences
 
@@ -357,6 +358,24 @@ static NSString *DockWigglesOnActivationDefaultsKey = @"DockWigglesOnActivation"
 {
   [[NSUserDefaults standardUserDefaults] setBool:wiggles
 					  forKey:DockWigglesOnActivationDefaultsKey];
+}
+
+- (BOOL) savedWigglesOnAttentionRequest
+{
+  NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+
+  if (![defaults objectForKey:DockWigglesOnAttentionRequestDefaultsKey])
+    {
+      return YES;
+    }
+
+  return [defaults boolForKey:DockWigglesOnAttentionRequestDefaultsKey];
+}
+
+- (void) saveWigglesOnAttentionRequest: (BOOL)wiggles
+{
+  [[NSUserDefaults standardUserDefaults] setBool:wiggles
+					  forKey:DockWigglesOnAttentionRequestDefaultsKey];
 }
 
 @end

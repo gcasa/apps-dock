@@ -169,6 +169,28 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   X11DockManagerLastErrorCode = 0;
 }
 
+- (void) makeWindowSticky: (unsigned long)xWindow
+{
+  Display *display = (Display *)_display;
+  Atom desktopProperty;
+  unsigned long allDesktops = 0xFFFFFFFFUL;
+
+  if (!display || !xWindow)
+    {
+      return;
+    }
+
+  desktopProperty = XInternAtom(display, "_NET_WM_DESKTOP", False);
+  [self clearX11Error];
+  XChangeProperty(display, (Window)xWindow, desktopProperty, XA_CARDINAL, 32,
+		  PropModeReplace, (unsigned char *)&allDesktops, 1);
+  XFlush(display);
+  if ([self x11ErrorOccurred])
+    {
+      NSLog(@"Unable to mark DockWM window %lu as sticky.", xWindow);
+    }
+}
+
 - (NSString *) procFilesystemPath
 {
   FILE *mounts;
@@ -2005,6 +2027,22 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
       [_delegate x11DockManagerDidUpdateApplicationIcon:icon
 					     badgeLabel:badgeText
 				      processIdentifier:aProcessId];
+    }
+}
+
+- (void) requestUserAttention: (NSInteger)requestType
+		 appProcessId: (int)aProcessId
+{
+  if (aProcessId <= 0)
+    {
+      return;
+    }
+
+  if ([_delegate respondsToSelector:
+		   @selector(x11DockManagerDidRequestUserAttentionForProcessIdentifier:requestType:)])
+    {
+      [_delegate x11DockManagerDidRequestUserAttentionForProcessIdentifier:aProcessId
+							 requestType:requestType];
     }
 }
 

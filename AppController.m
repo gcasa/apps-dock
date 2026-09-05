@@ -54,6 +54,7 @@
   _hoverIconScale = [_preferences savedHoverIconScale];
   _wigglesOnLaunch = [_preferences savedWigglesOnLaunch];
   _wigglesOnActivation = [_preferences savedWigglesOnActivation];
+  _wigglesOnAttentionRequest = [_preferences savedWigglesOnAttentionRequest];
   frame = [self dockWindowFrameForPlacement:_dockPlacement];
 
   _window = [[NSWindow alloc] initWithContentRect:frame
@@ -61,6 +62,8 @@
                                           backing:NSBackingStoreBuffered
                                             defer:NO];
   [_window setLevel:NSDockWindowLevel];
+  [_window setCollectionBehavior:(NSWindowCollectionBehaviorCanJoinAllSpaces |
+                                  NSWindowCollectionBehaviorStationary)];
   [_window setOpaque:NO];
   [_window setAlphaValue:_windowAlpha];
   [_window setBackgroundColor:[NSColor clearColor]];
@@ -93,6 +96,7 @@
   [_x11 setDelegate:self];
   if ([_x11 start])
     {
+      [_x11 makeWindowSticky:(unsigned long)[_window windowNumber]];
       [_x11 setDockPlacement:_dockPlacement];
     }
 
@@ -692,6 +696,31 @@
 	{
 	  [self refreshDock];
 	}
+    }
+}
+
+- (void) x11DockManagerDidRequestUserAttentionForProcessIdentifier: (int)processIdentifier
+						       requestType: (NSInteger)requestType
+{
+  DockItem *item = nil;
+  NSNumber *processIdentifierNumber = nil;
+
+  if (processIdentifier <= 0)
+    {
+      return;
+    }
+
+  processIdentifierNumber = [NSNumber numberWithInt:processIdentifier];
+  item = [self applicationItemMatchingProcessIdentifier:processIdentifierNumber];
+  if (!item)
+    {
+      item = [self transientApplicationItemForProcessIdentifier:
+			processIdentifierNumber];
+    }
+
+  if (item)
+    {
+      [self startAttentionWiggleForItem:item];
     }
 }
 
@@ -1368,6 +1397,11 @@
   return _wigglesOnActivation;
 }
 
+- (BOOL) settingsControllerWigglesOnAttentionRequest: (SettingsController *)controller
+{
+  return _wigglesOnAttentionRequest;
+}
+
 - (BOOL) settingsControllerRecyclerHasContents: (SettingsController *)controller
 {
   return [self recyclerHasContents];
@@ -1479,6 +1513,13 @@ didChangeWigglesOnActivation: (BOOL)wiggles
 {
   _wigglesOnActivation = wiggles;
   [_preferences saveWigglesOnActivation:_wigglesOnActivation];
+}
+
+- (void) settingsController: (SettingsController *)controller
+didChangeWigglesOnAttentionRequest: (BOOL)wiggles
+{
+  _wigglesOnAttentionRequest = wiggles;
+  [_preferences saveWigglesOnAttentionRequest:_wigglesOnAttentionRequest];
 }
 
 - (void) settingsController: (SettingsController *)controller
@@ -1635,6 +1676,14 @@ didChangeRunningIndicatorMode: (DockRunningIndicatorMode)mode
 - (void) startActivationWiggleForItem: (DockItem *)item
 {
   if (_wigglesOnActivation)
+    {
+      [_dockView startWiggleForItem:item];
+    }
+}
+
+- (void) startAttentionWiggleForItem: (DockItem *)item
+{
+  if (_wigglesOnAttentionRequest)
     {
       [_dockView startWiggleForItem:item];
     }
