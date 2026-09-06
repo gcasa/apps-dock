@@ -27,6 +27,7 @@ static NSString *DockHoverIconScaleDefaultsKey = @"DockHoverIconScale";
 static NSString *DockWigglesOnLaunchDefaultsKey = @"DockWigglesOnLaunch";
 static NSString *DockWigglesOnActivationDefaultsKey = @"DockWigglesOnActivation";
 static NSString *DockWigglesOnAttentionRequestDefaultsKey = @"DockWigglesOnAttentionRequest";
+static NSString *DockPlaysSoundOnRemoveDefaultsKey = @"DockPlaysSoundOnRemove";
 
 @implementation DockPreferences
 
@@ -376,6 +377,24 @@ static NSString *DockWigglesOnAttentionRequestDefaultsKey = @"DockWigglesOnAtten
 {
   [[NSUserDefaults standardUserDefaults] setBool:wiggles
 					  forKey:DockWigglesOnAttentionRequestDefaultsKey];
+}
+
+- (BOOL) savedPlaysSoundOnRemove
+{
+  NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+
+  if (![defaults objectForKey:DockPlaysSoundOnRemoveDefaultsKey])
+    {
+      return YES;
+    }
+
+  return [defaults boolForKey:DockPlaysSoundOnRemoveDefaultsKey];
+}
+
+- (void) savePlaysSoundOnRemove: (BOOL)playsSound
+{
+  [[NSUserDefaults standardUserDefaults] setBool:playsSound
+					  forKey:DockPlaysSoundOnRemoveDefaultsKey];
 }
 
 @end

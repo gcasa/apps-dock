@@ -64,6 +64,7 @@ SettingsClampedWindowAlpha(CGFloat alpha)
   DESTROY(_applicationArgumentsField);
   DESTROY(_applicationPopup);
   DESTROY(_wiggleOnAttentionRequestButton);
+  DESTROY(_playSoundOnRemoveButton);
   DESTROY(_wiggleOnActivationButton);
   DESTROY(_wiggleOnLaunchButton);
   DESTROY(_hoverIconScaleSlider);
@@ -280,6 +281,13 @@ SettingsClampedWindowAlpha(CGFloat alpha)
 		   action:@selector(wiggleOnAttentionRequestChanged:)];
   [contentView addSubview:_wiggleOnAttentionRequestButton];
 
+  _playSoundOnRemoveButton =
+    [self buttonWithTitle:@"Sound On Remove"
+		    frame:NSMakeRect(212, 218, 200, 24)
+	       buttonType:NSSwitchButton
+		   action:@selector(playSoundOnRemoveChanged:)];
+  [contentView addSubview:_playSoundOnRemoveButton];
+
   label = [self labelWithTitle:@"App"
 			 frame:NSMakeRect(18, 168, 110, 20)];
   [contentView addSubview:label];
@@ -495,6 +503,9 @@ SettingsClampedWindowAlpha(CGFloat alpha)
   [_wiggleOnAttentionRequestButton setState:
       ([_delegate settingsControllerWigglesOnAttentionRequest:self] ?
        NSOnState : NSOffState)];
+  [_playSoundOnRemoveButton setState:
+      ([_delegate settingsControllerPlaysSoundOnRemove:self] ?
+       NSOnState : NSOffState)];
   [_emptyRecyclerButton setEnabled:
       [_delegate settingsControllerRecyclerHasContents:self]];
 
@@ -677,6 +688,12 @@ didChangeUseCellTileBackground:[(NSButton *)sender state] == NSOnState];
 {
   [_delegate settingsController:self
 didChangeWigglesOnAttentionRequest:[(NSButton *)sender state] == NSOnState];
+}
+
+- (void) playSoundOnRemoveChanged: (id)sender
+{
+  [_delegate settingsController:self
+ didChangePlaysSoundOnRemove:[(NSButton *)sender state] == NSOnState];
 }
 
 - (void) dockCellSizeChanged: (id)sender

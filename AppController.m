@@ -55,6 +55,7 @@
   _wigglesOnLaunch = [_preferences savedWigglesOnLaunch];
   _wigglesOnActivation = [_preferences savedWigglesOnActivation];
   _wigglesOnAttentionRequest = [_preferences savedWigglesOnAttentionRequest];
+  _playsSoundOnRemove = [_preferences savedPlaysSoundOnRemove];
   frame = [self dockWindowFrameForPlacement:_dockPlacement];
 
   _window = [[NSWindow alloc] initWithContentRect:frame
@@ -235,6 +236,14 @@
 - (void) savePersistedApplications
 {
   [_applicationStore savePersistedApplicationsFromItems:_items];
+}
+
+- (void) playDockRemovalSoundIfEnabled
+{
+  if (_playsSoundOnRemove)
+    {
+      [[NSSound soundNamed:@"Pop"] play];
+    }
 }
 
 - (id) persistedApplicationRecordForItem: (DockItem *)item
@@ -1402,6 +1411,11 @@
   return _wigglesOnAttentionRequest;
 }
 
+- (BOOL) settingsControllerPlaysSoundOnRemove: (SettingsController *)controller
+{
+  return _playsSoundOnRemove;
+}
+
 - (BOOL) settingsControllerRecyclerHasContents: (SettingsController *)controller
 {
   return [self recyclerHasContents];
@@ -1523,6 +1537,13 @@ didChangeWigglesOnAttentionRequest: (BOOL)wiggles
 }
 
 - (void) settingsController: (SettingsController *)controller
+didChangePlaysSoundOnRemove: (BOOL)playsSound
+{
+  _playsSoundOnRemove = playsSound;
+  [_preferences savePlaysSoundOnRemove:_playsSoundOnRemove];
+}
+
+- (void) settingsController: (SettingsController *)controller
   didChangeDockCellSizeMode: (NSInteger)mode
 {
   if (mode != DockCellSizeMode64)
@@ -1632,6 +1653,7 @@ didChangeRunningIndicatorMode: (DockRunningIndicatorMode)mode
   [_items removeObjectAtIndex:index];
   [self savePersistedApplications];
   [self refreshDock];
+  [self playDockRemovalSoundIfEnabled];
 }
 
 - (void) settingsControllerDidEmptyRecycler: (SettingsController *)controller
@@ -1950,6 +1972,7 @@ didChangeRunningIndicatorMode: (DockRunningIndicatorMode)mode
   [_items removeObjectAtIndex:index];
   [self savePersistedApplications];
   [self refreshDock];
+  [self playDockRemovalSoundIfEnabled];
 }
 
 - (BOOL) dockView: (id)dockView itemIsOpenAtLogin: (DockItem *)item
