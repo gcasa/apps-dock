@@ -63,6 +63,8 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 - (BOOL) windowIsKnownDockAppWindow: (Window)window;
 - (void) updateHostWindowShape;
 - (NSRect) hiddenIconWindowFrame;
+- (void) handlePossiblyNewWindow: (Window)window;
+- (void) scanClientWindow: (Window)window;
 - (void) deiconifyWindow: (Window)window;
 - (NSUInteger) activateIconicWindowsForProcessIdentifiers: (NSArray *)processIdentifiers
 					      underWindow: (Window)parentWindow;
@@ -336,6 +338,8 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 - (void) processPendingEvents
 {
   Display *display = (Display *)_display;
+  NSMutableSet *eventWindows = nil;
+  NSMutableSet *iconEventWindows = nil;
   BOOL sawRelevantEvent = NO;
   unsigned int processedEvents = 0;
   const unsigned int maxEventsPerTick = 64;
@@ -355,13 +359,76 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
       switch (event.type)
 	{
 	case CreateNotify:
+	  if (event.xcreatewindow.width > 0 &&
+	      event.xcreatewindow.height > 0 &&
+	      event.xcreatewindow.width <= DockSmallIconWindowMaximumSize &&
+	      event.xcreatewindow.height <= DockSmallIconWindowMaximumSize)
+	    {
+	      if (!iconEventWindows)
+		{
+		  iconEventWindows = [NSMutableSet set];
+		}
+	      [iconEventWindows addObject:
+				  [NSNumber numberWithUnsignedLong:
+					      (unsigned long)event.xcreatewindow.window]];
+	    }
+	  sawRelevantEvent = YES;
+	  break;
 	case MapNotify:
+	  if (!eventWindows)
+	    {
+	      eventWindows = [NSMutableSet set];
+	    }
+	  [eventWindows addObject:
+			  [NSNumber numberWithUnsignedLong:
+				      (unsigned long)event.xmap.window]];
+	  sawRelevantEvent = YES;
+	  break;
 	case MapRequest:
-	  _scanPending = YES;
+	  if (!eventWindows)
+	    {
+	      eventWindows = [NSMutableSet set];
+	    }
+	  [eventWindows addObject:
+			  [NSNumber numberWithUnsignedLong:
+				      (unsigned long)event.xmaprequest.window]];
 	  sawRelevantEvent = YES;
 	  break;
 	default:
 	  break;
+	}
+    }
+
+  if (XPending(display) > 0)
+    {
+      _scanPending = YES;
+    }
+
+  if ([eventWindows count] > 0)
+    {
+      NSArray *windows = [eventWindows allObjects];
+      NSUInteger i;
+
+      for (i = 0; i < [windows count]; i++)
+	{
+	  Window window =
+	    (Window)[[windows objectAtIndex:i] unsignedLongValue];
+
+	  [self scanClientWindow:window];
+	}
+    }
+
+  if ([iconEventWindows count] > 0)
+    {
+      NSArray *windows = [iconEventWindows allObjects];
+      NSUInteger i;
+
+      for (i = 0; i < [windows count]; i++)
+	{
+	  Window window =
+	    (Window)[[windows objectAtIndex:i] unsignedLongValue];
+
+	  [self handlePossiblyNewWindow:window];
 	}
     }
 
@@ -1360,14 +1427,6 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
       [self unmapIconWindow:window];
       return;
     }
-
-  if ([self windowIsRegisteredIconWindow:window] ||
-      [self rememberApplicationIconWindow:window
-                        processIdentifier:[self processIdentifierForWindow:window]
-                                    title:[self classNameForWindow:window]])
-    {
-      return;
-    }
 }
 
 - (BOOL) windowLooksLikeDockApp: (Window)window
@@ -1805,6 +1864,14 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
       NSString *title;
 
       if ([self windowIsRegisteredIconWindow:children[i]])
+	{
+	  continue;
+	}
+      if (![self windowIsSmallIconSized:children[i]])
+	{
+	  continue;
+	}
+      if (![self windowHasGNUstepIconStyle:children[i]])
 	{
 	  continue;
 	}

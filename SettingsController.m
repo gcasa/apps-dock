@@ -68,6 +68,8 @@ SettingsClampedWindowAlpha(CGFloat alpha)
   DESTROY(_wiggleOnActivationButton);
   DESTROY(_wiggleOnLaunchButton);
   DESTROY(_hoverIconScaleSlider);
+  DESTROY(_hoverIconScaleValueLabel);
+  DESTROY(_hoverIconScaleLabel);
   DESTROY(_magnifyHoveredIconsButton);
   DESTROY(_showBorderButton);
   DESTROY(_useCellTileButton);
@@ -75,11 +77,48 @@ SettingsClampedWindowAlpha(CGFloat alpha)
   DESTROY(_runningDotButton);
   DESTROY(_cellSize64Button);
   DESTROY(_currentCellSizeButton);
+  DESTROY(_transparencyValueLabel);
   DESTROY(_transparencySlider);
+  DESTROY(_transparencyLabel);
   DESTROY(_backgroundColorWell);
   DESTROY(_placementPopup);
   DESTROY(_panel);
   DEALLOC;
+}
+
+- (NSTextField *) valueLabelWithFrame: (NSRect)frame
+{
+  NSTextField *label = [[NSTextField alloc] initWithFrame:frame];
+
+  [label setEditable:NO];
+  [label setSelectable:NO];
+  [label setBordered:NO];
+  [label setDrawsBackground:NO];
+  [label setAlignment:NSRightTextAlignment];
+  [label setFont:[NSFont systemFontOfSize:[NSFont systemFontSize]]];
+  return label;
+}
+
+- (void) updateTransparencyValueLabel
+{
+  NSInteger percent =
+    (NSInteger)([_transparencySlider floatValue] * 100.0 + 0.5);
+
+  [_transparencyValueLabel setStringValue:
+      [NSString stringWithFormat:@"%ld%%", (long)percent]];
+  [_transparencyLabel setStringValue:
+      [NSString stringWithFormat:@"Transparency %ld%%", (long)percent]];
+}
+
+- (void) updateHoverIconScaleValueLabel
+{
+  NSInteger percent =
+    (NSInteger)(([_hoverIconScaleSlider floatValue] - 1.0) * 100.0 + 0.5);
+
+  [_hoverIconScaleValueLabel setStringValue:
+      [NSString stringWithFormat:@"+%ld%%", (long)percent]];
+  [_hoverIconScaleLabel setStringValue:
+      [NSString stringWithFormat:@"Hover Size +%ld%%", (long)percent]];
 }
 
 - (NSTextField *) labelWithTitle: (NSString *)title frame: (NSRect)frame
@@ -173,18 +212,23 @@ SettingsClampedWindowAlpha(CGFloat alpha)
   [colorPanel setShowsAlpha:NO];
   [colorPanel setContinuous:YES];
 
-  label = [self labelWithTitle:@"Transparency"
-			 frame:NSMakeRect(18, 498, 110, 20)];
-  [contentView addSubview:label];
+  _transparencyLabel =
+    [self labelWithTitle:@"Transparency"
+		   frame:NSMakeRect(18, 498, 130, 20)];
+  RETAIN(_transparencyLabel);
+  [contentView addSubview:_transparencyLabel];
 
   _transparencySlider =
-    [[NSSlider alloc] initWithFrame:NSMakeRect(132, 494, 300, 24)];
+    [[NSSlider alloc] initWithFrame:NSMakeRect(150, 494, 220, 24)];
   [_transparencySlider setMinValue:0.2];
   [_transparencySlider setMaxValue:1.0];
   [_transparencySlider setContinuous:YES];
   [_transparencySlider setTarget:self];
   [_transparencySlider setAction:@selector(transparencyChanged:)];
   [contentView addSubview:_transparencySlider];
+  _transparencyValueLabel =
+    [self valueLabelWithFrame:NSMakeRect(378, 496, 54, 20)];
+  [contentView addSubview:_transparencyValueLabel];
 
   label = [self labelWithTitle:@"Icon Cells"
 			 frame:NSMakeRect(18, 476, 110, 20)];
@@ -247,18 +291,23 @@ SettingsClampedWindowAlpha(CGFloat alpha)
 		   action:@selector(magnifyHoveredIconsChanged:)];
   [contentView addSubview:_magnifyHoveredIconsButton];
 
-  label = [self labelWithTitle:@"Hover Size"
-			 frame:NSMakeRect(18, 252, 110, 20)];
-  [contentView addSubview:label];
+  _hoverIconScaleLabel =
+    [self labelWithTitle:@"Hover Size"
+		   frame:NSMakeRect(18, 252, 130, 20)];
+  RETAIN(_hoverIconScaleLabel);
+  [contentView addSubview:_hoverIconScaleLabel];
 
   _hoverIconScaleSlider =
-    [[NSSlider alloc] initWithFrame:NSMakeRect(132, 248, 300, 24)];
+    [[NSSlider alloc] initWithFrame:NSMakeRect(150, 248, 220, 24)];
   [_hoverIconScaleSlider setMinValue:1.0];
   [_hoverIconScaleSlider setMaxValue:1.5];
   [_hoverIconScaleSlider setContinuous:YES];
   [_hoverIconScaleSlider setTarget:self];
   [_hoverIconScaleSlider setAction:@selector(hoverIconScaleChanged:)];
   [contentView addSubview:_hoverIconScaleSlider];
+  _hoverIconScaleValueLabel =
+    [self valueLabelWithFrame:NSMakeRect(378, 250, 54, 20)];
+  [contentView addSubview:_hoverIconScaleValueLabel];
 
   _wiggleOnLaunchButton =
     [self buttonWithTitle:@"Wiggle On Launch"
@@ -479,6 +528,7 @@ SettingsClampedWindowAlpha(CGFloat alpha)
        NSOnState : NSOffState)];
   [_transparencySlider setFloatValue:
       [_delegate settingsControllerWindowAlpha:self]];
+  [self updateTransparencyValueLabel];
   if (![_panel isVisible])
     {
       color = [_delegate settingsControllerBackgroundColor:self];
@@ -494,6 +544,7 @@ SettingsClampedWindowAlpha(CGFloat alpha)
       [_delegate settingsControllerHoverIconScale:self]];
   [_hoverIconScaleSlider setEnabled:
       [_delegate settingsControllerMagnifiesHoveredIcons:self]];
+  [self updateHoverIconScaleValueLabel];
   [_wiggleOnLaunchButton setState:
       ([_delegate settingsControllerWigglesOnLaunch:self] ?
        NSOnState : NSOffState)];
@@ -645,6 +696,7 @@ SettingsClampedWindowAlpha(CGFloat alpha)
   [_delegate settingsController:self didChangeWindowAlpha:alpha];
   [_transparencySlider setFloatValue:
       [_delegate settingsControllerWindowAlpha:self]];
+  [self updateTransparencyValueLabel];
 }
 
 - (void) showBorderChanged: (id)sender
@@ -670,6 +722,9 @@ didChangeUseCellTileBackground:[(NSButton *)sender state] == NSOnState];
 {
   [_delegate settingsController:self
 	didChangeHoverIconScale:[(NSSlider *)sender floatValue]];
+  [_hoverIconScaleSlider setFloatValue:
+      [_delegate settingsControllerHoverIconScale:self]];
+  [self updateHoverIconScaleValueLabel];
 }
 
 - (void) wiggleOnLaunchChanged: (id)sender

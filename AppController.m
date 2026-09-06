@@ -996,7 +996,7 @@
 	}
       if (!_scanTimer)
 	{
-	  _scanTimer = [NSTimer scheduledTimerWithTimeInterval:5.0
+	  _scanTimer = [NSTimer scheduledTimerWithTimeInterval:30.0
 							target:_x11
 						      selector:@selector(scanForDockApps)
 						      userInfo:nil
@@ -1005,7 +1005,7 @@
     }
   if (!_processScanTimer)
     {
-      _processScanTimer = [NSTimer scheduledTimerWithTimeInterval:5.0
+      _processScanTimer = [NSTimer scheduledTimerWithTimeInterval:15.0
 							   target:self
 							 selector:@selector(scanRunningApplications)
 							 userInfo:nil
@@ -2341,14 +2341,25 @@ didChangeRunningIndicatorMode: (DockRunningIndicatorMode)mode
     }
   if (item)
     {
-      [item setState: (hidden ? DockItemHidden : DockItemRunning)];
+      DockItemState newState = hidden ? DockItemHidden : DockItemRunning;
+      BOOL changed = NO;
+
+      if ([item state] != newState)
+	{
+	  [item setState:newState];
+	  changed = YES;
+	}
       if ([self shouldApplyX11Icon:icon toItem:item])
 	{
 	  [self applyX11Icon:icon
 		      toItem:item
 		  identifier:[NSString stringWithFormat:@"0x%lx", xWindow]];
+	  changed = YES;
 	}
-      [_dockView setNeedsDisplay:YES];
+      if (changed)
+	{
+	  [_dockView setNeedsDisplay:YES];
+	}
     }
 }
 
