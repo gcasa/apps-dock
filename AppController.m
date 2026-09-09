@@ -28,6 +28,34 @@
 #import <signal.h>
 #import <unistd.h>
 
+@interface AppController (Private)
+- (DockPlacement) savedDockPlacement;
+- (NSColor *) savedBackgroundColor;
+- (CGFloat) savedWindowAlpha;
+- (BOOL) savedShowDockBorder;
+- (NSInteger) savedDockCellSizeMode;
+- (DockRunningIndicatorMode) savedRunningIndicatorMode;
+- (BOOL) savedUseCellTileBackground;
+- (void) applyDockCellSizeToView;
+- (void) savePersistedApplications;
+- (NSUInteger) pinnedApplicationCount;
+- (BOOL) applicationBundlePathIsDockWM: (NSString *)path;
+- (DockItem *) applicationItemMatchingTitle: (NSString *)title;
+- (BOOL) launchApplicationItem: (DockItem *)item;
+- (NSArray *) launchArgumentsFromString: (NSString *)arguments;
+- (void) performInitialApplicationScans;
+- (void) scanRunningApplications;
+- (void) updateRecyclerState;
+- (NSRect) dockWindowFrameForPlacement: (DockPlacement)placement;
+- (NSMenu *) dockMenu;
+- (void) applyDockPlacement;
+- (void) updateDockBackground;
+- (void) startAttentionWiggleForItem: (DockItem *)item;
+- (void) refreshDock;
+- (void) restoreApplicationItemAfterExit: (DockItem *)item;
+- (BOOL) launchDesktopFile: (NSString *)path arguments: (NSArray *)arguments;
+@end
+
 @implementation AppController
 
 - (void) applicationDidFinishLaunching: (NSNotification *)notification
@@ -56,6 +84,7 @@
   _wigglesOnActivation = [_preferences savedWigglesOnActivation];
   _wigglesOnAttentionRequest = [_preferences savedWigglesOnAttentionRequest];
   _playsSoundOnRemove = [_preferences savedPlaysSoundOnRemove];
+  [self loadPersistedApplications];
   frame = [self dockWindowFrameForPlacement:_dockPlacement];
 
   _window = [[NSWindow alloc] initWithContentRect:frame
@@ -980,8 +1009,6 @@
 
 - (void) performInitialApplicationScans
 {
-  [self loadPersistedApplications];
-  [self refreshDock];
   [self scanRunningApplications];
   if (_x11)
     {
