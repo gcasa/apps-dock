@@ -37,6 +37,7 @@
 - (DockRunningIndicatorMode) savedRunningIndicatorMode;
 - (BOOL) savedUseCellTileBackground;
 - (void) applyDockCellSizeToView;
+- (void) loadPersistedApplications;
 - (void) savePersistedApplications;
 - (NSUInteger) pinnedApplicationCount;
 - (BOOL) applicationBundlePathIsDockWM: (NSString *)path;

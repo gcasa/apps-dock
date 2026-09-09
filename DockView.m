@@ -45,6 +45,7 @@ static NSInteger DockHoverRecycler = -3;
 - (void) hideTooltip;
 - (void) addPathsFromPasteboardObject: (id)object toArray: (NSMutableArray *)paths;
 - (void) addPathsFromPasteboardString: (NSString *)string toArray: (NSMutableArray *)paths;
+- (NSRect) iconRectInCell: (NSRect)cell size: (CGFloat)size;
 @end
 
 static NSColor *
