@@ -151,6 +151,12 @@ SettingsClampedWindowAlpha(CGFloat alpha)
 - (void) createPanel
 {
   NSView *contentView;
+  NSView *dockView;
+  NSView *appearanceView;
+  NSView *behaviorView;
+  NSView *applicationsView;
+  NSTabView *tabView;
+  NSTabViewItem *tabItem;
   NSTextField *label;
   NSButton *closeButton;
   NSColorPanel *colorPanel;
@@ -163,7 +169,7 @@ SettingsClampedWindowAlpha(CGFloat alpha)
     }
 
   _panel = [[NSPanel alloc]
-	     initWithContentRect:NSMakeRect(0, 0, 460, 620)
+	     initWithContentRect:NSMakeRect(0, 0, 460, 420)
 		       styleMask:NSTitledWindowMask | NSClosableWindowMask
 			 backing:NSBackingStoreBuffered
 			   defer:NO];
@@ -173,12 +179,44 @@ SettingsClampedWindowAlpha(CGFloat alpha)
 
   contentView = [_panel contentView];
 
+  tabView = AUTORELEASE([[NSTabView alloc]
+			  initWithFrame:NSMakeRect(12, 56, 436, 352)]);
+  [contentView addSubview:tabView];
+
+  dockView = AUTORELEASE([[NSView alloc]
+			   initWithFrame:NSMakeRect(0, 0, 420, 308)]);
+  tabItem = AUTORELEASE([[NSTabViewItem alloc] initWithIdentifier:@"Dock"]);
+  [tabItem setLabel:@"Dock"];
+  [tabItem setView:dockView];
+  [tabView addTabViewItem:tabItem];
+
+  appearanceView = AUTORELEASE([[NSView alloc]
+				 initWithFrame:NSMakeRect(0, 0, 420, 308)]);
+  tabItem = AUTORELEASE([[NSTabViewItem alloc] initWithIdentifier:@"Appearance"]);
+  [tabItem setLabel:@"Appearance"];
+  [tabItem setView:appearanceView];
+  [tabView addTabViewItem:tabItem];
+
+  behaviorView = AUTORELEASE([[NSView alloc]
+			       initWithFrame:NSMakeRect(0, 0, 420, 308)]);
+  tabItem = AUTORELEASE([[NSTabViewItem alloc] initWithIdentifier:@"Behavior"]);
+  [tabItem setLabel:@"Behavior"];
+  [tabItem setView:behaviorView];
+  [tabView addTabViewItem:tabItem];
+
+  applicationsView = AUTORELEASE([[NSView alloc]
+				   initWithFrame:NSMakeRect(0, 0, 420, 308)]);
+  tabItem = AUTORELEASE([[NSTabViewItem alloc] initWithIdentifier:@"Applications"]);
+  [tabItem setLabel:@"Applications"];
+  [tabItem setView:applicationsView];
+  [tabView addTabViewItem:tabItem];
+
   label = [self labelWithTitle:@"Placement"
-			 frame:NSMakeRect(18, 576, 110, 20)];
-  [contentView addSubview:label];
+			 frame:NSMakeRect(18, 264, 110, 20)];
+  [dockView addSubview:label];
 
   _placementPopup =
-    [[NSPopUpButton alloc] initWithFrame:NSMakeRect(132, 572, 170, 26)
+    [[NSPopUpButton alloc] initWithFrame:NSMakeRect(132, 260, 170, 26)
 			       pullsDown:NO];
   placements = [NSArray arrayWithObjects:
 			  @"Left Top",
@@ -195,218 +233,218 @@ SettingsClampedWindowAlpha(CGFloat alpha)
     }
   [_placementPopup setTarget:self];
   [_placementPopup setAction:@selector(placementChanged:)];
-  [contentView addSubview:_placementPopup];
+  [dockView addSubview:_placementPopup];
 
-  [_placementPopup setFrame:NSMakeRect(132, 572, 170, 26)];
+  [_placementPopup setFrame:NSMakeRect(132, 260, 170, 26)];
+
+  label = [self labelWithTitle:@"Icon Cells"
+			 frame:NSMakeRect(18, 218, 110, 20)];
+  [dockView addSubview:label];
+
+  _cellSize64Button =
+    [self buttonWithTitle:@"64 x 64"
+		    frame:NSMakeRect(132, 216, 160, 24)
+	       buttonType:NSRadioButton
+		   action:@selector(dockCellSizeChanged:)];
+  [_cellSize64Button setTag:SettingsDockCellSizeMode64];
+  [dockView addSubview:_cellSize64Button];
+
+  _currentCellSizeButton =
+    [self buttonWithTitle:[_delegate settingsControllerCurrentDockCellSizeTitle:self]
+		    frame:NSMakeRect(132, 192, 160, 24)
+	       buttonType:NSRadioButton
+		   action:@selector(dockCellSizeChanged:)];
+  [_currentCellSizeButton setTag:SettingsDockCellSizeModeCurrent];
+  [dockView addSubview:_currentCellSizeButton];
+
+  label = [self labelWithTitle:@"State Dots"
+			 frame:NSMakeRect(18, 144, 110, 20)];
+  [dockView addSubview:label];
+
+  _runningDotButton =
+    [self buttonWithTitle:@"Dot when running"
+		    frame:NSMakeRect(132, 142, 170, 24)
+	       buttonType:NSRadioButton
+		   action:@selector(runningIndicatorModeChanged:)];
+  [_runningDotButton setTag:DockRunningIndicatorModeRunningDot];
+  [dockView addSubview:_runningDotButton];
+
+  _notRunningDotsButton =
+    [self buttonWithTitle:@"Dots when stopped"
+		    frame:NSMakeRect(132, 118, 170, 24)
+	       buttonType:NSRadioButton
+		   action:@selector(runningIndicatorModeChanged:)];
+  [_notRunningDotsButton setTag:DockRunningIndicatorModeNotRunningDots];
+  [dockView addSubview:_notRunningDotsButton];
 
   label = [self labelWithTitle:@"Color"
-			 frame:NSMakeRect(18, 532, 110, 20)];
-  [contentView addSubview:label];
+			 frame:NSMakeRect(18, 264, 110, 20)];
+  [appearanceView addSubview:label];
 
   _backgroundColorWell =
-    [[NSColorWell alloc] initWithFrame:NSMakeRect(132, 526, 58, 32)];
+    [[NSColorWell alloc] initWithFrame:NSMakeRect(132, 258, 58, 32)];
   [_backgroundColorWell setTarget:self];
   [_backgroundColorWell setAction:@selector(backgroundColorChanged:)];
-  [contentView addSubview:_backgroundColorWell];
+  [appearanceView addSubview:_backgroundColorWell];
   colorPanel = [NSColorPanel sharedColorPanel];
   [colorPanel setShowsAlpha:NO];
   [colorPanel setContinuous:YES];
 
   _transparencyLabel =
     [self labelWithTitle:@"Transparency"
-		   frame:NSMakeRect(18, 498, 130, 20)];
+		   frame:NSMakeRect(18, 222, 130, 20)];
   RETAIN(_transparencyLabel);
-  [contentView addSubview:_transparencyLabel];
+  [appearanceView addSubview:_transparencyLabel];
 
   _transparencySlider =
-    [[NSSlider alloc] initWithFrame:NSMakeRect(150, 494, 220, 24)];
+    [[NSSlider alloc] initWithFrame:NSMakeRect(150, 218, 220, 24)];
   [_transparencySlider setMinValue:0.2];
   [_transparencySlider setMaxValue:1.0];
   [_transparencySlider setContinuous:YES];
   [_transparencySlider setTarget:self];
   [_transparencySlider setAction:@selector(transparencyChanged:)];
-  [contentView addSubview:_transparencySlider];
+  [appearanceView addSubview:_transparencySlider];
   _transparencyValueLabel =
-    [self valueLabelWithFrame:NSMakeRect(378, 496, 54, 20)];
-  [contentView addSubview:_transparencyValueLabel];
-
-  label = [self labelWithTitle:@"Icon Cells"
-			 frame:NSMakeRect(18, 476, 110, 20)];
-  [contentView addSubview:label];
-
-  _cellSize64Button =
-    [self buttonWithTitle:@"64 x 64"
-		    frame:NSMakeRect(132, 474, 160, 24)
-	       buttonType:NSRadioButton
-		   action:@selector(dockCellSizeChanged:)];
-  [_cellSize64Button setTag:SettingsDockCellSizeMode64];
-  [contentView addSubview:_cellSize64Button];
-
-  _currentCellSizeButton =
-    [self buttonWithTitle:[_delegate settingsControllerCurrentDockCellSizeTitle:self]
-		    frame:NSMakeRect(132, 450, 160, 24)
-	       buttonType:NSRadioButton
-		   action:@selector(dockCellSizeChanged:)];
-  [_currentCellSizeButton setTag:SettingsDockCellSizeModeCurrent];
-  [contentView addSubview:_currentCellSizeButton];
-
-  label = [self labelWithTitle:@"State Dots"
-			 frame:NSMakeRect(18, 404, 110, 20)];
-  [contentView addSubview:label];
-
-  _runningDotButton =
-    [self buttonWithTitle:@"Dot when running"
-		    frame:NSMakeRect(132, 402, 170, 24)
-	       buttonType:NSRadioButton
-		   action:@selector(runningIndicatorModeChanged:)];
-  [_runningDotButton setTag:DockRunningIndicatorModeRunningDot];
-  [contentView addSubview:_runningDotButton];
-
-  _notRunningDotsButton =
-    [self buttonWithTitle:@"Dots when stopped"
-		    frame:NSMakeRect(132, 378, 170, 24)
-	       buttonType:NSRadioButton
-		   action:@selector(runningIndicatorModeChanged:)];
-  [_notRunningDotsButton setTag:DockRunningIndicatorModeNotRunningDots];
-  [contentView addSubview:_notRunningDotsButton];
+    [self valueLabelWithFrame:NSMakeRect(378, 220, 54, 20)];
+  [appearanceView addSubview:_transparencyValueLabel];
 
   _useCellTileButton =
     [self buttonWithTitle:@"Use common_Tile"
-		    frame:NSMakeRect(18, 340, 170, 24)
+		    frame:NSMakeRect(18, 174, 170, 24)
 	       buttonType:NSSwitchButton
 		   action:@selector(useCellTileChanged:)];
-  [contentView addSubview:_useCellTileButton];
+  [appearanceView addSubview:_useCellTileButton];
 
   _showBorderButton =
     [self buttonWithTitle:@"Show Border"
-		    frame:NSMakeRect(18, 314, 140, 24)
+		    frame:NSMakeRect(18, 148, 140, 24)
 	       buttonType:NSSwitchButton
 		   action:@selector(showBorderChanged:)];
-  [contentView addSubview:_showBorderButton];
+  [appearanceView addSubview:_showBorderButton];
 
   _magnifyHoveredIconsButton =
     [self buttonWithTitle:@"Magnify Icons"
-		    frame:NSMakeRect(18, 284, 160, 24)
+		    frame:NSMakeRect(18, 106, 160, 24)
 	       buttonType:NSSwitchButton
 		   action:@selector(magnifyHoveredIconsChanged:)];
-  [contentView addSubview:_magnifyHoveredIconsButton];
+  [appearanceView addSubview:_magnifyHoveredIconsButton];
 
   _hoverIconScaleLabel =
     [self labelWithTitle:@"Hover Size"
-		   frame:NSMakeRect(18, 252, 130, 20)];
+		   frame:NSMakeRect(18, 72, 130, 20)];
   RETAIN(_hoverIconScaleLabel);
-  [contentView addSubview:_hoverIconScaleLabel];
+  [appearanceView addSubview:_hoverIconScaleLabel];
 
   _hoverIconScaleSlider =
-    [[NSSlider alloc] initWithFrame:NSMakeRect(150, 248, 220, 24)];
+    [[NSSlider alloc] initWithFrame:NSMakeRect(150, 68, 220, 24)];
   [_hoverIconScaleSlider setMinValue:1.0];
   [_hoverIconScaleSlider setMaxValue:1.5];
   [_hoverIconScaleSlider setContinuous:YES];
   [_hoverIconScaleSlider setTarget:self];
   [_hoverIconScaleSlider setAction:@selector(hoverIconScaleChanged:)];
-  [contentView addSubview:_hoverIconScaleSlider];
+  [appearanceView addSubview:_hoverIconScaleSlider];
   _hoverIconScaleValueLabel =
-    [self valueLabelWithFrame:NSMakeRect(378, 250, 54, 20)];
-  [contentView addSubview:_hoverIconScaleValueLabel];
+    [self valueLabelWithFrame:NSMakeRect(378, 70, 54, 20)];
+  [appearanceView addSubview:_hoverIconScaleValueLabel];
 
   _wiggleOnLaunchButton =
     [self buttonWithTitle:@"Wiggle On Launch"
-		    frame:NSMakeRect(18, 218, 180, 24)
+		    frame:NSMakeRect(18, 264, 180, 24)
 	       buttonType:NSSwitchButton
 		   action:@selector(wiggleOnLaunchChanged:)];
-  [contentView addSubview:_wiggleOnLaunchButton];
+  [behaviorView addSubview:_wiggleOnLaunchButton];
 
   _wiggleOnActivationButton =
     [self buttonWithTitle:@"Wiggle On Activate"
-		    frame:NSMakeRect(18, 192, 180, 24)
+		    frame:NSMakeRect(18, 238, 180, 24)
 	       buttonType:NSSwitchButton
 		   action:@selector(wiggleOnActivationChanged:)];
-  [contentView addSubview:_wiggleOnActivationButton];
+  [behaviorView addSubview:_wiggleOnActivationButton];
 
   _wiggleOnAttentionRequestButton =
     [self buttonWithTitle:@"Wiggle On Attention"
-		    frame:NSMakeRect(212, 192, 200, 24)
+		    frame:NSMakeRect(18, 212, 200, 24)
 	       buttonType:NSSwitchButton
 		   action:@selector(wiggleOnAttentionRequestChanged:)];
-  [contentView addSubview:_wiggleOnAttentionRequestButton];
+  [behaviorView addSubview:_wiggleOnAttentionRequestButton];
 
   _playSoundOnRemoveButton =
     [self buttonWithTitle:@"Sound On Remove"
-		    frame:NSMakeRect(212, 218, 200, 24)
+		    frame:NSMakeRect(18, 174, 200, 24)
 	       buttonType:NSSwitchButton
 		   action:@selector(playSoundOnRemoveChanged:)];
-  [contentView addSubview:_playSoundOnRemoveButton];
+  [behaviorView addSubview:_playSoundOnRemoveButton];
 
   label = [self labelWithTitle:@"App"
-			 frame:NSMakeRect(18, 168, 110, 20)];
-  [contentView addSubview:label];
+			 frame:NSMakeRect(18, 264, 110, 20)];
+  [applicationsView addSubview:label];
 
   _applicationPopup =
-    [[NSPopUpButton alloc] initWithFrame:NSMakeRect(132, 164, 300, 26)
+    [[NSPopUpButton alloc] initWithFrame:NSMakeRect(132, 260, 280, 26)
 			       pullsDown:NO];
   [_applicationPopup setTarget:self];
   [_applicationPopup setAction:@selector(applicationSelectionChanged:)];
-  [contentView addSubview:_applicationPopup];
+  [applicationsView addSubview:_applicationPopup];
 
   label = [self labelWithTitle:@"Arguments"
-			 frame:NSMakeRect(18, 126, 110, 20)];
-  [contentView addSubview:label];
+			 frame:NSMakeRect(18, 222, 110, 20)];
+  [applicationsView addSubview:label];
 
   _applicationArgumentsField =
-    [[NSTextField alloc] initWithFrame:NSMakeRect(132, 124, 300, 24)];
+    [[NSTextField alloc] initWithFrame:NSMakeRect(132, 220, 280, 24)];
   [_applicationArgumentsField setTarget:self];
   [_applicationArgumentsField setAction:@selector(applyApplicationArguments:)];
-  [contentView addSubview:_applicationArgumentsField];
+  [applicationsView addSubview:_applicationArgumentsField];
 
   _applyApplicationButton =
     [self buttonWithTitle:@"Apply"
-		    frame:NSMakeRect(132, 88, 72, 28)
+		    frame:NSMakeRect(132, 184, 72, 28)
 	       buttonType:NSMomentaryPushInButton
 		   action:@selector(applyApplicationArguments:)];
   [_applyApplicationButton setBezelStyle:NSRoundedBezelStyle];
-  [contentView addSubview:_applyApplicationButton];
+  [applicationsView addSubview:_applyApplicationButton];
 
   _openAtLoginButton =
     [self buttonWithTitle:@"Open At Login"
-		    frame:NSMakeRect(212, 56, 160, 24)
+		    frame:NSMakeRect(132, 144, 160, 24)
 	       buttonType:NSSwitchButton
 		   action:@selector(openAtLoginChanged:)];
-  [contentView addSubview:_openAtLoginButton];
+  [applicationsView addSubview:_openAtLoginButton];
 
   _moveApplicationUpButton =
     [self buttonWithTitle:@"Move Up"
-		    frame:NSMakeRect(212, 88, 84, 28)
+		    frame:NSMakeRect(212, 184, 84, 28)
 	       buttonType:NSMomentaryPushInButton
 		   action:@selector(moveApplicationUp:)];
   [_moveApplicationUpButton setBezelStyle:NSRoundedBezelStyle];
-  [contentView addSubview:_moveApplicationUpButton];
+  [applicationsView addSubview:_moveApplicationUpButton];
 
   _moveApplicationDownButton =
     [self buttonWithTitle:@"Move Down"
-		    frame:NSMakeRect(304, 88, 96, 28)
+		    frame:NSMakeRect(304, 184, 96, 28)
 	       buttonType:NSMomentaryPushInButton
 		   action:@selector(moveApplicationDown:)];
   [_moveApplicationDownButton setBezelStyle:NSRoundedBezelStyle];
-  [contentView addSubview:_moveApplicationDownButton];
+  [applicationsView addSubview:_moveApplicationDownButton];
 
   _deleteApplicationButton =
     [self buttonWithTitle:@"Delete"
-		    frame:NSMakeRect(132, 54, 72, 28)
+		    frame:NSMakeRect(132, 102, 72, 28)
 	       buttonType:NSMomentaryPushInButton
 		   action:@selector(deleteApplication:)];
   [_deleteApplicationButton setBezelStyle:NSRoundedBezelStyle];
-  [contentView addSubview:_deleteApplicationButton];
+  [applicationsView addSubview:_deleteApplicationButton];
 
   _emptyRecyclerButton =
     [self buttonWithTitle:@"Empty Recycler"
-		    frame:NSMakeRect(18, 16, 120, 28)
+		    frame:NSMakeRect(212, 102, 120, 28)
 	       buttonType:NSMomentaryPushInButton
 		   action:@selector(emptyRecycler:)];
   [_emptyRecyclerButton setBezelStyle:NSRoundedBezelStyle];
-  [contentView addSubview:_emptyRecyclerButton];
+  [applicationsView addSubview:_emptyRecyclerButton];
 
   closeButton = [self buttonWithTitle:@"Close"
-				frame:NSMakeRect(344, 16, 88, 28)
+				frame:NSMakeRect(360, 16, 72, 28)
 			   buttonType:NSMomentaryPushInButton
 			       action:@selector(closePanel:)];
   [closeButton setBezelStyle:NSRoundedBezelStyle];

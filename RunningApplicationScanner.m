@@ -437,10 +437,6 @@
 {
   NSString *itemPath = [self normalizedPath:[item path]];
   NSString *executablePath = [self executablePathForApplicationPath:[item path]];
-  NSString *processName = [[processPath lastPathComponent] lowercaseString];
-  NSString *itemName = [[[[item path] lastPathComponent]
-			  stringByDeletingPathExtension] lowercaseString];
-  NSString *executableName = [[executablePath lastPathComponent] lowercaseString];
 
   if (![processPath length])
     {
@@ -449,8 +445,6 @@
 
   if (([itemPath length] && [processPath isEqualToString:itemPath]) ||
       ([executablePath length] && [processPath isEqualToString:executablePath]) ||
-      ([processName length] && [processName isEqualToString:itemName]) ||
-      ([processName length] && [processName isEqualToString:executableName]) ||
       ([itemPath length] &&
        [[[itemPath pathExtension] lowercaseString] isEqualToString:@"app"] &&
        [self path:processPath isEqualToOrDescendantOfPath:itemPath]))
