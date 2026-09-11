@@ -66,6 +66,7 @@ SettingsClampedWindowAlpha(CGFloat alpha)
   DESTROY(_openAtLoginButton);
   DESTROY(_applyApplicationButton);
   DESTROY(_applicationArgumentsField);
+  DESTROY(_applicationPathField);
   DESTROY(_applicationPopup);
   DESTROY(_wiggleOnAttentionRequestButton);
   DESTROY(_playSoundOnRemoveButton);
@@ -173,7 +174,7 @@ SettingsClampedWindowAlpha(CGFloat alpha)
     }
 
   _panel = [[NSPanel alloc]
-	     initWithContentRect:NSMakeRect(0, 0, 460, 420)
+	     initWithContentRect:NSMakeRect(0, 0, 460, 452)
 		       styleMask:NSTitledWindowMask | NSClosableWindowMask
 			 backing:NSBackingStoreBuffered
 			   defer:NO];
@@ -184,32 +185,32 @@ SettingsClampedWindowAlpha(CGFloat alpha)
   contentView = [_panel contentView];
 
   tabView = AUTORELEASE([[NSTabView alloc]
-			  initWithFrame:NSMakeRect(12, 56, 436, 352)]);
+			  initWithFrame:NSMakeRect(12, 56, 436, 384)]);
   [contentView addSubview:tabView];
 
   dockView = AUTORELEASE([[NSView alloc]
-			   initWithFrame:NSMakeRect(0, 0, 420, 308)]);
+			   initWithFrame:NSMakeRect(0, 0, 420, 340)]);
   tabItem = AUTORELEASE([[NSTabViewItem alloc] initWithIdentifier:@"Dock"]);
   [tabItem setLabel:@"Dock"];
   [tabItem setView:dockView];
   [tabView addTabViewItem:tabItem];
 
   appearanceView = AUTORELEASE([[NSView alloc]
-				 initWithFrame:NSMakeRect(0, 0, 420, 308)]);
+				 initWithFrame:NSMakeRect(0, 0, 420, 340)]);
   tabItem = AUTORELEASE([[NSTabViewItem alloc] initWithIdentifier:@"Appearance"]);
   [tabItem setLabel:@"Appearance"];
   [tabItem setView:appearanceView];
   [tabView addTabViewItem:tabItem];
 
   behaviorView = AUTORELEASE([[NSView alloc]
-			       initWithFrame:NSMakeRect(0, 0, 420, 308)]);
+			       initWithFrame:NSMakeRect(0, 0, 420, 340)]);
   tabItem = AUTORELEASE([[NSTabViewItem alloc] initWithIdentifier:@"Behavior"]);
   [tabItem setLabel:@"Behavior"];
   [tabItem setView:behaviorView];
   [tabView addTabViewItem:tabItem];
 
   applicationsView = AUTORELEASE([[NSView alloc]
-				   initWithFrame:NSMakeRect(0, 0, 420, 308)]);
+				   initWithFrame:NSMakeRect(0, 0, 420, 340)]);
   tabItem = AUTORELEASE([[NSTabViewItem alloc] initWithIdentifier:@"Applications"]);
   [tabItem setLabel:@"Applications"];
   [tabItem setView:applicationsView];
@@ -380,15 +381,25 @@ SettingsClampedWindowAlpha(CGFloat alpha)
   [behaviorView addSubview:_playSoundOnRemoveButton];
 
   label = [self labelWithTitle:@"App"
-			 frame:NSMakeRect(18, 264, 110, 20)];
+			 frame:NSMakeRect(18, 296, 110, 20)];
   [applicationsView addSubview:label];
 
   _applicationPopup =
-    [[NSPopUpButton alloc] initWithFrame:NSMakeRect(132, 260, 280, 26)
+    [[NSPopUpButton alloc] initWithFrame:NSMakeRect(132, 292, 280, 26)
 			       pullsDown:NO];
   [_applicationPopup setTarget:self];
   [_applicationPopup setAction:@selector(applicationSelectionChanged:)];
   [applicationsView addSubview:_applicationPopup];
+
+  label = [self labelWithTitle:@"Path"
+			 frame:NSMakeRect(18, 254, 110, 20)];
+  [applicationsView addSubview:label];
+
+  _applicationPathField =
+    [[NSTextField alloc] initWithFrame:NSMakeRect(132, 252, 280, 24)];
+  [_applicationPathField setEditable:NO];
+  [_applicationPathField setSelectable:YES];
+  [applicationsView addSubview:_applicationPathField];
 
   label = [self labelWithTitle:@"Arguments"
 			 frame:NSMakeRect(18, 222, 110, 20)];
@@ -690,6 +701,10 @@ SettingsClampedWindowAlpha(CGFloat alpha)
       BOOL usesDockBehaviorDefaults =
 	[_delegate settingsController:self itemUsesDockBehaviorDefaults:item];
 
+      [_applicationPathField setStringValue:
+	  ([item path] ? [item path] : @"")];
+      [_applicationPathField setToolTip:
+	  ([item path] ? [item path] : @"")];
       [_applicationArgumentsField setStringValue:
 	  ([item launchArguments] ? [item launchArguments] : @"")];
       [_applicationArgumentsField setEnabled:hasApplicationPath];
@@ -722,6 +737,8 @@ SettingsClampedWindowAlpha(CGFloat alpha)
     }
   else
     {
+      [_applicationPathField setStringValue:@""];
+      [_applicationPathField setToolTip:@""];
       [_applicationArgumentsField setStringValue:@""];
       [_applicationArgumentsField setEnabled:NO];
       [_applyApplicationButton setEnabled:NO];

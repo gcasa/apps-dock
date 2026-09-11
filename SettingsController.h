@@ -131,6 +131,7 @@ didChangeItemWigglesOnAttentionRequest: (BOOL)wiggles
   NSButton *_playSoundOnRemoveButton;
   NSButton *_emptyRecyclerButton;
   NSPopUpButton *_applicationPopup;
+  NSTextField *_applicationPathField;
   NSTextField *_applicationArgumentsField;
   NSButton *_applyApplicationButton;
   NSButton *_openAtLoginButton;
