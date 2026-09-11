@@ -17,6 +17,10 @@
 static NSString *DockApplicationsDefaultsKey = @"DockApplications";
 static NSString *DockApplicationPathKey = @"Path";
 static NSString *DockApplicationArgumentsKey = @"Arguments";
+static NSString *DockApplicationUseBehaviorDefaultsKey = @"UseBehaviorDefaults";
+static NSString *DockApplicationWigglesOnLaunchKey = @"WigglesOnLaunch";
+static NSString *DockApplicationWigglesOnActivationKey = @"WigglesOnActivation";
+static NSString *DockApplicationWigglesOnAttentionRequestKey = @"WigglesOnAttentionRequest";
 static NSString *DockOpenAtLoginApplicationsDefaultsKey = @"DockOpenAtLoginApplications";
 
 @implementation DockApplicationStore
@@ -115,6 +119,7 @@ static NSString *DockOpenAtLoginApplicationsDefaultsKey = @"DockOpenAtLoginAppli
 	  {
 	    DockItem *item = [DockItem applicationItemWithPath:applicationPath];
 	    [item setLaunchArguments:arguments];
+	    [self applyPersistedApplicationSettingsFromRecord:record toItem:item];
 	    [items addObject:item];
 	  }
 	}
@@ -160,16 +165,32 @@ static NSString *DockOpenAtLoginApplicationsDefaultsKey = @"DockOpenAtLoginAppli
 {
   NSString *path = [item path];
   NSString *arguments = [item launchArguments];
+  NSMutableDictionary *record;
 
-  if (![arguments length])
+  if (![arguments length] && [item usesDockBehaviorDefaults])
     {
       return path;
     }
 
-  return [NSDictionary dictionaryWithObjectsAndKeys:
-			 path, DockApplicationPathKey,
-			 arguments, DockApplicationArgumentsKey,
-			 nil];
+  record = [NSMutableDictionary dictionaryWithObject:path
+					      forKey:DockApplicationPathKey];
+  if ([arguments length])
+    {
+      [record setObject:arguments forKey:DockApplicationArgumentsKey];
+    }
+  if (![item usesDockBehaviorDefaults])
+    {
+      [record setObject:[NSNumber numberWithBool:NO]
+		 forKey:DockApplicationUseBehaviorDefaultsKey];
+      [record setObject:[NSNumber numberWithBool:[item wigglesOnLaunch]]
+		 forKey:DockApplicationWigglesOnLaunchKey];
+      [record setObject:[NSNumber numberWithBool:[item wigglesOnActivation]]
+		 forKey:DockApplicationWigglesOnActivationKey];
+      [record setObject:[NSNumber numberWithBool:[item wigglesOnAttentionRequest]]
+		 forKey:DockApplicationWigglesOnAttentionRequestKey];
+    }
+
+  return record;
 }
 
 - (NSString *) persistedApplicationPathFromRecord: (id)record
@@ -202,6 +223,44 @@ static NSString *DockOpenAtLoginApplicationsDefaultsKey = @"DockOpenAtLoginAppli
 	}
     }
   return nil;
+}
+
+- (BOOL) boolValueFromRecord: (NSDictionary *)record
+		      key: (NSString *)key
+		  defaultValue: (BOOL)defaultValue
+{
+  id value = [record objectForKey:key];
+
+  return [value respondsToSelector:@selector(boolValue)] ?
+    [value boolValue] : defaultValue;
+}
+
+- (void) applyPersistedApplicationSettingsFromRecord: (id)record
+					     toItem: (DockItem *)item
+{
+  BOOL usesDefaults = YES;
+
+  if (![record isKindOfClass:[NSDictionary class]] || !item)
+    {
+      return;
+    }
+
+  usesDefaults = [self boolValueFromRecord:record
+				       key:DockApplicationUseBehaviorDefaultsKey
+			      defaultValue:YES];
+  [item setUsesDockBehaviorDefaults:usesDefaults];
+  [item setWigglesOnLaunch:
+	  [self boolValueFromRecord:record
+				key:DockApplicationWigglesOnLaunchKey
+		       defaultValue:YES]];
+  [item setWigglesOnActivation:
+	  [self boolValueFromRecord:record
+				key:DockApplicationWigglesOnActivationKey
+		       defaultValue:YES]];
+  [item setWigglesOnAttentionRequest:
+	  [self boolValueFromRecord:record
+				key:DockApplicationWigglesOnAttentionRequestKey
+		       defaultValue:YES]];
 }
 
 - (BOOL) items: (NSArray *)items haveApplicationPath: (NSString *)path

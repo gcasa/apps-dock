@@ -545,6 +545,10 @@
   item->_kind = DockItemApplication;
   item->_state = DockItemNotRunning;
   item->_pinned = YES;
+  item->_usesDockBehaviorDefaults = YES;
+  item->_wigglesOnLaunch = YES;
+  item->_wigglesOnActivation = YES;
+  item->_wigglesOnAttentionRequest = YES;
   ASSIGNCOPY(item->_path, path);
   ASSIGNCOPY(item->_iconPath, iconPath);
   ASSIGNCOPY(item->_title, [[path lastPathComponent] stringByDeletingPathExtension]);
@@ -572,6 +576,10 @@
   item->_state = hidden ? DockItemHidden : DockItemRunning;
   item->_xWindow = xWindow;
   item->_pinned = NO;
+  item->_usesDockBehaviorDefaults = YES;
+  item->_wigglesOnLaunch = YES;
+  item->_wigglesOnActivation = YES;
+  item->_wigglesOnAttentionRequest = YES;
   ASSIGNCOPY(item->_title, displayTitle);
   ASSIGN(item->_icon, icon);
   item->_dockTile = [[NSDockTile alloc] init];
@@ -737,6 +745,46 @@
 - (void) setPinned: (BOOL)pinned
 {
   _pinned = pinned;
+}
+
+- (BOOL) usesDockBehaviorDefaults
+{
+  return _usesDockBehaviorDefaults;
+}
+
+- (void) setUsesDockBehaviorDefaults: (BOOL)usesDefaults
+{
+  _usesDockBehaviorDefaults = usesDefaults;
+}
+
+- (BOOL) wigglesOnLaunch
+{
+  return _wigglesOnLaunch;
+}
+
+- (void) setWigglesOnLaunch: (BOOL)wiggles
+{
+  _wigglesOnLaunch = wiggles;
+}
+
+- (BOOL) wigglesOnActivation
+{
+  return _wigglesOnActivation;
+}
+
+- (void) setWigglesOnActivation: (BOOL)wiggles
+{
+  _wigglesOnActivation = wiggles;
+}
+
+- (BOOL) wigglesOnAttentionRequest
+{
+  return _wigglesOnAttentionRequest;
+}
+
+- (void) setWigglesOnAttentionRequest: (BOOL)wiggles
+{
+  _wigglesOnAttentionRequest = wiggles;
 }
 
 @end

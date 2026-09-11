@@ -52,6 +52,9 @@
 - (void) applyDockPlacement;
 - (void) updateDockBackground;
 - (void) startAttentionWiggleForItem: (DockItem *)item;
+- (BOOL) itemWigglesOnLaunch: (DockItem *)item;
+- (BOOL) itemWigglesOnActivation: (DockItem *)item;
+- (BOOL) itemWigglesOnAttentionRequest: (DockItem *)item;
 - (void) refreshDock;
 - (void) restoreApplicationItemAfterExit: (DockItem *)item;
 - (BOOL) launchDesktopFile: (NSString *)path arguments: (NSArray *)arguments;
@@ -1478,6 +1481,32 @@
   return [self applicationPathIsOpenAtLogin:[item path]];
 }
 
+- (BOOL) settingsController: (SettingsController *)controller
+itemUsesDockBehaviorDefaults: (DockItem *)item
+{
+  return [item usesDockBehaviorDefaults];
+}
+
+- (BOOL) settingsController: (SettingsController *)controller
+	itemWigglesOnLaunch: (DockItem *)item
+{
+  return [item usesDockBehaviorDefaults] ? _wigglesOnLaunch : [item wigglesOnLaunch];
+}
+
+- (BOOL) settingsController: (SettingsController *)controller
+    itemWigglesOnActivation: (DockItem *)item
+{
+  return [item usesDockBehaviorDefaults] ?
+    _wigglesOnActivation : [item wigglesOnActivation];
+}
+
+- (BOOL) settingsController: (SettingsController *)controller
+itemWigglesOnAttentionRequest: (DockItem *)item
+{
+  return [item usesDockBehaviorDefaults] ?
+    _wigglesOnAttentionRequest : [item wigglesOnAttentionRequest];
+}
+
 - (void) settingsController: (SettingsController *)controller
      didChangeDockPlacement: (DockPlacement)placement
 {
@@ -1632,6 +1661,52 @@ didChangeRunningIndicatorMode: (DockRunningIndicatorMode)mode
 }
 
 - (void) settingsController: (SettingsController *)controller
+didChangeUseDockBehaviorDefaults: (BOOL)usesDefaults
+		    forItem: (DockItem *)item
+{
+  if (!([item kind] == DockItemApplication || [item kind] == DockItemX11Window))
+    {
+      return;
+    }
+
+  if (!usesDefaults && [item usesDockBehaviorDefaults])
+    {
+      [item setWigglesOnLaunch:_wigglesOnLaunch];
+      [item setWigglesOnActivation:_wigglesOnActivation];
+      [item setWigglesOnAttentionRequest:_wigglesOnAttentionRequest];
+    }
+  [item setUsesDockBehaviorDefaults:usesDefaults];
+  [self savePersistedApplications];
+}
+
+- (void) settingsController: (SettingsController *)controller
+ didChangeItemWigglesOnLaunch: (BOOL)wiggles
+		    forItem: (DockItem *)item
+{
+  [item setUsesDockBehaviorDefaults:NO];
+  [item setWigglesOnLaunch:wiggles];
+  [self savePersistedApplications];
+}
+
+- (void) settingsController: (SettingsController *)controller
+didChangeItemWigglesOnActivation: (BOOL)wiggles
+		    forItem: (DockItem *)item
+{
+  [item setUsesDockBehaviorDefaults:NO];
+  [item setWigglesOnActivation:wiggles];
+  [self savePersistedApplications];
+}
+
+- (void) settingsController: (SettingsController *)controller
+didChangeItemWigglesOnAttentionRequest: (BOOL)wiggles
+		    forItem: (DockItem *)item
+{
+  [item setUsesDockBehaviorDefaults:NO];
+  [item setWigglesOnAttentionRequest:wiggles];
+  [self savePersistedApplications];
+}
+
+- (void) settingsController: (SettingsController *)controller
        didMoveItemFromIndex: (NSUInteger)fromIndex
 		    toIndex: (NSUInteger)toIndex
 {
@@ -1717,7 +1792,7 @@ didChangeRunningIndicatorMode: (DockRunningIndicatorMode)mode
 
 - (void) startLaunchWiggleForItem: (DockItem *)item
 {
-  if (_wigglesOnLaunch)
+  if ([self itemWigglesOnLaunch:item])
     {
       [_dockView startWiggleForItem:item];
     }
@@ -1725,7 +1800,7 @@ didChangeRunningIndicatorMode: (DockRunningIndicatorMode)mode
 
 - (void) startActivationWiggleForItem: (DockItem *)item
 {
-  if (_wigglesOnActivation)
+  if ([self itemWigglesOnActivation:item])
     {
       [_dockView startWiggleForItem:item];
     }
@@ -1733,10 +1808,27 @@ didChangeRunningIndicatorMode: (DockRunningIndicatorMode)mode
 
 - (void) startAttentionWiggleForItem: (DockItem *)item
 {
-  if (_wigglesOnAttentionRequest)
+  if ([self itemWigglesOnAttentionRequest:item])
     {
       [_dockView startWiggleForItem:item];
     }
+}
+
+- (BOOL) itemWigglesOnLaunch: (DockItem *)item
+{
+  return [item usesDockBehaviorDefaults] ? _wigglesOnLaunch : [item wigglesOnLaunch];
+}
+
+- (BOOL) itemWigglesOnActivation: (DockItem *)item
+{
+  return [item usesDockBehaviorDefaults] ?
+    _wigglesOnActivation : [item wigglesOnActivation];
+}
+
+- (BOOL) itemWigglesOnAttentionRequest: (DockItem *)item
+{
+  return [item usesDockBehaviorDefaults] ?
+    _wigglesOnAttentionRequest : [item wigglesOnAttentionRequest];
 }
 
 - (void) quitDock: (id)sender

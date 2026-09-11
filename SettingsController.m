@@ -59,6 +59,10 @@ SettingsClampedWindowAlpha(CGFloat alpha)
   DESTROY(_deleteApplicationButton);
   DESTROY(_moveApplicationDownButton);
   DESTROY(_moveApplicationUpButton);
+  DESTROY(_applicationWiggleOnAttentionRequestButton);
+  DESTROY(_applicationWiggleOnActivationButton);
+  DESTROY(_applicationWiggleOnLaunchButton);
+  DESTROY(_useDockBehaviorDefaultsButton);
   DESTROY(_openAtLoginButton);
   DESTROY(_applyApplicationButton);
   DESTROY(_applicationArgumentsField);
@@ -411,6 +415,38 @@ SettingsClampedWindowAlpha(CGFloat alpha)
 		   action:@selector(openAtLoginChanged:)];
   [applicationsView addSubview:_openAtLoginButton];
 
+  label = [self labelWithTitle:@"App Behavior"
+			 frame:NSMakeRect(18, 82, 110, 20)];
+  [applicationsView addSubview:label];
+
+  _useDockBehaviorDefaultsButton =
+    [self buttonWithTitle:@"Use Dock Defaults"
+		    frame:NSMakeRect(132, 80, 180, 24)
+	       buttonType:NSSwitchButton
+		   action:@selector(useDockBehaviorDefaultsChanged:)];
+  [applicationsView addSubview:_useDockBehaviorDefaultsButton];
+
+  _applicationWiggleOnLaunchButton =
+    [self buttonWithTitle:@"Wiggle On Launch"
+		    frame:NSMakeRect(132, 58, 180, 24)
+	       buttonType:NSSwitchButton
+		   action:@selector(applicationWiggleOnLaunchChanged:)];
+  [applicationsView addSubview:_applicationWiggleOnLaunchButton];
+
+  _applicationWiggleOnActivationButton =
+    [self buttonWithTitle:@"Wiggle On Activate"
+		    frame:NSMakeRect(132, 36, 180, 24)
+	       buttonType:NSSwitchButton
+		   action:@selector(applicationWiggleOnActivationChanged:)];
+  [applicationsView addSubview:_applicationWiggleOnActivationButton];
+
+  _applicationWiggleOnAttentionRequestButton =
+    [self buttonWithTitle:@"Wiggle On Attention"
+		    frame:NSMakeRect(132, 14, 190, 24)
+	       buttonType:NSSwitchButton
+		   action:@selector(applicationWiggleOnAttentionRequestChanged:)];
+  [applicationsView addSubview:_applicationWiggleOnAttentionRequestButton];
+
   _moveApplicationUpButton =
     [self buttonWithTitle:@"Move Up"
 		    frame:NSMakeRect(212, 184, 84, 28)
@@ -648,6 +684,11 @@ SettingsClampedWindowAlpha(CGFloat alpha)
       BOOL hasOpenAtLoginPath =
 	([item kind] == DockItemApplication || [item kind] == DockItemX11Window) &&
 	[[item path] length] > 0;
+      BOOL hasPersistedApplicationSettings =
+	[item kind] == DockItemApplication && [item isPinned] &&
+	[[item path] length] > 0;
+      BOOL usesDockBehaviorDefaults =
+	[_delegate settingsController:self itemUsesDockBehaviorDefaults:item];
 
       [_applicationArgumentsField setStringValue:
 	  ([item launchArguments] ? [item launchArguments] : @"")];
@@ -655,6 +696,24 @@ SettingsClampedWindowAlpha(CGFloat alpha)
       [_applyApplicationButton setEnabled:hasApplicationPath];
       [_openAtLoginButton setState:(openAtLogin ? NSOnState : NSOffState)];
       [_openAtLoginButton setEnabled:hasOpenAtLoginPath];
+      [_useDockBehaviorDefaultsButton setState:
+	  (usesDockBehaviorDefaults ? NSOnState : NSOffState)];
+      [_useDockBehaviorDefaultsButton setEnabled:hasPersistedApplicationSettings];
+      [_applicationWiggleOnLaunchButton setState:
+	  ([_delegate settingsController:self itemWigglesOnLaunch:item] ?
+	   NSOnState : NSOffState)];
+      [_applicationWiggleOnLaunchButton setEnabled:
+	  hasPersistedApplicationSettings && !usesDockBehaviorDefaults];
+      [_applicationWiggleOnActivationButton setState:
+	  ([_delegate settingsController:self itemWigglesOnActivation:item] ?
+	   NSOnState : NSOffState)];
+      [_applicationWiggleOnActivationButton setEnabled:
+	  hasPersistedApplicationSettings && !usesDockBehaviorDefaults];
+      [_applicationWiggleOnAttentionRequestButton setState:
+	  ([_delegate settingsController:self itemWigglesOnAttentionRequest:item] ?
+	   NSOnState : NSOffState)];
+      [_applicationWiggleOnAttentionRequestButton setEnabled:
+	  hasPersistedApplicationSettings && !usesDockBehaviorDefaults];
       [_moveApplicationUpButton setEnabled:(selectedIndex > 0)];
       [_moveApplicationDownButton setEnabled:
 	  (selectedIndex + 1 < [items count] &&
@@ -668,6 +727,14 @@ SettingsClampedWindowAlpha(CGFloat alpha)
       [_applyApplicationButton setEnabled:NO];
       [_openAtLoginButton setState:NSOffState];
       [_openAtLoginButton setEnabled:NO];
+      [_useDockBehaviorDefaultsButton setState:NSOffState];
+      [_useDockBehaviorDefaultsButton setEnabled:NO];
+      [_applicationWiggleOnLaunchButton setState:NSOffState];
+      [_applicationWiggleOnLaunchButton setEnabled:NO];
+      [_applicationWiggleOnActivationButton setState:NSOffState];
+      [_applicationWiggleOnActivationButton setEnabled:NO];
+      [_applicationWiggleOnAttentionRequestButton setState:NSOffState];
+      [_applicationWiggleOnAttentionRequestButton setEnabled:NO];
       [_moveApplicationUpButton setEnabled:NO];
       [_moveApplicationDownButton setEnabled:NO];
       [_deleteApplicationButton setEnabled:NO];
@@ -847,6 +914,66 @@ didChangeWigglesOnAttentionRequest:[(NSButton *)sender state] == NSOnState];
 
   [_delegate settingsController:self
 	   didChangeOpenAtLogin:[_openAtLoginButton state] == NSOnState
+			forItem:item];
+  [self updateControls];
+}
+
+- (void) useDockBehaviorDefaultsChanged: (id)sender
+{
+  DockItem *item = [self selectedApplicationItem];
+
+  if (!item)
+    {
+      return;
+    }
+
+  [_delegate settingsController:self
+didChangeUseDockBehaviorDefaults:[_useDockBehaviorDefaultsButton state] == NSOnState
+			forItem:item];
+  [self updateControls];
+}
+
+- (void) applicationWiggleOnLaunchChanged: (id)sender
+{
+  DockItem *item = [self selectedApplicationItem];
+
+  if (!item)
+    {
+      return;
+    }
+
+  [_delegate settingsController:self
+ didChangeItemWigglesOnLaunch:[_applicationWiggleOnLaunchButton state] == NSOnState
+			forItem:item];
+  [self updateControls];
+}
+
+- (void) applicationWiggleOnActivationChanged: (id)sender
+{
+  DockItem *item = [self selectedApplicationItem];
+
+  if (!item)
+    {
+      return;
+    }
+
+  [_delegate settingsController:self
+didChangeItemWigglesOnActivation:[_applicationWiggleOnActivationButton state] == NSOnState
+			forItem:item];
+  [self updateControls];
+}
+
+- (void) applicationWiggleOnAttentionRequestChanged: (id)sender
+{
+  DockItem *item = [self selectedApplicationItem];
+
+  if (!item)
+    {
+      return;
+    }
+
+  [_delegate settingsController:self
+didChangeItemWigglesOnAttentionRequest:[_applicationWiggleOnAttentionRequestButton state] == NSOnState
 			forItem:item];
   [self updateControls];
 }

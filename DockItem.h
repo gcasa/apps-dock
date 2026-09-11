@@ -46,6 +46,10 @@ typedef enum
   NSDockTile *_dockTile;
   unsigned long _xWindow;
   BOOL _pinned;
+  BOOL _usesDockBehaviorDefaults;
+  BOOL _wigglesOnLaunch;
+  BOOL _wigglesOnActivation;
+  BOOL _wigglesOnAttentionRequest;
 }
 
 + (id) applicationItemWithPath: (NSString *)path;
@@ -76,5 +80,13 @@ typedef enum
 - (void) setXWindow: (unsigned long)xWindow;
 - (BOOL) isPinned;
 - (void) setPinned: (BOOL)pinned;
+- (BOOL) usesDockBehaviorDefaults;
+- (void) setUsesDockBehaviorDefaults: (BOOL)usesDefaults;
+- (BOOL) wigglesOnLaunch;
+- (void) setWigglesOnLaunch: (BOOL)wiggles;
+- (BOOL) wigglesOnActivation;
+- (void) setWigglesOnActivation: (BOOL)wiggles;
+- (BOOL) wigglesOnAttentionRequest;
+- (void) setWigglesOnAttentionRequest: (BOOL)wiggles;
 
 @end

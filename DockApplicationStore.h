@@ -25,6 +25,8 @@
 - (id) persistedApplicationRecordForItem: (DockItem *)item;
 - (NSString *) persistedApplicationPathFromRecord: (id)record;
 - (NSString *) persistedApplicationArgumentsFromRecord: (id)record;
+- (void) applyPersistedApplicationSettingsFromRecord: (id)record
+					     toItem: (DockItem *)item;
 - (BOOL) items: (NSArray *)items haveApplicationPath: (NSString *)path;
 - (NSArray *) openAtLoginApplicationPaths;
 - (BOOL) path: (NSString *)path matchesOpenAtLoginPath: (NSString *)savedPath;

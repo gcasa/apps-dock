@@ -46,6 +46,14 @@
 	       itemIsDockWM: (DockItem *)item;
 - (BOOL) settingsController: (SettingsController *)controller
 	 itemIsOpenAtLogin: (DockItem *)item;
+- (BOOL) settingsController: (SettingsController *)controller
+itemUsesDockBehaviorDefaults: (DockItem *)item;
+- (BOOL) settingsController: (SettingsController *)controller
+	itemWigglesOnLaunch: (DockItem *)item;
+- (BOOL) settingsController: (SettingsController *)controller
+    itemWigglesOnActivation: (DockItem *)item;
+- (BOOL) settingsController: (SettingsController *)controller
+itemWigglesOnAttentionRequest: (DockItem *)item;
 - (void) settingsController: (SettingsController *)controller
      didChangeDockPlacement: (DockPlacement)placement;
 - (void) settingsController: (SettingsController *)controller
@@ -77,6 +85,18 @@ didChangeRunningIndicatorMode: (DockRunningIndicatorMode)mode;
 		    forItem: (DockItem *)item;
 - (void) settingsController: (SettingsController *)controller
        didChangeOpenAtLogin: (BOOL)openAtLogin
+		    forItem: (DockItem *)item;
+- (void) settingsController: (SettingsController *)controller
+didChangeUseDockBehaviorDefaults: (BOOL)usesDefaults
+		    forItem: (DockItem *)item;
+- (void) settingsController: (SettingsController *)controller
+ didChangeItemWigglesOnLaunch: (BOOL)wiggles
+		    forItem: (DockItem *)item;
+- (void) settingsController: (SettingsController *)controller
+didChangeItemWigglesOnActivation: (BOOL)wiggles
+		    forItem: (DockItem *)item;
+- (void) settingsController: (SettingsController *)controller
+didChangeItemWigglesOnAttentionRequest: (BOOL)wiggles
 		    forItem: (DockItem *)item;
 - (void) settingsController: (SettingsController *)controller
        didMoveItemFromIndex: (NSUInteger)fromIndex
@@ -114,6 +134,10 @@ didChangeRunningIndicatorMode: (DockRunningIndicatorMode)mode;
   NSTextField *_applicationArgumentsField;
   NSButton *_applyApplicationButton;
   NSButton *_openAtLoginButton;
+  NSButton *_useDockBehaviorDefaultsButton;
+  NSButton *_applicationWiggleOnLaunchButton;
+  NSButton *_applicationWiggleOnActivationButton;
+  NSButton *_applicationWiggleOnAttentionRequestButton;
   NSButton *_moveApplicationUpButton;
   NSButton *_moveApplicationDownButton;
   NSButton *_deleteApplicationButton;
