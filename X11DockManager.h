@@ -50,6 +50,8 @@ typedef enum
                               processIdentifier: (int)processIdentifier;
 - (void) x11DockManagerDidRequestUserAttentionForProcessIdentifier: (int)processIdentifier
 						       requestType: (NSInteger)requestType;
+- (void) x11DockManagerDidCancelUserAttentionRequest: (NSInteger)request
+				forProcessIdentifier: (int)processIdentifier;
 @end
 
 @interface X11DockManager : NSObject

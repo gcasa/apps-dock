@@ -39,6 +39,7 @@
 - (BOOL) settingsControllerWigglesOnActivation: (SettingsController *)controller;
 - (BOOL) settingsControllerWigglesOnAttentionRequest: (SettingsController *)controller;
 - (BOOL) settingsControllerPlaysSoundOnRemove: (SettingsController *)controller;
+- (BOOL) settingsControllerSingleClickLaunchesApplications: (SettingsController *)controller;
 - (BOOL) settingsControllerRecyclerHasContents: (SettingsController *)controller;
 - (NSArray *) settingsControllerDockItems: (SettingsController *)controller;
 - (NSUInteger) settingsControllerPinnedItemCount: (SettingsController *)controller;
@@ -76,6 +77,8 @@ didChangeWigglesOnActivation: (BOOL)wiggles;
 didChangeWigglesOnAttentionRequest: (BOOL)wiggles;
 - (void) settingsController: (SettingsController *)controller
 didChangePlaysSoundOnRemove: (BOOL)playsSound;
+- (void) settingsController: (SettingsController *)controller
+didChangeSingleClickLaunchesApplications: (BOOL)singleClickLaunches;
 - (void) settingsController: (SettingsController *)controller
   didChangeDockCellSizeMode: (NSInteger)mode;
 - (void) settingsController: (SettingsController *)controller
@@ -129,6 +132,7 @@ didChangeItemWigglesOnAttentionRequest: (BOOL)wiggles
   NSButton *_wiggleOnActivationButton;
   NSButton *_wiggleOnAttentionRequestButton;
   NSButton *_playSoundOnRemoveButton;
+  NSButton *_singleClickLaunchButton;
   NSButton *_emptyRecyclerButton;
   NSPopUpButton *_applicationPopup;
   NSTextField *_applicationPathField;

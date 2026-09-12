@@ -54,5 +54,7 @@ enum
 - (void) saveWigglesOnAttentionRequest: (BOOL)wiggles;
 - (BOOL) savedPlaysSoundOnRemove;
 - (void) savePlaysSoundOnRemove: (BOOL)playsSound;
+- (BOOL) savedSingleClickLaunchesApplications;
+- (void) saveSingleClickLaunchesApplications: (BOOL)singleClickLaunches;
 
 @end

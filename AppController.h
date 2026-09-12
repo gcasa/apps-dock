@@ -59,6 +59,7 @@
   BOOL _wigglesOnActivation;
   BOOL _wigglesOnAttentionRequest;
   BOOL _playsSoundOnRemove;
+  BOOL _singleClickLaunchesApplications;
 }
 
 @end

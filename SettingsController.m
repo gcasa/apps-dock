@@ -68,6 +68,7 @@ SettingsClampedWindowAlpha(CGFloat alpha)
   DESTROY(_applicationArgumentsField);
   DESTROY(_applicationPathField);
   DESTROY(_applicationPopup);
+  DESTROY(_singleClickLaunchButton);
   DESTROY(_wiggleOnAttentionRequestButton);
   DESTROY(_playSoundOnRemoveButton);
   DESTROY(_wiggleOnActivationButton);
@@ -380,6 +381,13 @@ SettingsClampedWindowAlpha(CGFloat alpha)
 		   action:@selector(playSoundOnRemoveChanged:)];
   [behaviorView addSubview:_playSoundOnRemoveButton];
 
+  _singleClickLaunchButton =
+    [self buttonWithTitle:@"Single Click To Launch"
+		    frame:NSMakeRect(18, 136, 220, 24)
+	       buttonType:NSSwitchButton
+		   action:@selector(singleClickLaunchChanged:)];
+  [behaviorView addSubview:_singleClickLaunchButton];
+
   label = [self labelWithTitle:@"App"
 			 frame:NSMakeRect(18, 296, 110, 20)];
   [applicationsView addSubview:label];
@@ -642,6 +650,9 @@ SettingsClampedWindowAlpha(CGFloat alpha)
   [_playSoundOnRemoveButton setState:
       ([_delegate settingsControllerPlaysSoundOnRemove:self] ?
        NSOnState : NSOffState)];
+  [_singleClickLaunchButton setState:
+      ([_delegate settingsControllerSingleClickLaunchesApplications:self] ?
+       NSOnState : NSOffState)];
   [_emptyRecyclerButton setEnabled:
       [_delegate settingsControllerRecyclerHasContents:self]];
 
@@ -871,6 +882,12 @@ didChangeWigglesOnAttentionRequest:[(NSButton *)sender state] == NSOnState];
 {
   [_delegate settingsController:self
  didChangePlaysSoundOnRemove:[(NSButton *)sender state] == NSOnState];
+}
+
+- (void) singleClickLaunchChanged: (id)sender
+{
+  [_delegate settingsController:self
+didChangeSingleClickLaunchesApplications:[(NSButton *)sender state] == NSOnState];
 }
 
 - (void) dockCellSizeChanged: (id)sender

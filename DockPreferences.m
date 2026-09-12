@@ -28,6 +28,7 @@ static NSString *DockWigglesOnLaunchDefaultsKey = @"DockWigglesOnLaunch";
 static NSString *DockWigglesOnActivationDefaultsKey = @"DockWigglesOnActivation";
 static NSString *DockWigglesOnAttentionRequestDefaultsKey = @"DockWigglesOnAttentionRequest";
 static NSString *DockPlaysSoundOnRemoveDefaultsKey = @"DockPlaysSoundOnRemove";
+static NSString *DockSingleClickLaunchesApplicationsDefaultsKey = @"DockSingleClickLaunchesApplications";
 
 @implementation DockPreferences
 
@@ -395,6 +396,18 @@ static NSString *DockPlaysSoundOnRemoveDefaultsKey = @"DockPlaysSoundOnRemove";
 {
   [[NSUserDefaults standardUserDefaults] setBool:playsSound
 					  forKey:DockPlaysSoundOnRemoveDefaultsKey];
+}
+
+- (BOOL) savedSingleClickLaunchesApplications
+{
+  return [[NSUserDefaults standardUserDefaults]
+	   boolForKey:DockSingleClickLaunchesApplicationsDefaultsKey];
+}
+
+- (void) saveSingleClickLaunchesApplications: (BOOL)singleClickLaunches
+{
+  [[NSUserDefaults standardUserDefaults] setBool:singleClickLaunches
+					  forKey:DockSingleClickLaunchesApplicationsDefaultsKey];
 }
 
 @end

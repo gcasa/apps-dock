@@ -27,6 +27,7 @@ static CGFloat DockGap = 2.0;
 static CGFloat DockPad = 10.0;
 static CGFloat DockSeparatorInset = 12.0;
 static NSTimeInterval DockWiggleDuration = 0.8;
+static NSTimeInterval DockAttentionWiggleInterval = 2.0;
 
 static NSString *GWRemoteFilenamesPboardType = @"GWRemoteFilenamesPboardType";
 static NSString *GWLSFolderPboardType = @"GWLSFolderPboardType";
@@ -249,6 +250,7 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   DESTROY(_wiggleTimer);
   DESTROY(_wiggleItem);
   _wiggleStartTime = 0.0;
+  _wiggleRepeatsUntilAcknowledged = NO;
   [self setNeedsDisplay:YES];
 }
 
@@ -256,7 +258,19 @@ DockViewCalibratedBackgroundColor (NSColor *color)
 {
   NSTimeInterval now = [NSDate timeIntervalSinceReferenceDate];
 
-  if (!_wiggleItem || now - _wiggleStartTime >= DockWiggleDuration)
+  if (!_wiggleItem)
+    {
+      [self stopWiggle];
+      return;
+    }
+
+  if (_wiggleRepeatsUntilAcknowledged &&
+      now - _wiggleStartTime >= DockAttentionWiggleInterval)
+    {
+      _wiggleStartTime = now;
+    }
+  else if (!_wiggleRepeatsUntilAcknowledged &&
+	   now - _wiggleStartTime >= DockWiggleDuration)
     {
       [self stopWiggle];
       return;
@@ -276,6 +290,7 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   DESTROY(_wiggleTimer);
   ASSIGN(_wiggleItem, item);
   _wiggleStartTime = [NSDate timeIntervalSinceReferenceDate];
+  _wiggleRepeatsUntilAcknowledged = NO;
   _wiggleTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 / 30.0
                                                   target:self
                                                 selector:@selector(stepWiggle:)
@@ -283,6 +298,25 @@ DockViewCalibratedBackgroundColor (NSColor *color)
 						 repeats:YES];
   _wiggleTimer = RETAIN(_wiggleTimer);
   [self setNeedsDisplay:YES];
+}
+
+- (void) startAttentionWiggleForItem: (DockItem *)item
+{
+  if (!item)
+    {
+      return;
+    }
+
+  [self startWiggleForItem:item];
+  _wiggleRepeatsUntilAcknowledged = YES;
+}
+
+- (void) acknowledgeWiggleForItem: (DockItem *)item
+{
+  if (item && item == _wiggleItem && _wiggleRepeatsUntilAcknowledged)
+    {
+      [self stopWiggle];
+    }
 }
 
 - (void) stopRecyclerWiggle
@@ -453,6 +487,18 @@ DockViewCalibratedBackgroundColor (NSColor *color)
 - (CGFloat) hoverIconScale
 {
   return _hoverIconScale;
+}
+
+- (void) setSingleClickLaunchesApplications: (BOOL)singleClickLaunches
+{
+  _singleClickLaunchesApplications = singleClickLaunches;
+  _lastMouseDownIndex = NSNotFound;
+  _lastMouseDownTime = 0.0;
+}
+
+- (BOOL) singleClickLaunchesApplications
+{
+  return _singleClickLaunchesApplications;
 }
 
 - (void) setUsesCellBackgroundTile: (BOOL)usesTile
@@ -2044,7 +2090,16 @@ DockViewCalibratedBackgroundColor (NSColor *color)
       clickedIndex = DockRecyclerClickIndex;
     }
 
-  if (clickedIndex != NSNotFound)
+  if (index != NSNotFound)
+    {
+      [self acknowledgeWiggleForItem:[_items objectAtIndex:index]];
+    }
+
+  if (_singleClickLaunchesApplications && index != NSNotFound)
+    {
+      isDoubleClick = YES;
+    }
+  else if (clickedIndex != NSNotFound)
     {
       if ([event clickCount] >= 2)
 	{

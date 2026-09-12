@@ -73,6 +73,7 @@ typedef enum
   NSTimer *_recyclerWiggleTimer;
   DockItem *_wiggleItem;
   NSTimeInterval _wiggleStartTime;
+  BOOL _wiggleRepeatsUntilAcknowledged;
   NSTimeInterval _recyclerWiggleStartTime;
   NSInteger _hoveredItemIndex;
   NSInteger _tooltipItemIndex;
@@ -84,6 +85,7 @@ typedef enum
   NSUInteger _pinnedItemCount;
   NSUInteger _lastMouseDownIndex;
   NSTimeInterval _lastMouseDownTime;
+  BOOL _singleClickLaunchesApplications;
 }
 
 - (void) setDelegate: (id)delegate;
@@ -103,9 +105,13 @@ typedef enum
 - (BOOL) magnifiesHoveredIcons;
 - (void) setHoverIconScale: (CGFloat)scale;
 - (CGFloat) hoverIconScale;
+- (void) setSingleClickLaunchesApplications: (BOOL)singleClickLaunches;
+- (BOOL) singleClickLaunchesApplications;
 - (void) setUsesCellBackgroundTile: (BOOL)usesTile;
 - (BOOL) usesCellBackgroundTile;
 - (void) startWiggleForItem: (DockItem *)item;
+- (void) startAttentionWiggleForItem: (DockItem *)item;
+- (void) acknowledgeWiggleForItem: (DockItem *)item;
 - (void) startRecyclerWiggle;
 - (void) setHorizontal: (BOOL)horizontal;
 - (BOOL) isHorizontal;

@@ -52,6 +52,8 @@
 - (void) applyDockPlacement;
 - (void) updateDockBackground;
 - (void) startAttentionWiggleForItem: (DockItem *)item;
+- (void) cancelAttentionWiggleForItem: (DockItem *)item;
+- (BOOL) savedSingleClickLaunchesApplications;
 - (BOOL) itemWigglesOnLaunch: (DockItem *)item;
 - (BOOL) itemWigglesOnActivation: (DockItem *)item;
 - (BOOL) itemWigglesOnAttentionRequest: (DockItem *)item;
@@ -88,6 +90,7 @@
   _wigglesOnActivation = [_preferences savedWigglesOnActivation];
   _wigglesOnAttentionRequest = [_preferences savedWigglesOnAttentionRequest];
   _playsSoundOnRemove = [_preferences savedPlaysSoundOnRemove];
+  _singleClickLaunchesApplications = [self savedSingleClickLaunchesApplications];
   [self loadPersistedApplications];
   frame = [self dockWindowFrameForPlacement:_dockPlacement];
 
@@ -116,6 +119,7 @@
   [_dockView setRunningIndicatorMode:_runningIndicatorMode];
   [_dockView setMagnifiesHoveredIcons:_magnifiesHoveredIcons];
   [_dockView setHoverIconScale:_hoverIconScale];
+  [_dockView setSingleClickLaunchesApplications:_singleClickLaunchesApplications];
   [_dockView setItems:_items];
   [_dockView setPinnedItemCount:[self pinnedApplicationCount]];
   [_dockView setMenu:[self dockMenu]];
@@ -234,6 +238,11 @@
 - (void) saveUseCellTileBackground
 {
   [_preferences saveUseCellTileBackground:_useCellTileBackground];
+}
+
+- (BOOL) savedSingleClickLaunchesApplications
+{
+  return [_preferences savedSingleClickLaunchesApplications];
 }
 
 - (CGFloat) activeDockPad
@@ -763,6 +772,25 @@
   if (item)
     {
       [self startAttentionWiggleForItem:item];
+    }
+}
+
+- (void) x11DockManagerDidCancelUserAttentionRequest: (NSInteger)request
+				forProcessIdentifier: (int)processIdentifier
+{
+  DockItem *item = nil;
+  NSNumber *processIdentifierNumber = nil;
+
+  if (processIdentifier <= 0)
+    {
+      return;
+    }
+
+  processIdentifierNumber = [NSNumber numberWithInt:processIdentifier];
+  item = [self applicationItemMatchingProcessIdentifier:processIdentifierNumber];
+  if (item)
+    {
+      [self cancelAttentionWiggleForItem:item];
     }
 }
 
@@ -1447,6 +1475,11 @@
   return _playsSoundOnRemove;
 }
 
+- (BOOL) settingsControllerSingleClickLaunchesApplications: (SettingsController *)controller
+{
+  return _singleClickLaunchesApplications;
+}
+
 - (BOOL) settingsControllerRecyclerHasContents: (SettingsController *)controller
 {
   return [self recyclerHasContents];
@@ -1598,6 +1631,14 @@ didChangePlaysSoundOnRemove: (BOOL)playsSound
 {
   _playsSoundOnRemove = playsSound;
   [_preferences savePlaysSoundOnRemove:_playsSoundOnRemove];
+}
+
+- (void) settingsController: (SettingsController *)controller
+didChangeSingleClickLaunchesApplications: (BOOL)singleClickLaunches
+{
+  _singleClickLaunchesApplications = singleClickLaunches;
+  [_dockView setSingleClickLaunchesApplications:_singleClickLaunchesApplications];
+  [_preferences saveSingleClickLaunchesApplications:_singleClickLaunchesApplications];
 }
 
 - (void) settingsController: (SettingsController *)controller
@@ -1810,8 +1851,13 @@ didChangeItemWigglesOnAttentionRequest: (BOOL)wiggles
 {
   if ([self itemWigglesOnAttentionRequest:item])
     {
-      [_dockView startWiggleForItem:item];
+      [_dockView startAttentionWiggleForItem:item];
     }
+}
+
+- (void) cancelAttentionWiggleForItem: (DockItem *)item
+{
+  [_dockView acknowledgeWiggleForItem:item];
 }
 
 - (BOOL) itemWigglesOnLaunch: (DockItem *)item

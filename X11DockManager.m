@@ -2113,6 +2113,22 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
     }
 }
 
+- (void) cancelUserAttentionRequest: (NSInteger)request
+			appProcessId: (int)aProcessId
+{
+  if (aProcessId <= 0)
+    {
+      return;
+    }
+
+  if ([_delegate respondsToSelector:
+		   @selector(x11DockManagerDidCancelUserAttentionRequest:forProcessIdentifier:)])
+    {
+      [_delegate x11DockManagerDidCancelUserAttentionRequest:request
+					forProcessIdentifier:aProcessId];
+    }
+}
+
 - (void) removeWindow: (unsigned int)aWindowNumber
 {
   NSArray *processKeys = [_iconWindowsByProcessID allKeys];
