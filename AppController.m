@@ -77,6 +77,7 @@
   _applicationIconManager = [[ApplicationIconManager alloc]
 			      initWithScanner:_applicationScanner];
   _launchedApplicationPaths = [NSMutableSet new];
+  _launchDotFallbacks = [NSMutableDictionary new];
   _dockPlacement = [self savedDockPlacement];
   _dockCellSizeMode = [self savedDockCellSizeMode];
   _runningIndicatorMode = [self savedRunningIndicatorMode];
@@ -875,14 +876,16 @@
 - (BOOL) launchApplicationItem: (DockItem *)item
 {
   NSString *path = [item path];
+  NSString *name = [item title];
   NSArray *arguments = [self launchArgumentsFromString:[item launchArguments]];
   NSString *extension = [[path pathExtension] lowercaseString];
   BOOL isDir = NO;
+  BOOL launched = NO;
 
   [[NSFileManager defaultManager] fileExistsAtPath:path isDirectory:&isDir];
   if ([extension isEqualToString:@"desktop"])
     {
-      return [self launchDesktopFile:path arguments:arguments];
+      launched = [self launchDesktopFile:path arguments:arguments];
     }
   else if ([extension isEqualToString:@"app"])
     {
@@ -892,26 +895,147 @@
 	{
 	  [NSTask launchedTaskWithLaunchPath:executablePath
 				   arguments:arguments];
-	  return YES;
+	  launched = YES;
 	}
-      if (![arguments count] &&
+      if (!launched && ![arguments count] &&
 	  [[NSWorkspace sharedWorkspace] launchApplication:path])
 	{
-	  return YES;
+	  launched = YES;
 	}
-      return [[NSWorkspace sharedWorkspace] openFile:path];
+      if (!launched)
+	{
+	  launched = [[NSWorkspace sharedWorkspace] openFile:path];
+	}
     }
   else if (isDir)
     {
-      return [[NSWorkspace sharedWorkspace] openFile:path];
+      launched = [[NSWorkspace sharedWorkspace] openFile:path];
     }
   else if ([[NSFileManager defaultManager] isExecutableFileAtPath:path])
     {
       [NSTask launchedTaskWithLaunchPath:path arguments:arguments];
-      return YES;
+      launched = YES;
+    }
+  else
+    {
+      launched = [[NSWorkspace sharedWorkspace] openFile:path];
     }
 
-  return [[NSWorkspace sharedWorkspace] openFile:path];
+  if (launched && [item state] == DockItemNotRunning)
+    {
+      [self _scheduleLaunchDotFallbackForPath:path name:name];
+    }
+
+  return launched;
+}
+
+- (NSString *) _launchKeyForPath: (NSString *)path name: (NSString *)name
+{
+  return [NSString stringWithFormat:@"%@|%@", path ?: @"", name ?: @""];
+}
+
+- (void) _scheduleLaunchDotFallbackForPath: (NSString *)path
+                                      name: (NSString *)name
+{
+  NSString *key = [self _launchKeyForPath:path name:name];
+  NSDictionary *ui;
+
+  if ([_launchDotFallbacks objectForKey:key] != nil)
+    {
+      return;
+    }
+
+  ui = [NSDictionary dictionaryWithObjectsAndKeys:
+    [NSNumber numberWithInt:0], @"retryCount",
+    path ?: @"", @"path",
+    name ?: @"", @"name",
+    nil];
+
+  NSTimer *t = [NSTimer scheduledTimerWithTimeInterval:0.5
+                                                target:self
+                                              selector:@selector(_launchDotFallbackTimerFired:)
+                                              userInfo:ui
+                                               repeats:NO];
+  [_launchDotFallbacks setObject:t forKey:key];
+}
+
+- (void) _cancelLaunchDotFallbackForPath: (NSString *)path
+                                    name: (NSString *)name
+{
+  NSString *key = [self _launchKeyForPath:path name:name];
+  NSTimer *t = [_launchDotFallbacks objectForKey:key];
+
+  if (t)
+    {
+      [t invalidate];
+      [_launchDotFallbacks removeObjectForKey:key];
+    }
+}
+
+- (void) _launchDotFallbackTimerFired: (NSTimer *)timer
+{
+  NSDictionary *ui = [timer userInfo];
+  NSString *path = [ui objectForKey:@"path"];
+  NSString *name = [ui objectForKey:@"name"];
+  int retryCount = [[ui objectForKey:@"retryCount"] intValue];
+  NSString *key = [self _launchKeyForPath:path name:name];
+  BOOL shouldShowDot = NO;
+  BOOL processRunning = NO;
+
+  if (!path || ![path length])
+    {
+      [_launchDotFallbacks removeObjectForKey:key];
+      return;
+    }
+
+  NSArray *processPaths = [_applicationScanner runningProcessExecutablePaths];
+  DockItem *item = [self transientApplicationItemMatchingBundlePath:path];
+
+  if (!item)
+    {
+      item = [self dockHasApplicationPath:path] ? nil : nil;
+    }
+
+  if (item && [self applicationItemHasRunningProcess:item paths:processPaths])
+    {
+      processRunning = YES;
+    }
+
+  if (processRunning && [item state] == DockItemNotRunning)
+    {
+      shouldShowDot = YES;
+    }
+
+  if (!shouldShowDot && processRunning && retryCount < 20)
+    {
+      NSDictionary *nextUi = [NSDictionary dictionaryWithObjectsAndKeys:
+        [NSNumber numberWithInt:retryCount + 1], @"retryCount",
+        path ?: @"", @"path",
+        name ?: @"", @"name",
+        nil];
+
+      NSTimer *t = [NSTimer scheduledTimerWithTimeInterval:0.5
+                                                    target:self
+                                                  selector:@selector(_launchDotFallbackTimerFired:)
+                                                  userInfo:nextUi
+                                                   repeats:NO];
+      NSTimer *oldTimer = [_launchDotFallbacks objectForKey:key];
+      if (oldTimer)
+        {
+          [oldTimer invalidate];
+        }
+      [_launchDotFallbacks setObject:t forKey:key];
+      return;
+    }
+
+  if (shouldShowDot || (processRunning && retryCount >= 20))
+    {
+      [item setState:DockItemRunning];
+      [self refreshDock];
+      [self startLaunchWiggleForItem:item];
+    }
+
+  [_launchDotFallbacks removeObjectForKey:key];
 }
 
 - (NSArray *) launchArgumentsFromString: (NSString *)arguments
