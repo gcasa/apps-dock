@@ -1125,6 +1125,17 @@
       NSString *bundlePath = [DockItem applicationBundlePathForPath:processPath];
       DockItem *item;
 
+      if (![bundlePath length])
+	{
+	  NSString *exeName = [[processPath lastPathComponent]
+	    stringByDeletingPathExtension];
+	  if ([exeName length])
+	    {
+	      bundlePath = [[NSWorkspace sharedWorkspace]
+		fullPathForApplication:exeName];
+	    }
+	}
+
       if (![bundlePath length] ||
 	  [self applicationBundlePathIsDockWM:bundlePath] ||
 	  [self dockHasApplicationPath:bundlePath] ||
@@ -2453,6 +2464,23 @@ didChangeItemWigglesOnAttentionRequest: (BOOL)wiggles
       if (!dockApp && [path length] && ![self applicationBundlePathIsDockWM:path])
 	{
 	  NSString *bundlePath = [DockItem applicationBundlePathForPath:path];
+
+	  if (![bundlePath length] && [title length])
+	    {
+	      bundlePath = [[NSWorkspace sharedWorkspace]
+		fullPathForApplication:title];
+	    }
+	  if (![bundlePath length])
+	    {
+	      NSString *exeName = [[path lastPathComponent]
+		stringByDeletingPathExtension];
+	      if ([exeName length])
+		{
+		  bundlePath = [[NSWorkspace sharedWorkspace]
+		    fullPathForApplication:exeName];
+		}
+	    }
+
 	  NSString *applicationPath = [bundlePath length] ? bundlePath : path;
 
 	  item = [DockItem applicationItemWithPath:applicationPath];
