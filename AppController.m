@@ -1886,9 +1886,23 @@ didChangeItemWigglesOnAttentionRequest: (BOOL)wiggles
 
 - (void) refreshDock
 {
+  NSUInteger i;
+
   [_dockView setItems:_items];
   [_dockView setPinnedItemCount:[self pinnedApplicationCount]];
   [self applyDockPlacement];
+
+  for (i = 0; i < [_items count]; i++)
+    {
+      DockItem *item = [_items objectAtIndex:i];
+      unsigned long xWin = [item xWindow];
+
+      if (xWin && [item kind] == DockItemX11Window)
+	{
+	  NSRect cellRect = [_dockView cellRectForHoverIndex:i];
+	  [_x11 setIconGeometry:cellRect forWindow:xWin];
+	}
+    }
 }
 
 - (DockItem *) itemForXWindow: (unsigned long)xWindow
