@@ -1837,6 +1837,64 @@ didChangeItemWigglesOnAttentionRequest: (BOOL)wiggles
     {
       [_dockView startWiggleForItem:item];
     }
+
+  if ([item state] == DockItemNotRunning)
+    {
+      NSDictionary *ui = [NSDictionary dictionaryWithObjectsAndKeys:
+        item, @"item",
+        [NSNumber numberWithInt:0], @"retryCount",
+        nil];
+
+      [NSTimer scheduledTimerWithTimeInterval:1.0
+                                       target:self
+                                     selector:@selector(_checkLaunchFailed:)
+                                     userInfo:ui
+                                      repeats:NO];
+    }
+}
+
+- (void) _checkLaunchFailed: (NSTimer *)timer
+{
+  NSDictionary *ui = [timer userInfo];
+  DockItem *item = [ui objectForKey:@"item"];
+  int retryCount = [[ui objectForKey:@"retryCount"] intValue];
+
+  if (!item)
+    {
+      return;
+    }
+
+  if ([item state] != DockItemNotRunning)
+    {
+      return;
+    }
+
+  NSArray *processPaths = [_applicationScanner runningProcessExecutablePaths];
+
+  if ([self applicationItemHasRunningProcess:item paths:processPaths])
+    {
+      [item setState:DockItemRunning];
+      [self refreshDock];
+      return;
+    }
+
+  if (retryCount < 5)
+    {
+      NSDictionary *nextUi = [NSDictionary dictionaryWithObjectsAndKeys:
+        item, @"item",
+        [NSNumber numberWithInt:retryCount + 1], @"retryCount",
+        nil];
+
+      [NSTimer scheduledTimerWithTimeInterval:1.0
+                                       target:self
+                                     selector:@selector(_checkLaunchFailed:)
+                                     userInfo:nextUi
+                                      repeats:NO];
+    }
+  else
+    {
+      [_dockView stopWiggle];
+    }
 }
 
 - (void) startActivationWiggleForItem: (DockItem *)item
