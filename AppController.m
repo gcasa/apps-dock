@@ -2529,4 +2529,9 @@ didChangeItemWigglesOnAttentionRequest: (BOOL)wiggles
     }
 }
 
+- (void) x11DockManagerDidDetectWindowDestroyed: (unsigned long)xWindow
+{
+  [self scanRunningApplications];
+}
+
 @end
