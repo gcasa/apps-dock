@@ -13,7 +13,8 @@ DockApplicationStore.m \
 ApplicationIconManager.m \
 DockView.m \
 DockItem.m \
-X11DockManager.m
+X11DockManager.m \
+ProcessMonitor.m
 
 DockWM_APPLICATION_ICON = DockWM.tiff
 
