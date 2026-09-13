@@ -1141,6 +1141,56 @@
       changed = YES;
     }
 
+  {
+    NSArray *x11Apps = [_x11 discoveredX11Applications];
+    NSUInteger j;
+
+    for (j = 0; j < [x11Apps count]; j++)
+      {
+        NSDictionary *entry = [x11Apps objectAtIndex:j];
+        NSString *title = [entry objectForKey:@"title"];
+        unsigned long xWindow = [[entry objectForKey:@"window"] unsignedLongValue];
+        DockItem *existing = nil;
+        DockItem *item;
+        NSUInteger k;
+
+        for (k = 0; k < [_items count]; k++)
+          {
+            DockItem *di = [_items objectAtIndex:k];
+            if ([[di title] isEqualToString:title] ||
+                ([di xWindow] && [di xWindow] == xWindow))
+              {
+                existing = di;
+                break;
+              }
+          }
+
+        if (existing)
+          {
+            if ([existing xWindow] == 0)
+              {
+                [existing setXWindow:xWindow];
+                changed = YES;
+              }
+            if ([existing state] == DockItemNotRunning)
+              {
+                [existing setState:DockItemRunning];
+                changed = YES;
+              }
+            continue;
+          }
+
+        item = [DockItem x11ItemWithTitle:title
+                                   window:xWindow
+                                     icon:nil
+                                   hidden:NO];
+        [item setPinned:NO];
+        [item setState:DockItemRunning];
+        [_items addObject:item];
+        changed = YES;
+      }
+  }
+
   for (i = [_items count]; i > 0; i--)
     {
       DockItem *item = [_items objectAtIndex:i - 1];

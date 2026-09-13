@@ -84,5 +84,6 @@ typedef enum
 - (BOOL) windowExists: (unsigned long)xWindow;
 - (BOOL) activateApplicationWithProcessIdentifiers: (NSArray *)processIdentifiers;
 - (void) closeWindow: (unsigned long)xWindow;
+- (NSArray *) discoveredX11Applications;
 
 @end
