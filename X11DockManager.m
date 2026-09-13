@@ -2581,4 +2581,106 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   XFlush(display);
 }
 
+- (BOOL) hasWindowForPID: (int)pid
+{
+  Display *display = XOpenDisplay(NULL);
+  if (!display)
+    {
+      return NO;
+    }
+
+  Window root;
+  Window parent;
+  Window *children = NULL;
+  unsigned int count = 0;
+  BOOL found = NO;
+  unsigned int i;
+
+  root = RootWindow(display, DefaultScreen(display));
+  if (XQueryTree(display, root, &root, &parent, &children, &count))
+    {
+      for (i = 0; i < count && !found; i++)
+        {
+          Atom property = XInternAtom(display, "_NET_WM_PID", False);
+          Atom actualType;
+          int actualFormat;
+          unsigned long itemCount;
+          unsigned long bytesAfter;
+          unsigned char *data = NULL;
+
+          if (XGetWindowProperty(display, children[i], property, 0, 1, False,
+                                 XA_CARDINAL, &actualType, &actualFormat,
+                                 &itemCount, &bytesAfter, &data) == Success && data)
+            {
+              if (actualFormat == 32 && itemCount >= 1)
+                {
+                  int winPid = (int)((unsigned long *)data)[0];
+                  if (winPid == pid)
+                    {
+                      found = YES;
+                    }
+                }
+              XFree(data);
+            }
+        }
+      if (children) XFree(children);
+    }
+
+  XCloseDisplay(display);
+  return found;
+}
+
+- (NSArray *) windowsMatchingName: (NSString *)name
+{
+  Display *display = XOpenDisplay(NULL);
+  if (!display)
+    {
+      return [NSArray array];
+    }
+
+  Window root;
+  Window parent;
+  Window *children = NULL;
+  unsigned int count = 0;
+  NSMutableArray *result = [NSMutableArray array];
+  unsigned int i;
+
+  root = RootWindow(display, DefaultScreen(display));
+  if (XQueryTree(display, root, &root, &parent, &children, &count))
+    {
+      for (i = 0; i < count; i++)
+        {
+          XClassHint hint;
+          if (XGetClassHint(display, children[i], &hint))
+            {
+              NSString *className = nil;
+              NSString *resName = nil;
+
+              if (hint.res_class)
+                {
+                  className = [NSString stringWithUTF8String:hint.res_class];
+                }
+              if (hint.res_name)
+                {
+                  resName = [NSString stringWithUTF8String:hint.res_name];
+                }
+
+              if ((className && [className caseInsensitiveCompare:name] == NSOrderedSame) ||
+                  (resName && [resName caseInsensitiveCompare:name] == NSOrderedSame))
+                {
+                  [result addObject:
+                    [NSNumber numberWithUnsignedLong:(unsigned long)children[i]]];
+                }
+
+              if (hint.res_name) XFree(hint.res_name);
+              if (hint.res_class) XFree(hint.res_class);
+            }
+        }
+      if (children) XFree(children);
+    }
+
+  XCloseDisplay(display);
+  return result;
+}
+
 @end
