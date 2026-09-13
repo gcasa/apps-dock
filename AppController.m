@@ -28,6 +28,18 @@
 #import <signal.h>
 #import <unistd.h>
 
+static inline CGFloat _dockScaleFactor(void)
+{
+  NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+  id val = [defaults objectForKey:@"GSScaleFactor"];
+  if (val == nil)
+    {
+      return 1.0;
+    }
+  CGFloat sf = [val floatValue];
+  return (sf > 0.0) ? sf : 1.0;
+}
+
 @interface AppController (Private)
 - (DockPlacement) savedDockPlacement;
 - (NSColor *) savedBackgroundColor;
@@ -1294,6 +1306,7 @@
 
 - (NSRect) dockWindowFrameForPlacement: (DockPlacement)placement
 {
+  CGFloat sf = _dockScaleFactor();
   NSRect screenFrame = [[NSScreen mainScreen] frame];
   NSUInteger cellCount = [_items count] + 2;
   CGFloat pad = [self activeDockPad];
@@ -1304,6 +1317,9 @@
   CGFloat height = [DockPreferences placementIsHorizontal:placement] ? thickness : length;
   CGFloat x;
   CGFloat y;
+
+  width *= sf;
+  height *= sf;
 
   if (height > NSHeight(screenFrame))
     {
