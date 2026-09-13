@@ -2581,4 +2581,31 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   XFlush(display);
 }
 
+- (void) setIconGeometry: (NSRect)rect forWindow: (unsigned long)xWindow
+{
+  Display *display = (Display *)_display;
+  Atom iconGeometry;
+  unsigned long geometry[4];
+
+  if (!display || !xWindow)
+    {
+      return;
+    }
+
+  iconGeometry = XInternAtom(display, "_NET_WM_ICON_GEOMETRY", False);
+  geometry[0] = (unsigned long)rect.origin.x;
+  geometry[1] = (unsigned long)rect.origin.y;
+  geometry[2] = (unsigned long)rect.size.width;
+  geometry[3] = (unsigned long)rect.size.height;
+
+  [self clearX11Error];
+  XChangeProperty(display, (Window)xWindow, iconGeometry, XA_CARDINAL, 32,
+                  PropModeReplace, (unsigned char *)geometry, 4);
+
+  if (![self x11ErrorOccurred])
+    {
+      XFlush(display);
+    }
+}
+
 @end
