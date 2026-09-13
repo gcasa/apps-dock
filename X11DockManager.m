@@ -143,6 +143,7 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   _display = display;
   XSetErrorHandler(X11DockManagerHandleError);
   XSelectInput(display, root, SubstructureNotifyMask | PropertyChangeMask);
+  [self setEWMHPropertiesForDockWindow:(Window)_hostWindow];
   [self updateHostWindowShape];
   [self registerIconManager];
   return YES;
@@ -157,6 +158,57 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
       NSLog(@"Unable to register GSIconManager; GNUstep app icon windows will not be handed to DockWM.");
       DESTROY(_iconConnection);
     }
+}
+
+- (void) setEWMHPropertiesForDockWindow: (Window)window
+{
+  Display *display = (Display *)_display;
+  NSRect frame = [_dockView frame];
+
+  if (!display || !window)
+    {
+      return;
+    }
+
+  /* _NET_WM_WINDOW_TYPE_DOCK */
+  Atom netWmWindowType = XInternAtom(display, "_NET_WM_WINDOW_TYPE", False);
+  Atom netWmWindowTypeDock = XInternAtom(display, "_NET_WM_WINDOW_TYPE_DOCK", False);
+  XChangeProperty(display, window, netWmWindowType, XA_ATOM, 32,
+                  PropModeReplace, (unsigned char *)&netWmWindowTypeDock, 1);
+
+  /* _NET_WM_STATE: SKIP_TASKBAR | SKIP_PAGER | STICKY */
+  Atom netWmState = XInternAtom(display, "_NET_WM_STATE", False);
+  Atom skipTaskbar = XInternAtom(display, "_NET_WM_STATE_SKIP_TASKBAR", False);
+  Atom skipPager = XInternAtom(display, "_NET_WM_STATE_SKIP_PAGER", False);
+  Atom sticky = XInternAtom(display, "_NET_WM_STATE_STICKY", False);
+  Atom states[3] = { skipTaskbar, skipPager, sticky };
+  XChangeProperty(display, window, netWmState, XA_ATOM, 32,
+                  PropModeReplace, (unsigned char *)states, 3);
+
+  /* _NET_WM_DESKTOP: all desktops */
+  Atom netWmDesktop = XInternAtom(display, "_NET_WM_DESKTOP", False);
+  unsigned long allDesktops = 0xFFFFFFFFUL;
+  XChangeProperty(display, window, netWmDesktop, XA_CARDINAL, 32,
+                  PropModeReplace, (unsigned char *)&allDesktops, 1);
+
+  /* _NET_WM_STRUT and _NET_WM_STRUT_PARTIAL */
+  {
+    unsigned long strutPartial[12] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+
+    strutPartial[3] = (unsigned long)frame.size.height;
+    strutPartial[10] = (unsigned long)frame.origin.x;
+    strutPartial[11] = (unsigned long)(frame.origin.x + frame.size.width);
+
+    Atom netWmStrut = XInternAtom(display, "_NET_WM_STRUT", False);
+    Atom netWmStrutPartial = XInternAtom(display, "_NET_WM_STRUT_PARTIAL", False);
+
+    XChangeProperty(display, window, netWmStrut, XA_CARDINAL, 32,
+                    PropModeReplace, (unsigned char *)strutPartial, 4);
+    XChangeProperty(display, window, netWmStrutPartial, XA_CARDINAL, 32,
+                    PropModeReplace, (unsigned char *)strutPartial, 12);
+  }
+
+  XFlush(display);
 }
 
 - (BOOL) x11ErrorOccurred
