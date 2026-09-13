@@ -2529,4 +2529,64 @@ didChangeItemWigglesOnAttentionRequest: (BOOL)wiggles
     }
 }
 
+
+- (void) x11DockManagerDidSetProgressValue: (double)value
+                                    visible: (BOOL)visible
+                            processIdentifier: (int)processIdentifier
+{
+  NSNumber *processIdentifierNumber = nil;
+  DockItem *item = nil;
+
+  if (processIdentifier <= 0)
+    {
+      return;
+    }
+
+  processIdentifierNumber = [NSNumber numberWithInt:processIdentifier];
+  item = [self applicationItemMatchingProcessIdentifier:processIdentifierNumber];
+
+  if (!item)
+    {
+      item = [self transientApplicationItemForProcessIdentifier:processIdentifierNumber];
+    }
+
+  if (item)
+    {
+      [item setProgressValue:value];
+      [item setProgressVisible:visible];
+      [_dockView setNeedsDisplay:YES];
+    }
+}
+
+- (void) x11DockManagerDidSetUrgent: (BOOL)urgent
+                    processIdentifier: (int)processIdentifier
+{
+  NSNumber *processIdentifierNumber = nil;
+  DockItem *item = nil;
+
+  if (processIdentifier <= 0)
+    {
+      return;
+    }
+
+  processIdentifierNumber = [NSNumber numberWithInt:processIdentifier];
+  item = [self applicationItemMatchingProcessIdentifier:processIdentifierNumber];
+
+  if (!item)
+    {
+      item = [self transientApplicationItemForProcessIdentifier:processIdentifierNumber];
+    }
+
+  if (item)
+    {
+      [item setUrgent:urgent];
+      [_dockView setNeedsDisplay:YES];
+    }
+}
+
+- (void) x11DockManagerDidDetectWindowDestroyed: (unsigned long)xWindow
+{
+  [self scanRunningApplications];
+}
+
 @end

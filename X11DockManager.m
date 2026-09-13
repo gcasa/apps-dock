@@ -2129,6 +2129,40 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
     }
 }
 
+- (void) setProgressValue: (double)value
+               visible: (BOOL)visible
+         appProcessId: (int)aProcessId
+{
+  if (aProcessId <= 0)
+    {
+      return;
+    }
+
+  if ([_delegate respondsToSelector:
+		   @selector(x11DockManagerDidSetProgressValue:visible:processIdentifier:)])
+    {
+      [_delegate x11DockManagerDidSetProgressValue:value
+                                           visible:visible
+                                   processIdentifier:aProcessId];
+    }
+}
+
+- (void) setUrgent: (BOOL)urgent
+       appProcessId: (int)aProcessId
+{
+  if (aProcessId <= 0)
+    {
+      return;
+    }
+
+  if ([_delegate respondsToSelector:
+		   @selector(x11DockManagerDidSetUrgent:processIdentifier:)])
+    {
+      [_delegate x11DockManagerDidSetUrgent:urgent
+                           processIdentifier:aProcessId];
+    }
+}
+
 - (void) removeWindow: (unsigned int)aWindowNumber
 {
   NSArray *processKeys = [_iconWindowsByProcessID allKeys];

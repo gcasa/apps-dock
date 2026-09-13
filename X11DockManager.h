@@ -52,6 +52,12 @@ typedef enum
 						       requestType: (NSInteger)requestType;
 - (void) x11DockManagerDidCancelUserAttentionRequest: (NSInteger)request
 				forProcessIdentifier: (int)processIdentifier;
+- (void) x11DockManagerDidSetProgressValue: (double)value
+                                    visible: (BOOL)visible
+                            processIdentifier: (int)processIdentifier;
+- (void) x11DockManagerDidSetUrgent: (BOOL)urgent
+                    processIdentifier: (int)processIdentifier;
+- (void) x11DockManagerDidDetectWindowDestroyed: (unsigned long)xWindow;
 @end
 
 @interface X11DockManager : NSObject
