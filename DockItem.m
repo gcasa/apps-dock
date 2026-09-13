@@ -787,4 +787,34 @@
   _wigglesOnAttentionRequest = wiggles;
 }
 
+- (double) progressValue
+{
+  return _progressValue;
+}
+
+- (void) setProgressValue: (double)value
+{
+  _progressValue = value;
+}
+
+- (BOOL) progressVisible
+{
+  return _progressVisible;
+}
+
+- (void) setProgressVisible: (BOOL)visible
+{
+  _progressVisible = visible;
+}
+
+- (BOOL) urgent
+{
+  return _urgent;
+}
+
+- (void) setUrgent: (BOOL)urgent
+{
+  _urgent = urgent;
+}
+
 @end
