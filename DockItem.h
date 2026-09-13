@@ -50,6 +50,9 @@ typedef enum
   BOOL _wigglesOnLaunch;
   BOOL _wigglesOnActivation;
   BOOL _wigglesOnAttentionRequest;
+  double _progressValue;
+  BOOL _progressVisible;
+  BOOL _urgent;
 }
 
 + (id) applicationItemWithPath: (NSString *)path;
@@ -88,5 +91,11 @@ typedef enum
 - (void) setWigglesOnActivation: (BOOL)wiggles;
 - (BOOL) wigglesOnAttentionRequest;
 - (void) setWigglesOnAttentionRequest: (BOOL)wiggles;
+- (double) progressValue;
+- (void) setProgressValue: (double)value;
+- (BOOL) progressVisible;
+- (void) setProgressVisible: (BOOL)visible;
+- (BOOL) urgent;
+- (void) setUrgent: (BOOL)urgent;
 
 @end
