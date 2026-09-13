@@ -394,6 +394,15 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 				      (unsigned long)event.xmaprequest.window]];
 	  sawRelevantEvent = YES;
 	  break;
+	case DestroyNotify:
+	  if ([_delegate respondsToSelector:
+		   @selector(x11DockManagerDidDetectWindowDestroyed:)])
+	    {
+	      [_delegate x11DockManagerDidDetectWindowDestroyed:
+			      (unsigned long)event.xdestroywindow.window];
+	    }
+	  sawRelevantEvent = YES;
+	  break;
 	default:
 	  break;
 	}
