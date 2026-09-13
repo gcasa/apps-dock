@@ -404,6 +404,16 @@
 							paths:processPaths];
 }
 
+- (BOOL) applicationBundlePathHidesIcon: (NSString *)bundlePath
+{
+  if (![bundlePath length])
+    {
+      return NO;
+    }
+  NSBundle *bundle = [NSBundle bundleWithPath:bundlePath];
+  return [[bundle objectForInfoDictionaryKey:@"GSSuppressAppIcon"] boolValue];
+}
+
 - (DockItem *) transientApplicationItemMatchingBundlePath: (NSString *)path
 {
   NSString *normalizedPath = [self normalizedPath:path];
@@ -1127,6 +1137,7 @@
 
       if (![bundlePath length] ||
 	  [self applicationBundlePathIsDockWM:bundlePath] ||
+	  [self applicationBundlePathHidesIcon:bundlePath] ||
 	  [self dockHasApplicationPath:bundlePath] ||
 	  [self transientApplicationItemMatchingBundlePath:bundlePath])
 	{
