@@ -1839,6 +1839,64 @@ didChangeItemWigglesOnAttentionRequest: (BOOL)wiggles
     }
 }
 
+- (void) refreshX11StateAsync
+{
+  NSUInteger i;
+  for (i = 0; i < [_items count]; i++)
+    {
+      DockItem *item = [_items objectAtIndex:i];
+      if ([item kind] != DockItemApplication || [item state] == DockItemNotRunning)
+        {
+          continue;
+        }
+
+      NSString *title = [item title];
+      if (![title length])
+        {
+          continue;
+        }
+
+      NSDictionary *inputs = [NSDictionary dictionaryWithObjectsAndKeys:
+        item, @"item",
+        title, @"title",
+        nil];
+      [NSThread detachNewThreadSelector:@selector(_refreshX11StateWorker:)
+                               toTarget:self
+                             withObject:inputs];
+    }
+}
+
+- (void) _refreshX11StateWorker: (NSDictionary *)inputs
+{
+  NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+  NSString *title = [inputs objectForKey:@"title"];
+  DockItem *item = [inputs objectForKey:@"item"];
+  BOOL hasWindows = NO;
+
+  if (item && title)
+    {
+      hasWindows = [_x11 hasWindowForPID:0];
+    }
+
+  NSDictionary *result = [NSDictionary dictionaryWithObjectsAndKeys:
+    item, @"item",
+    [NSNumber numberWithBool:hasWindows], @"hasWindows",
+    nil];
+  [self performSelectorOnMainThread:@selector(_applyX11StateSnapshot:)
+                         withObject:result
+                      waitUntilDone:NO];
+  [pool drain];
+}
+
+- (void) _applyX11StateSnapshot: (NSDictionary *)snap
+{
+  DockItem *item = [snap objectForKey:@"item"];
+  if (item && [item state] == DockItemRunning)
+    {
+      [_dockView setNeedsDisplay:YES];
+    }
+}
+
 - (void) startActivationWiggleForItem: (DockItem *)item
 {
   if ([self itemWigglesOnActivation:item])

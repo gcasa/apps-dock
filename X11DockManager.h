@@ -84,5 +84,7 @@ typedef enum
 - (BOOL) windowExists: (unsigned long)xWindow;
 - (BOOL) activateApplicationWithProcessIdentifiers: (NSArray *)processIdentifiers;
 - (void) closeWindow: (unsigned long)xWindow;
+- (BOOL) hasWindowForPID: (int)pid;
+- (NSArray *) windowsMatchingName: (NSString *)name;
 
 @end
