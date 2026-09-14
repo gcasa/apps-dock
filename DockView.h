@@ -55,6 +55,7 @@ typedef enum
   BOOL _performedDragOperation;
   NSImage *_gnustepIcon;
   NSImage *_recyclerIcon;
+  NSImage *_recyclerFullIcon;
   NSImage *_cellBackgroundImage;
   NSColor *_backgroundColor;
   CGFloat _backgroundAlpha;

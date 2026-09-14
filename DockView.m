@@ -42,6 +42,7 @@ static NSInteger DockHoverRecycler = -3;
 @interface DockView (Private)
 - (NSImage *) loadGNUstepIcon;
 - (NSImage *) loadRecyclerIcon;
+- (NSImage *) loadRecyclerFullIcon;
 - (NSImage *) loadCellBackgroundImage;
 - (void) hideTooltip;
 - (void) addPathsFromPasteboardObject: (id)object toArray: (NSMutableArray *)paths;
@@ -116,6 +117,7 @@ DockViewCalibratedBackgroundColor (NSColor *color)
       _runningIndicatorMode = DockRunningIndicatorModeRunningDot;
       _gnustepIcon = RETAIN([self loadGNUstepIcon]);
       _recyclerIcon = RETAIN([self loadRecyclerIcon]);
+      _recyclerFullIcon = RETAIN([self loadRecyclerFullIcon]);
       _cellBackgroundImage = RETAIN([self loadCellBackgroundImage]);
       [self registerForDraggedTypes:
 	      [NSArray arrayWithObjects:NSFilenamesPboardType,
@@ -149,6 +151,7 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   DESTROY(_cellBackgroundImage);
   DESTROY(_gnustepIcon);
   DESTROY(_recyclerIcon);
+  DESTROY(_recyclerFullIcon);
   DESTROY(_items);
   DEALLOC;
 }
@@ -165,17 +168,12 @@ DockViewCalibratedBackgroundColor (NSColor *color)
 
 - (NSImage *) loadRecyclerIcon
 {
-  NSString *path = [[NSBundle mainBundle] pathForResource:@"Recycler.GNUstep"
-                                                   ofType:@"xpm"];
-  NSImage *image;
+  return [NSImage imageNamed:NSImageNameTrashEmpty];
+}
 
-  image = AUTORELEASE([[NSImage alloc] initWithContentsOfFile:path]);
-  if (image)
-    {
-      return image;
-    }
-
-  return nil;
+- (NSImage *) loadRecyclerFullIcon
+{
+  return [NSImage imageNamed:NSImageNameTrashFull];
 }
 
 - (NSImage *) loadCellBackgroundImage
@@ -1503,6 +1501,7 @@ DockViewCalibratedBackgroundColor (NSColor *color)
 - (void) drawRecyclerTile
 {
   NSRect cell = [self recyclerTileRect];
+  NSImage *recyclerIcon = _recyclerHasContents ? _recyclerFullIcon : _recyclerIcon;
   CGFloat angle = 0.0;
 
   [self drawCellBackgroundInCell:cell];
@@ -1517,7 +1516,7 @@ DockViewCalibratedBackgroundColor (NSColor *color)
       angle = sin(progress * 8.0 * M_PI) * 8.0 * decay;
     }
 
-  if (![self drawImage:_recyclerIcon inCell:cell size:46.0 angle:angle])
+  if (![self drawImage:recyclerIcon inCell:cell size:46.0 angle:angle])
     {
       if (angle != 0.0)
 	{
@@ -1536,7 +1535,6 @@ DockViewCalibratedBackgroundColor (NSColor *color)
 	  [self drawRecyclerFallbackInCell:cell];
 	}
     }
-  [self drawRecyclerContentsIndicatorInCell:cell];
 }
 
 - (void) drawDropIndicator
