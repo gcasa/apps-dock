@@ -20,7 +20,6 @@ DockWM_APPLICATION_ICON = DockWM.tiff
 DockWM_RESOURCE_FILES = \
 Resources/DockWM.tiff \
 Resources/GNUstep.tiff \
-Resources/Recycler.GNUstep.xpm \
 Resources/gnustep_whale.png \
 Resources/GNUstep_circle.png
 
