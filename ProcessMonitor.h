@@ -19,23 +19,25 @@
 
 #import <Foundation/Foundation.h>
 
-typedef void (^ProcessExitCallback)(pid_t pid, id token);
-
+/* Tells its target the moment a watched process exits.  A thread of its own
+ * waits for the exit notification of the kernel (pidfd on Linux, kqueue on
+ * the BSDs), so nothing has to poll the process table.  The action is sent
+ * on the main thread with the process identifier as an NSNumber. */
 @interface ProcessMonitor : NSObject
 {
-  pthread_mutex_t _mutex;
-  pthread_t _monitorThread;
-  BOOL _running;
+  id _target;
+  SEL _action;
+  NSLock *_lock;
+  NSMutableSet *_requestedProcessIdentifiers;
+  NSMutableDictionary *_watchedProcessIdentifiers;
   int _wakeupPipe[2];
-  NSMutableDictionary *_watchedPIDs;
+  int _queue;
+  BOOL _running;
 }
 
-+ (instancetype)sharedMonitor;
-
-- (void)addPID:(pid_t)pid
-         token:(id)token
-      callback:(ProcessExitCallback)block;
-- (void)removePID:(pid_t)pid;
-- (BOOL)processAlive:(pid_t)pid;
+- (id) initWithTarget: (id)target action: (SEL)action;
+/* Replaces the watched processes by the given NSNumber identifiers. */
+- (void) setProcessIdentifiers: (NSSet *)processIdentifiers;
+- (void) stop;
 
 @end

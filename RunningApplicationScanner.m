@@ -309,12 +309,11 @@
   return YES;
 }
 
-- (NSArray *) runningProcessExecutablePaths
+- (NSDictionary *) runningProcessExecutablePathsByProcessIdentifier
 {
   NSString *procPath = [self procFilesystemPath];
   NSArray *entries;
-  NSMutableArray *paths = [NSMutableArray array];
-  NSMutableSet *seenPaths = [NSMutableSet set];
+  NSMutableDictionary *paths = [NSMutableDictionary dictionary];
   NSUInteger i;
 
   if (![procPath length])
@@ -327,6 +326,7 @@
     {
       NSString *entry = [entries objectAtIndex:i];
       NSString *linkPath;
+      NSString *path;
       char target[PATH_MAX];
       ssize_t length;
 
@@ -346,18 +346,44 @@
 	}
 
       target[length] = '\0';
-      {
-	NSString *path = [self normalizedPath:
-				 [NSString stringWithUTF8String:target]];
-	if ([path length] && ![seenPaths containsObject:path])
-	  {
-	    [seenPaths addObject:path];
-	    [paths addObject:path];
-	  }
-      }
+      path = [self normalizedPath:[NSString stringWithUTF8String:target]];
+      if ([path length])
+	{
+	  [paths setObject:path
+		    forKey:[NSNumber numberWithInt:[entry intValue]]];
+	}
     }
 
   return paths;
+}
+
+- (NSArray *) executablePathsOfProcesses: (NSDictionary *)processes
+{
+  NSArray *processIdentifiers =
+    [[processes allKeys] sortedArrayUsingSelector:@selector(compare:)];
+  NSMutableArray *paths = [NSMutableArray array];
+  NSMutableSet *seenPaths = [NSMutableSet set];
+  NSUInteger i;
+
+  /* In process identifier order, as listed in the process table. */
+  for (i = 0; i < [processIdentifiers count]; i++)
+    {
+      NSString *path = [processes objectForKey:[processIdentifiers objectAtIndex:i]];
+
+      if (![seenPaths containsObject:path])
+	{
+	  [seenPaths addObject:path];
+	  [paths addObject:path];
+	}
+    }
+
+  return paths;
+}
+
+- (NSArray *) runningProcessExecutablePaths
+{
+  return [self executablePathsOfProcesses:
+		 [self runningProcessExecutablePathsByProcessIdentifier]];
 }
 
 - (NSString *) executablePathForProcessIdentifier: (NSNumber *)processIdentifier
@@ -388,45 +414,17 @@
 
 - (NSArray *) runningProcessIdentifiersForApplicationItem: (DockItem *)item
 {
-  NSString *procPath = [self procFilesystemPath];
-  NSArray *entries;
+  NSDictionary *processes = [self runningProcessExecutablePathsByProcessIdentifier];
+  NSEnumerator *enumerator = [processes keyEnumerator];
   NSMutableArray *processIds = [NSMutableArray array];
-  NSUInteger i;
+  NSNumber *processIdentifier;
 
-  if (![procPath length])
+  while ((processIdentifier = [enumerator nextObject]) != nil)
     {
-      return processIds;
-    }
-  entries = [[NSFileManager defaultManager] directoryContentsAtPath:procPath];
-
-  for (i = 0; i < [entries count]; i++)
-    {
-      NSString *entry = [entries objectAtIndex:i];
-      NSString *linkPath;
-      char target[PATH_MAX];
-      ssize_t length;
-      NSString *processPath;
-
-      if (![self stringIsProcessIdentifier:entry])
+      if ([self applicationItem:item
+	      matchesRunningProcessPath:[processes objectForKey:processIdentifier]])
 	{
-	  continue;
-	}
-
-      linkPath = [[procPath stringByAppendingPathComponent:entry]
-		   stringByAppendingPathComponent:@"exe"];
-      length = readlink([linkPath fileSystemRepresentation],
-			target,
-			sizeof(target) - 1);
-      if (length <= 0)
-	{
-	  continue;
-	}
-
-      target[length] = '\0';
-      processPath = [self normalizedPath:[NSString stringWithUTF8String:target]];
-      if ([self applicationItem:item matchesRunningProcessPath:processPath])
-	{
-	  [processIds addObject:[NSNumber numberWithInt:[entry intValue]]];
+	  [processIds addObject:processIdentifier];
 	}
     }
 

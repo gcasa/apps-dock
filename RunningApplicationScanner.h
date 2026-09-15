@@ -25,6 +25,10 @@
 - (NSString *) pathForExecutableCommand: (NSString *)command;
 - (NSString *) executablePathForDesktopFile: (NSString *)path;
 - (BOOL) stringIsProcessIdentifier: (NSString *)string;
+/* NSNumber process identifier -> executable path, for every process. */
+- (NSDictionary *) runningProcessExecutablePathsByProcessIdentifier;
+/* The distinct paths of such a dictionary. */
+- (NSArray *) executablePathsOfProcesses: (NSDictionary *)processes;
 - (NSArray *) runningProcessExecutablePaths;
 - (NSString *) executablePathForProcessIdentifier: (NSNumber *)processIdentifier;
 - (NSArray *) runningProcessIdentifiersForApplicationItem: (DockItem *)item;
