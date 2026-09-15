@@ -138,6 +138,9 @@
       [_x11 setDockPlacement:_dockPlacement];
     }
 
+  _dockService = [[DockService alloc] initWithDelegate:self];
+  [_dockService start];
+
   [self performSelector:@selector(performInitialApplicationScans)
 	     withObject:nil
 	     afterDelay:0.5];
@@ -152,6 +155,7 @@
   DESTROY(_recyclerController);
   DESTROY(_preferences);
   DESTROY(_dockMenu);
+  DESTROY(_dockService);
   DESTROY(_x11);
   DESTROY(_dockView);
   DESTROY(_window);
@@ -2529,64 +2533,19 @@ didChangeItemWigglesOnAttentionRequest: (BOOL)wiggles
     }
 }
 
-
-- (void) x11DockManagerDidSetProgressValue: (double)value
-                                    visible: (BOOL)visible
-                            processIdentifier: (int)processIdentifier
+/* Only icons that are in the Dock already: processes which stay out of the
+ * Dock report through the service too (Eau mirrors every progress
+ * indicator, also those of the window manager). */
+- (DockItem *) dockService: (DockService *)service
+  itemForProcessIdentifier: (int)processIdentifier
 {
-  NSNumber *processIdentifierNumber = nil;
-  DockItem *item = nil;
-
-  if (processIdentifier <= 0)
-    {
-      return;
-    }
-
-  processIdentifierNumber = [NSNumber numberWithInt:processIdentifier];
-  item = [self applicationItemMatchingProcessIdentifier:processIdentifierNumber];
-
-  if (!item)
-    {
-      item = [self transientApplicationItemForProcessIdentifier:processIdentifierNumber];
-    }
-
-  if (item)
-    {
-      [item setProgressValue:value];
-      [item setProgressVisible:visible];
-      [_dockView setNeedsDisplay:YES];
-    }
+  return [self applicationItemMatchingProcessIdentifier:
+		 [NSNumber numberWithInt:processIdentifier]];
 }
 
-- (void) x11DockManagerDidSetUrgent: (BOOL)urgent
-                    processIdentifier: (int)processIdentifier
+- (void) dockService: (DockService *)service didChangeItem: (DockItem *)item
 {
-  NSNumber *processIdentifierNumber = nil;
-  DockItem *item = nil;
-
-  if (processIdentifier <= 0)
-    {
-      return;
-    }
-
-  processIdentifierNumber = [NSNumber numberWithInt:processIdentifier];
-  item = [self applicationItemMatchingProcessIdentifier:processIdentifierNumber];
-
-  if (!item)
-    {
-      item = [self transientApplicationItemForProcessIdentifier:processIdentifierNumber];
-    }
-
-  if (item)
-    {
-      [item setUrgent:urgent];
-      [_dockView setNeedsDisplay:YES];
-    }
-}
-
-- (void) x11DockManagerDidDetectWindowDestroyed: (unsigned long)xWindow
-{
-  [self scanRunningApplications];
+  [_dockView setNeedsDisplay:YES];
 }
 
 @end

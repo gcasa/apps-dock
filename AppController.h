@@ -18,6 +18,7 @@
  */
 
 #import <AppKit/AppKit.h>
+#import "DockService.h"
 #import "DockView.h"
 #import "SettingsController.h"
 #import "X11DockManager.h"
@@ -29,8 +30,9 @@
 @class RecyclerController;
 @class RunningApplicationScanner;
 
-@interface AppController : NSObject <DockViewDelegate, SettingsControllerDelegate, X11DockManagerDelegate>
+@interface AppController : NSObject <DockViewDelegate, SettingsControllerDelegate, X11DockManagerDelegate, DockServiceDelegate>
 {
+  DockService *_dockService;
   NSWindow *_window;
   SettingsController *_settingsController;
   RecyclerController *_recyclerController;

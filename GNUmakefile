@@ -13,6 +13,7 @@ DockApplicationStore.m \
 ApplicationIconManager.m \
 DockView.m \
 DockItem.m \
+DockService.m \
 X11DockManager.m
 
 DockWM_APPLICATION_ICON = DockWM.tiff
