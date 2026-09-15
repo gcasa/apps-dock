@@ -309,6 +309,32 @@
   return YES;
 }
 
+- (NSSet *) runningProcessIdentifiers
+{
+  NSString *procPath = [self procFilesystemPath];
+  NSArray *entries;
+  NSMutableSet *processIdentifiers = [NSMutableSet set];
+  NSUInteger i;
+
+  if (![procPath length])
+    {
+      return processIdentifiers;
+    }
+  entries = [[NSFileManager defaultManager] directoryContentsAtPath:procPath];
+
+  for (i = 0; i < [entries count]; i++)
+    {
+      NSString *entry = [entries objectAtIndex:i];
+
+      if ([self stringIsProcessIdentifier:entry])
+	{
+	  [processIdentifiers addObject:[NSNumber numberWithInt:[entry intValue]]];
+	}
+    }
+
+  return processIdentifiers;
+}
+
 - (NSArray *) runningProcessExecutablePaths
 {
   NSString *procPath = [self procFilesystemPath];

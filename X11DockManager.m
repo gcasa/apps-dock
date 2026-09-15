@@ -2581,37 +2581,4 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   XFlush(display);
 }
 
-- (NSArray *) discoveredX11Applications
-{
-  Display *display = (Display *)_display;
-  NSArray *clientWindows;
-  NSMutableArray *result = [NSMutableArray array];
-  NSUInteger i;
-
-  if (!display)
-    {
-      return result;
-    }
-
-  clientWindows = [self clientListWindows];
-  for (i = 0; i < [clientWindows count]; i++)
-    {
-      Window window = (Window)[[clientWindows objectAtIndex:i] unsignedLongValue];
-      int pid = [self processIdentifierForWindow:window];
-      NSString *title = [self titleForWindow:window];
-
-      if (pid > 0 && [title length] > 0)
-        {
-          NSDictionary *entry = [NSDictionary dictionaryWithObjectsAndKeys:
-            [NSNumber numberWithUnsignedLong:(unsigned long)window], @"window",
-            [NSNumber numberWithInt:pid], @"pid",
-            title, @"title",
-            nil];
-          [result addObject:entry];
-        }
-    }
-
-  return result;
-}
-
 @end

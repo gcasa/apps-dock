@@ -50,6 +50,8 @@ typedef enum
   BOOL _wigglesOnLaunch;
   BOOL _wigglesOnActivation;
   BOOL _wigglesOnAttentionRequest;
+  NSMutableSet *_processIdentifiers;
+  NSSet *_processIdentifiersBeforeLaunch;
 }
 
 + (id) applicationItemWithPath: (NSString *)path;
@@ -88,5 +90,17 @@ typedef enum
 - (void) setWigglesOnActivation: (BOOL)wiggles;
 - (BOOL) wigglesOnAttentionRequest;
 - (void) setWigglesOnAttentionRequest: (BOOL)wiggles;
+/* The processes whose windows the item shows.  They keep the item running
+ * even when their executable lies outside of the application bundle. */
+- (NSSet *) processIdentifiers;
+- (void) addProcessIdentifier: (int)processIdentifier;
+- (void) removeProcessIdentifier: (NSNumber *)processIdentifier;
+- (void) removeAllProcessIdentifiers;
+/* A launch the workspace announced, until the application shows up.  The
+ * processes running when it began tell the processes it started. */
+- (void) beginLaunchWithRunningProcessIdentifiers: (NSSet *)processIdentifiers;
+- (void) endLaunch;
+- (BOOL) isLaunching;
+- (BOOL) processIdentifierIsNewSinceLaunch: (int)processIdentifier;
 
 @end

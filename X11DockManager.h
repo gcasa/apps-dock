@@ -82,8 +82,9 @@ typedef enum
 - (void) moveDockedWindow: (unsigned long)xWindow toIndex: (NSUInteger)index;
 - (void) activateWindow: (unsigned long)xWindow;
 - (BOOL) windowExists: (unsigned long)xWindow;
+/* _NET_WM_PID of the window, 0 when it has none. */
+- (int) processIdentifierForWindow: (unsigned long)window;
 - (BOOL) activateApplicationWithProcessIdentifiers: (NSArray *)processIdentifiers;
 - (void) closeWindow: (unsigned long)xWindow;
-- (NSArray *) discoveredX11Applications;
 
 @end

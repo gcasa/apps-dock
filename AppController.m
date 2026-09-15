@@ -60,7 +60,41 @@
 - (void) refreshDock;
 - (void) restoreApplicationItemAfterExit: (DockItem *)item;
 - (BOOL) launchDesktopFile: (NSString *)path arguments: (NSArray *)arguments;
+- (void) workspaceWillLaunchApplication: (NSNotification *)notification;
+- (void) workspaceDidLaunchApplication: (NSNotification *)notification;
+- (BOOL) launchNotificationIsForThisDisplay: (NSDictionary *)info;
+- (DockItem *) applicationItemForLaunchedPath: (NSString *)path;
+- (void) finishLaunchOfItem: (DockItem *)item;
+- (void) launchOfItemTimedOut: (DockItem *)item;
+- (BOOL) applicationItemIsRunning: (DockItem *)item paths: (NSArray *)processPaths;
+- (DockItem *) launchingItemForProcessIdentifier: (int)processIdentifier;
+- (DockItem *) applicationItemRememberingProcessIdentifier: (int)processIdentifier;
 @end
+
+/* Workspace names the display a launch is meant for, because the launch
+ * notification is sent before the application has a process. */
+static NSString * const DockLaunchDisplayKey = @"GWLaunchDisplay";
+/* How long the icon of an announced launch waits for the application. */
+static const NSTimeInterval DockLaunchTimeout = 30.0;
+
+/* ":0" and ":0.0" name the same display; only the screen number differs. */
+static NSString *
+DockDisplayWithoutScreen (NSString *display)
+{
+  NSRange colon = [display rangeOfString:@":" options:NSBackwardsSearch];
+  NSRange dot;
+
+  if (colon.location == NSNotFound)
+    {
+      return display;
+    }
+  dot = [display rangeOfString:@"."
+		       options:NSBackwardsSearch
+			 range:NSMakeRange(colon.location,
+					   [display length] - colon.location)];
+  return dot.location == NSNotFound ? display
+    : [display substringToIndex:dot.location];
+}
 
 @implementation AppController
 
@@ -138,6 +172,17 @@
       [_x11 setDockPlacement:_dockPlacement];
     }
 
+  [[[NSWorkspace sharedWorkspace] notificationCenter]
+    addObserver:self
+       selector:@selector(workspaceWillLaunchApplication:)
+	   name:NSWorkspaceWillLaunchApplicationNotification
+	 object:nil];
+  [[[NSWorkspace sharedWorkspace] notificationCenter]
+    addObserver:self
+       selector:@selector(workspaceDidLaunchApplication:)
+	   name:NSWorkspaceDidLaunchApplicationNotification
+	 object:nil];
+
   [self performSelector:@selector(performInitialApplicationScans)
 	     withObject:nil
 	     afterDelay:0.5];
@@ -145,6 +190,8 @@
 
 - (void) dealloc
 {
+  [[[NSWorkspace sharedWorkspace] notificationCenter] removeObserver:self];
+  [NSObject cancelPreviousPerformRequestsWithTarget:self];
   [_x11EventTimer invalidate];
   [_scanTimer invalidate];
   [_processScanTimer invalidate];
@@ -1092,7 +1139,7 @@
 	  continue;
 	}
 
-      running = [self applicationItemHasRunningProcess:item paths:processPaths];
+      running = [self applicationItemIsRunning:item paths:processPaths];
       if (!running && [item xWindow])
 	{
 	  if ([_x11 windowExists:[item xWindow]])
@@ -1141,63 +1188,14 @@
       changed = YES;
     }
 
-  {
-    NSArray *x11Apps = [_x11 discoveredX11Applications];
-    NSUInteger j;
-
-    for (j = 0; j < [x11Apps count]; j++)
-      {
-        NSDictionary *entry = [x11Apps objectAtIndex:j];
-        NSString *title = [entry objectForKey:@"title"];
-        unsigned long xWindow = [[entry objectForKey:@"window"] unsignedLongValue];
-        DockItem *existing = nil;
-        DockItem *item;
-        NSUInteger k;
-
-        for (k = 0; k < [_items count]; k++)
-          {
-            DockItem *di = [_items objectAtIndex:k];
-            if ([[di title] isEqualToString:title] ||
-                ([di xWindow] && [di xWindow] == xWindow))
-              {
-                existing = di;
-                break;
-              }
-          }
-
-        if (existing)
-          {
-            if ([existing xWindow] == 0)
-              {
-                [existing setXWindow:xWindow];
-                changed = YES;
-              }
-            if ([existing state] == DockItemNotRunning)
-              {
-                [existing setState:DockItemRunning];
-                changed = YES;
-              }
-            continue;
-          }
-
-        item = [DockItem x11ItemWithTitle:title
-                                   window:xWindow
-                                     icon:nil
-                                   hidden:NO];
-        [item setPinned:NO];
-        [item setState:DockItemRunning];
-        [_items addObject:item];
-        changed = YES;
-      }
-  }
-
   for (i = [_items count]; i > 0; i--)
     {
       DockItem *item = [_items objectAtIndex:i - 1];
 
       if ([item kind] == DockItemApplication &&
 	  ![item isPinned] &&
-	  ![self applicationItemHasRunningProcess:item paths:processPaths])
+	  ![item isLaunching] &&
+	  ![self applicationItemIsRunning:item paths:processPaths])
 	{
 	  [_items removeObjectAtIndex:i - 1];
 	  changed = YES;
@@ -1977,7 +1975,204 @@ didChangeItemWigglesOnAttentionRequest: (BOOL)wiggles
   [item setXWindow:0];
   [item restoreOriginalIcon];
   [item setBadgeLabel:nil];
+  [item removeAllProcessIdentifiers];
   [self removeApplicationIconWindowsForItem:item];
+}
+
+/* The workspace notifications of every session of this user arrive here. */
+- (BOOL) launchNotificationIsForThisDisplay: (NSDictionary *)info
+{
+  NSString *display = [info objectForKey:DockLaunchDisplayKey];
+  NSString *ownDisplay = [[[NSProcessInfo processInfo] environment]
+			   objectForKey:@"DISPLAY"];
+
+  if (![display length] || ![ownDisplay length])
+    {
+      return NO;
+    }
+  return [DockDisplayWithoutScreen(display)
+	   isEqualToString:DockDisplayWithoutScreen(ownDisplay)];
+}
+
+- (DockItem *) applicationItemForLaunchedPath: (NSString *)path
+{
+  NSString *normalizedPath = [self normalizedPath:path];
+  DockItem *item;
+  NSUInteger i;
+
+  for (i = 0; i < [_items count]; i++)
+    {
+      item = [_items objectAtIndex:i];
+      if ([item kind] == DockItemApplication &&
+	  [[self normalizedPath:[item path]] isEqualToString:normalizedPath])
+	{
+	  return item;
+	}
+    }
+
+  item = [DockItem applicationItemWithPath:path];
+  [item setPinned:NO];
+  [item setState:DockItemNotRunning];
+  [_items addObject:item];
+  return item;
+}
+
+/* Workspace announces a launch before the application has a process, so
+ * the Dock can show the launch while the application starts up. */
+- (void) workspaceWillLaunchApplication: (NSNotification *)notification
+{
+  NSDictionary *info = [notification userInfo];
+  NSString *path = [info objectForKey:@"NSApplicationPath"];
+  DockItem *item;
+
+  if (![self launchNotificationIsForThisDisplay:info] ||
+      ![path length] ||
+      [self applicationBundlePathIsDockWM:path])
+    {
+      return;
+    }
+
+  item = [self applicationItemForLaunchedPath:path];
+  /* Workspace posts the notification more than once per launch. */
+  if ([item state] != DockItemNotRunning || [item isLaunching])
+    {
+      return;
+    }
+
+  [item beginLaunchWithRunningProcessIdentifiers:
+	  [_applicationScanner runningProcessIdentifiers]];
+  [self refreshDock];
+  if ([self itemWigglesOnLaunch:item])
+    {
+      /* Repeats until the application shows up. */
+      [_dockView startAttentionWiggleForItem:item];
+    }
+  [self performSelector:@selector(launchOfItemTimedOut:)
+	     withObject:item
+	     afterDelay:DockLaunchTimeout];
+}
+
+/* GNUstep applications announce themselves when they finished launching. */
+- (void) workspaceDidLaunchApplication: (NSNotification *)notification
+{
+  NSString *normalizedPath =
+    [self normalizedPath:[[notification userInfo] objectForKey:@"NSApplicationPath"]];
+  NSUInteger i;
+
+  if (![normalizedPath length])
+    {
+      return;
+    }
+
+  for (i = 0; i < [_items count]; i++)
+    {
+      DockItem *item = [_items objectAtIndex:i];
+
+      if ([item isLaunching] &&
+	  [[self normalizedPath:[item path]] isEqualToString:normalizedPath])
+	{
+	  [self finishLaunchOfItem:item];
+	  [self scanRunningApplications];
+	  return;
+	}
+    }
+}
+
+- (void) finishLaunchOfItem: (DockItem *)item
+{
+  if (![item isLaunching])
+    {
+      return;
+    }
+  [item endLaunch];
+  [NSObject cancelPreviousPerformRequestsWithTarget:self
+					   selector:@selector(launchOfItemTimedOut:)
+					     object:item];
+  [_dockView acknowledgeWiggleForItem:item];
+}
+
+- (void) launchOfItemTimedOut: (DockItem *)item
+{
+  [self finishLaunchOfItem:item];
+  /* Takes the icon out again unless the application runs by now. */
+  [self scanRunningApplications];
+}
+
+- (BOOL) applicationItemIsRunning: (DockItem *)item paths: (NSArray *)processPaths
+{
+  BOOL running = [self applicationItemHasRunningProcess:item paths:processPaths];
+  NSEnumerator *enumerator = [[[item processIdentifiers] allObjects] objectEnumerator];
+  NSNumber *processIdentifier;
+
+  /* Applications started through a wrapper script run an executable outside
+   * of their bundle; the processes of their windows keep them running. */
+  while ((processIdentifier = [enumerator nextObject]) != nil)
+    {
+      if ([self executablePathForProcessIdentifier:processIdentifier])
+	{
+	  running = YES;
+	}
+      else
+	{
+	  [item removeProcessIdentifier:processIdentifier];
+	}
+    }
+
+  return running;
+}
+
+/* The first window of a wrapped application often shows neither its name
+ * nor an executable inside its bundle.  A process that did not exist when
+ * the only pending launch began belongs to that launch. */
+- (DockItem *) launchingItemForProcessIdentifier: (int)processIdentifier
+{
+  DockItem *launchingItem = nil;
+  NSUInteger i;
+
+  for (i = 0; i < [_items count]; i++)
+    {
+      DockItem *item = [_items objectAtIndex:i];
+
+      if (![item isLaunching])
+	{
+	  continue;
+	}
+      if (launchingItem)
+	{
+	  /* Several launches at once cannot be told apart. */
+	  return nil;
+	}
+      launchingItem = item;
+    }
+
+  return [launchingItem processIdentifierIsNewSinceLaunch:processIdentifier]
+    ? launchingItem : nil;
+}
+
+/* Further windows of a process belong to the item that showed its first
+ * one, whatever they are titled. */
+- (DockItem *) applicationItemRememberingProcessIdentifier: (int)processIdentifier
+{
+  NSNumber *processIdentifierNumber;
+  NSUInteger i;
+
+  if (processIdentifier <= 0)
+    {
+      return nil;
+    }
+  processIdentifierNumber = [NSNumber numberWithInt:processIdentifier];
+  for (i = 0; i < [_items count]; i++)
+    {
+      DockItem *item = [_items objectAtIndex:i];
+
+      if ([item kind] == DockItemApplication &&
+	  [[item processIdentifiers] containsObject:processIdentifierNumber])
+	{
+	  return item;
+	}
+    }
+
+  return nil;
 }
 
 - (NSUInteger) indexForItem: (DockItem *)targetItem
@@ -2432,6 +2627,7 @@ didChangeItemWigglesOnAttentionRequest: (BOOL)wiggles
   DockItem *item = [self itemForXWindow:xWindow];
   BOOL matchedApplication;
   NSString *iconIdentifier;
+  int processIdentifier = dockApp ? 0 : [_x11 processIdentifierForWindow:xWindow];
 
   if (dockApp && ![path length])
     {
@@ -2447,11 +2643,19 @@ didChangeItemWigglesOnAttentionRequest: (BOOL)wiggles
     }
   if (!item && !dockApp)
     {
+      item = [self applicationItemRememberingProcessIdentifier:processIdentifier];
+    }
+  if (!item && !dockApp)
+    {
       item = [self applicationItemMatchingExecutablePath:path];
     }
   if (!item && !dockApp)
     {
       item = [self applicationItemMatchingTitle:title];
+    }
+  if (!item && !dockApp)
+    {
+      item = [self launchingItemForProcessIdentifier:processIdentifier];
     }
   matchedApplication = item && [item kind] == DockItemApplication;
 
@@ -2488,6 +2692,11 @@ didChangeItemWigglesOnAttentionRequest: (BOOL)wiggles
       if (!(dockApp && matchedApplication))
 	{
 	  [item setXWindow:xWindow];
+	}
+      if (!dockApp && [item kind] == DockItemApplication)
+	{
+	  [item addProcessIdentifier:processIdentifier];
+	  [self finishLaunchOfItem:item];
 	}
       if ([self shouldApplyX11Icon:icon toItem:item])
 	{

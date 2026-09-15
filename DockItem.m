@@ -604,6 +604,8 @@
   DESTROY(_icon);
   DESTROY(_originalIcon);
   DESTROY(_dockTile);
+  DESTROY(_processIdentifiers);
+  DESTROY(_processIdentifiersBeforeLaunch);
   DEALLOC;
 }
 
@@ -785,6 +787,56 @@
 - (void) setWigglesOnAttentionRequest: (BOOL)wiggles
 {
   _wigglesOnAttentionRequest = wiggles;
+}
+
+- (NSSet *) processIdentifiers
+{
+  return _processIdentifiers ? AUTORELEASE([_processIdentifiers copy]) : [NSSet set];
+}
+
+- (void) addProcessIdentifier: (int)processIdentifier
+{
+  if (processIdentifier <= 0)
+    {
+      return;
+    }
+  if (!_processIdentifiers)
+    {
+      _processIdentifiers = [NSMutableSet new];
+    }
+  [_processIdentifiers addObject:[NSNumber numberWithInt:processIdentifier]];
+}
+
+- (void) removeProcessIdentifier: (NSNumber *)processIdentifier
+{
+  [_processIdentifiers removeObject:processIdentifier];
+}
+
+- (void) removeAllProcessIdentifiers
+{
+  [_processIdentifiers removeAllObjects];
+}
+
+- (void) beginLaunchWithRunningProcessIdentifiers: (NSSet *)processIdentifiers
+{
+  ASSIGNCOPY(_processIdentifiersBeforeLaunch, processIdentifiers);
+}
+
+- (void) endLaunch
+{
+  DESTROY(_processIdentifiersBeforeLaunch);
+}
+
+- (BOOL) isLaunching
+{
+  return _processIdentifiersBeforeLaunch != nil;
+}
+
+- (BOOL) processIdentifierIsNewSinceLaunch: (int)processIdentifier
+{
+  return [self isLaunching] && processIdentifier > 0 &&
+    ![_processIdentifiersBeforeLaunch containsObject:
+					[NSNumber numberWithInt:processIdentifier]];
 }
 
 @end
