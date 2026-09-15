@@ -64,6 +64,7 @@
 - (BOOL) itemWigglesOnActivation: (DockItem *)item;
 - (BOOL) itemWigglesOnAttentionRequest: (DockItem *)item;
 - (void) refreshDock;
+- (void) updateIconGeometries;
 - (void) restoreApplicationItemAfterExit: (DockItem *)item;
 - (BOOL) launchDesktopFile: (NSString *)path
 		 arguments: (NSArray *)arguments
@@ -1952,6 +1953,63 @@ didChangeItemWigglesOnAttentionRequest: (BOOL)wiggles
   [_dockView setItems:_items];
   [_dockView setPinnedItemCount:[self pinnedApplicationCount]];
   [self applyDockPlacement];
+  [self updateIconGeometries];
+}
+
+/* Points the minimize animation of every window at its own Dock icon.
+ * Application items own all client windows of their processes, not only the
+ * one window remembered in the item. */
+- (void) updateIconGeometries
+{
+  NSDictionary *windowsByProcess = [_x11 clientWindowsByProcessIdentifier];
+  NSMutableDictionary *processPaths = [NSMutableDictionary dictionary];
+  NSEnumerator *enumerator = [windowsByProcess keyEnumerator];
+  NSNumber *processIdentifier;
+  NSUInteger i;
+
+  while ((processIdentifier = [enumerator nextObject]) != nil)
+    {
+      NSString *path = [self executablePathForProcessIdentifier:processIdentifier];
+
+      if ([path length])
+	{
+	  [processPaths setObject:path forKey:processIdentifier];
+	}
+    }
+
+  for (i = 0; i < [_items count]; i++)
+    {
+      DockItem *item = [_items objectAtIndex:i];
+      NSMutableArray *windows = [NSMutableArray array];
+      NSRect rect = [_dockView cellRectForHoverIndex:(NSInteger)i];
+
+      if ([item xWindow])
+	{
+	  [windows addObject:[NSNumber numberWithUnsignedLong:[item xWindow]]];
+	}
+      if ([item kind] == DockItemApplication)
+	{
+	  enumerator = [processPaths keyEnumerator];
+	  while ((processIdentifier = [enumerator nextObject]) != nil)
+	    {
+	      if ([self applicationItem:item
+		      matchesRunningProcessPath:[processPaths objectForKey:processIdentifier]])
+		{
+		  [windows addObjectsFromArray:
+			     [windowsByProcess objectForKey:processIdentifier]];
+		}
+	    }
+	}
+      if (![windows count] || NSIsEmptyRect(rect))
+	{
+	  continue;
+	}
+
+      rect = [_dockView convertRect:rect toView:nil];
+      rect.origin.x += NSMinX([_window frame]);
+      rect.origin.y += NSMinY([_window frame]);
+      [_x11 setIconGeometry:rect forWindows:windows];
+    }
 }
 
 - (DockItem *) itemForXWindow: (unsigned long)xWindow

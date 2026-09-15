@@ -2581,4 +2581,70 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   XFlush(display);
 }
 
+- (NSDictionary *) clientWindowsByProcessIdentifier
+{
+  NSArray *clientWindows = [self clientListWindows];
+  NSMutableDictionary *windowsByProcess = [NSMutableDictionary dictionary];
+  NSUInteger i;
+
+  for (i = 0; i < [clientWindows count]; i++)
+    {
+      NSNumber *window = [clientWindows objectAtIndex:i];
+      int processIdentifier = [self processIdentifierForWindow:
+				      (Window)[window unsignedLongValue]];
+      NSNumber *key;
+      NSMutableArray *windows;
+
+      if (processIdentifier <= 0)
+	{
+	  continue;
+	}
+      key = [NSNumber numberWithInt:processIdentifier];
+      windows = [windowsByProcess objectForKey:key];
+      if (!windows)
+	{
+	  windows = [NSMutableArray array];
+	  [windowsByProcess setObject:windows forKey:key];
+	}
+      [windows addObject:window];
+    }
+
+  return windowsByProcess;
+}
+
+/* The window manager animates minimizing a window toward this rectangle, so
+ * it has to be where the Dock icon is on screen, in root window coordinates
+ * (y pointing down). */
+- (void) setIconGeometry: (NSRect)screenRect forWindows: (NSArray *)windows
+{
+  Display *display = (Display *)_display;
+  Atom iconGeometry;
+  unsigned long geometry[4];
+  CGFloat screenHeight;
+  NSUInteger i;
+
+  if (!display || ![windows count] || NSIsEmptyRect(screenRect))
+    {
+      return;
+    }
+
+  screenHeight = (CGFloat)DisplayHeight(display, DefaultScreen(display));
+  iconGeometry = XInternAtom(display, "_NET_WM_ICON_GEOMETRY", False);
+  geometry[0] = (unsigned long)MAX(0.0, NSMinX(screenRect));
+  geometry[1] = (unsigned long)MAX(0.0, screenHeight - NSMaxY(screenRect));
+  geometry[2] = (unsigned long)NSWidth(screenRect);
+  geometry[3] = (unsigned long)NSHeight(screenRect);
+
+  /* A window can be destroyed between listing and updating it; the error
+   * handler swallows the resulting BadWindow. */
+  for (i = 0; i < [windows count]; i++)
+    {
+      XChangeProperty(display,
+		      (Window)[[windows objectAtIndex:i] unsignedLongValue],
+		      iconGeometry, XA_CARDINAL, 32, PropModeReplace,
+		      (unsigned char *)geometry, 4);
+    }
+  XFlush(display);
+}
+
 @end

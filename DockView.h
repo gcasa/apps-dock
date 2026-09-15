@@ -112,6 +112,7 @@ typedef enum
 - (void) startWiggleForItem: (DockItem *)item;
 - (void) startAttentionWiggleForItem: (DockItem *)item;
 - (void) acknowledgeWiggleForItem: (DockItem *)item;
+- (NSRect) cellRectForHoverIndex: (NSInteger)index;
 - (void) startRecyclerWiggle;
 - (void) setHorizontal: (BOOL)horizontal;
 - (BOOL) isHorizontal;
