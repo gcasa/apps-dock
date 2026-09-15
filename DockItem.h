@@ -52,13 +52,6 @@ typedef enum
   BOOL _wigglesOnAttentionRequest;
 }
 
-+ (id) applicationItemWithPath: (NSString *)path;
-+ (id) x11ItemWithTitle: (NSString *)title
-                 window: (unsigned long)xWindow
-                   icon: (NSImage *)icon
-                 hidden: (BOOL)hidden;
-+ (NSString *) applicationBundlePathForPath: (NSString *)path;
-
 - (DockItemKind) kind;
 - (DockItemState) state;
 - (void) setState: (DockItemState)state;
@@ -89,4 +82,16 @@ typedef enum
 - (BOOL) wigglesOnAttentionRequest;
 - (void) setWigglesOnAttentionRequest: (BOOL)wiggles;
 
+@end
+
+@interface DockItem (Factory)
++ (id) applicationItemWithPath: (NSString *)path;
++ (id) x11ItemWithTitle: (NSString *)title
+                 window: (unsigned long)xWindow
+                   icon: (NSImage *)icon
+                 hidden: (BOOL)hidden;
+@end
+
+@interface DockItem (Icons)
++ (NSString *) applicationBundlePathForPath: (NSString *)path;
 @end

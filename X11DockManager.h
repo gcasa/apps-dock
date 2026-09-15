@@ -75,14 +75,29 @@ typedef enum
 - (BOOL) start;
 - (void) setDockPlacement: (DockPlacement)placement;
 - (void) makeWindowSticky: (unsigned long)xWindow;
+
+@end
+
+@interface X11DockManager (Events)
 - (void) processPendingEvents;
 - (void) drainTransientIconEvents;
+@end
+
+@interface X11DockManager (DockApps)
 - (void) scanForDockApps;
+@end
+
+@interface X11DockManager (Layout)
 - (void) dockWindow: (unsigned long)xWindow atIndex: (NSUInteger)index;
 - (void) moveDockedWindow: (unsigned long)xWindow toIndex: (NSUInteger)index;
-- (void) activateWindow: (unsigned long)xWindow;
+@end
+
+@interface X11DockManager (WindowFiltering)
 - (BOOL) windowExists: (unsigned long)xWindow;
+@end
+
+@interface X11DockManager (Activation)
+- (void) activateWindow: (unsigned long)xWindow;
 - (BOOL) activateApplicationWithProcessIdentifiers: (NSArray *)processIdentifiers;
 - (void) closeWindow: (unsigned long)xWindow;
-
 @end

@@ -151,6 +151,9 @@ didChangeItemWigglesOnAttentionRequest: (BOOL)wiggles
 - (id) initWithDelegate: (id<SettingsControllerDelegate>)delegate;
 - (void) showWindow: (id)sender;
 - (void) showWindowForItem: (DockItem *)item;
-- (void) updateControls;
 
+@end
+
+@interface SettingsController (Updates)
+- (void) updateControls;
 @end

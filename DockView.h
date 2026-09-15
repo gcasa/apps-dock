@@ -109,15 +109,21 @@ typedef enum
 - (BOOL) singleClickLaunchesApplications;
 - (void) setUsesCellBackgroundTile: (BOOL)usesTile;
 - (BOOL) usesCellBackgroundTile;
+- (void) setHorizontal: (BOOL)horizontal;
+- (BOOL) isHorizontal;
+
+@end
+
+@interface DockView (Wiggle)
 - (void) startWiggleForItem: (DockItem *)item;
 - (void) startAttentionWiggleForItem: (DockItem *)item;
 - (void) acknowledgeWiggleForItem: (DockItem *)item;
 - (void) startRecyclerWiggle;
-- (void) setHorizontal: (BOOL)horizontal;
-- (BOOL) isHorizontal;
+@end
+
+@interface DockView (Layout)
 - (NSRect) topTileRect;
 - (NSRect) recyclerTileRect;
 - (NSPoint) cellOriginAtIndex: (NSUInteger)index;
 - (NSSize) cellSize;
-
 @end
