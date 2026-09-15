@@ -60,6 +60,7 @@
   BOOL _wigglesOnAttentionRequest;
   BOOL _playsSoundOnRemove;
   BOOL _singleClickLaunchesApplications;
+  BOOL _reservesScreenSpace;
 }
 
 @end

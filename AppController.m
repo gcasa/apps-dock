@@ -25,6 +25,7 @@
 #import "RecyclerController.h"
 #import "RunningApplicationScanner.h"
 #import <GNUstepBase/GNUstep.h>
+#import <GNUstepGUI/GSDisplayServer.h>
 #import <signal.h>
 #import <unistd.h>
 
@@ -60,6 +61,8 @@
 - (void) refreshDock;
 - (void) restoreApplicationItemAfterExit: (DockItem *)item;
 - (BOOL) launchDesktopFile: (NSString *)path arguments: (NSArray *)arguments;
+- (unsigned long) dockXWindow;
+- (void) updateDockStrut;
 @end
 
 @implementation AppController
@@ -91,6 +94,7 @@
   _wigglesOnAttentionRequest = [_preferences savedWigglesOnAttentionRequest];
   _playsSoundOnRemove = [_preferences savedPlaysSoundOnRemove];
   _singleClickLaunchesApplications = [self savedSingleClickLaunchesApplications];
+  _reservesScreenSpace = [_preferences savedReservesScreenSpace];
   [self loadPersistedApplications];
   frame = [self dockWindowFrameForPlacement:_dockPlacement];
 
@@ -126,17 +130,22 @@
   [_window setContentView:_dockView];
 
   [self updateDockBackground];
-  [_window makeKeyAndOrderFront:nil];
-  [_window orderFrontRegardless];
-  [_window display];
 
+  /* Before the Dock window is mapped: window managers only take
+   * _NET_WM_STATE and _NET_WM_DESKTOP from the properties of a window that
+   * is about to be mapped. */
   _x11 = [[X11DockManager alloc] initWithDockView:_dockView];
   [_x11 setDelegate:self];
   if ([_x11 start])
     {
-      [_x11 makeWindowSticky:(unsigned long)[_window windowNumber]];
+      [_x11 setDockWindowProperties:[self dockXWindow]];
       [_x11 setDockPlacement:_dockPlacement];
+      [self updateDockStrut];
     }
+
+  [_window makeKeyAndOrderFront:nil];
+  [_window orderFrontRegardless];
+  [_window display];
 
   [self performSelector:@selector(performInitialApplicationScans)
 	     withObject:nil
@@ -1480,6 +1489,11 @@
   return _singleClickLaunchesApplications;
 }
 
+- (BOOL) settingsControllerReservesScreenSpace: (SettingsController *)controller
+{
+  return _reservesScreenSpace;
+}
+
 - (BOOL) settingsControllerRecyclerHasContents: (SettingsController *)controller
 {
   return [self recyclerHasContents];
@@ -1631,6 +1645,14 @@ didChangePlaysSoundOnRemove: (BOOL)playsSound
 {
   _playsSoundOnRemove = playsSound;
   [_preferences savePlaysSoundOnRemove:_playsSoundOnRemove];
+}
+
+- (void) settingsController: (SettingsController *)controller
+didChangeReservesScreenSpace: (BOOL)reserves
+{
+  _reservesScreenSpace = reserves;
+  [_preferences saveReservesScreenSpace:_reservesScreenSpace];
+  [self updateDockStrut];
 }
 
 - (void) settingsController: (SettingsController *)controller
@@ -1816,8 +1838,29 @@ didChangeItemWigglesOnAttentionRequest: (BOOL)wiggles
                                  NSWidth([_window frame]),
                                  NSHeight([_window frame]))];
   [_x11 setDockPlacement:_dockPlacement];
+  [self updateDockStrut];
   [self updateDockBackground];
   [self updateDockMenu];
+}
+
+/* -windowNumber is only GNUstep's window tag; EWMH needs the X11 window. */
+- (unsigned long) dockXWindow
+{
+  GSDisplayServer *server = GSServerForWindow(_window);
+
+  if (!server)
+    {
+      return 0;
+    }
+  return (unsigned long)(uintptr_t)[server windowDevice:[_window windowNumber]];
+}
+
+- (void) updateDockStrut
+{
+  [_x11 setStrutForDockWindow:[self dockXWindow]
+                        frame:[_window frame]
+                    placement:_dockPlacement
+          reservesScreenSpace:_reservesScreenSpace];
 }
 
 - (void) updateDockBackground

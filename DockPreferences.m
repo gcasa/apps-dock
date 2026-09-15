@@ -29,6 +29,7 @@ static NSString *DockWigglesOnActivationDefaultsKey = @"DockWigglesOnActivation"
 static NSString *DockWigglesOnAttentionRequestDefaultsKey = @"DockWigglesOnAttentionRequest";
 static NSString *DockPlaysSoundOnRemoveDefaultsKey = @"DockPlaysSoundOnRemove";
 static NSString *DockSingleClickLaunchesApplicationsDefaultsKey = @"DockSingleClickLaunchesApplications";
+static NSString *DockReservesScreenSpaceDefaultsKey = @"DockReservesScreenSpace";
 
 @implementation DockPreferences
 
@@ -408,6 +409,24 @@ static NSString *DockSingleClickLaunchesApplicationsDefaultsKey = @"DockSingleCl
 {
   [[NSUserDefaults standardUserDefaults] setBool:singleClickLaunches
 					  forKey:DockSingleClickLaunchesApplicationsDefaultsKey];
+}
+
+- (BOOL) savedReservesScreenSpace
+{
+  NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+
+  if (![defaults objectForKey:DockReservesScreenSpaceDefaultsKey])
+    {
+      return YES;
+    }
+
+  return [defaults boolForKey:DockReservesScreenSpaceDefaultsKey];
+}
+
+- (void) saveReservesScreenSpace: (BOOL)reserves
+{
+  [[NSUserDefaults standardUserDefaults] setBool:reserves
+					  forKey:DockReservesScreenSpaceDefaultsKey];
 }
 
 @end

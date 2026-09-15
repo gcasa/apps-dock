@@ -56,5 +56,7 @@ enum
 - (void) savePlaysSoundOnRemove: (BOOL)playsSound;
 - (BOOL) savedSingleClickLaunchesApplications;
 - (void) saveSingleClickLaunchesApplications: (BOOL)singleClickLaunches;
+- (BOOL) savedReservesScreenSpace;
+- (void) saveReservesScreenSpace: (BOOL)reserves;
 
 @end

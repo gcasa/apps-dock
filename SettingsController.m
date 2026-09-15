@@ -68,6 +68,7 @@ SettingsClampedWindowAlpha(CGFloat alpha)
   DESTROY(_applicationArgumentsField);
   DESTROY(_applicationPathField);
   DESTROY(_applicationPopup);
+  DESTROY(_reserveScreenSpaceButton);
   DESTROY(_singleClickLaunchButton);
   DESTROY(_wiggleOnAttentionRequestButton);
   DESTROY(_playSoundOnRemoveButton);
@@ -388,6 +389,13 @@ SettingsClampedWindowAlpha(CGFloat alpha)
 		   action:@selector(singleClickLaunchChanged:)];
   [behaviorView addSubview:_singleClickLaunchButton];
 
+  _reserveScreenSpaceButton =
+    [self buttonWithTitle:@"Reserve Screen Space"
+		    frame:NSMakeRect(18, 110, 220, 24)
+	       buttonType:NSSwitchButton
+		   action:@selector(reserveScreenSpaceChanged:)];
+  [behaviorView addSubview:_reserveScreenSpaceButton];
+
   label = [self labelWithTitle:@"App"
 			 frame:NSMakeRect(18, 296, 110, 20)];
   [applicationsView addSubview:label];
@@ -653,6 +661,9 @@ SettingsClampedWindowAlpha(CGFloat alpha)
   [_singleClickLaunchButton setState:
       ([_delegate settingsControllerSingleClickLaunchesApplications:self] ?
        NSOnState : NSOffState)];
+  [_reserveScreenSpaceButton setState:
+      ([_delegate settingsControllerReservesScreenSpace:self] ?
+       NSOnState : NSOffState)];
   [_emptyRecyclerButton setEnabled:
       [_delegate settingsControllerRecyclerHasContents:self]];
 
@@ -888,6 +899,12 @@ didChangeWigglesOnAttentionRequest:[(NSButton *)sender state] == NSOnState];
 {
   [_delegate settingsController:self
 didChangeSingleClickLaunchesApplications:[(NSButton *)sender state] == NSOnState];
+}
+
+- (void) reserveScreenSpaceChanged: (id)sender
+{
+  [_delegate settingsController:self
+   didChangeReservesScreenSpace:[(NSButton *)sender state] == NSOnState];
 }
 
 - (void) dockCellSizeChanged: (id)sender

@@ -143,7 +143,6 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
   _display = display;
   XSetErrorHandler(X11DockManagerHandleError);
   XSelectInput(display, root, SubstructureNotifyMask | PropertyChangeMask);
-  [self setEWMHPropertiesForDockWindow:(Window)_hostWindow];
   [self updateHostWindowShape];
   [self registerIconManager];
   return YES;
@@ -160,55 +159,125 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
     }
 }
 
-- (void) setEWMHPropertiesForDockWindow: (Window)window
+/* The properties go on the GNUstep window that draws the Dock, not on the
+ * override-redirect host of docked dockapps: window managers ignore every
+ * EWMH property of override-redirect windows. */
+- (void) setDockWindowProperties: (unsigned long)xWindow
 {
   Display *display = (Display *)_display;
-  NSRect frame = [_dockView frame];
+  Atom windowType;
+  Atom windowTypeDock;
+  Atom state;
+  Atom states[3];
+  Atom desktop;
+  unsigned long allDesktops = 0xFFFFFFFFUL;
 
-  if (!display || !window)
+  if (!display || !xWindow)
     {
       return;
     }
 
-  /* _NET_WM_WINDOW_TYPE_DOCK */
-  Atom netWmWindowType = XInternAtom(display, "_NET_WM_WINDOW_TYPE", False);
-  Atom netWmWindowTypeDock = XInternAtom(display, "_NET_WM_WINDOW_TYPE_DOCK", False);
-  XChangeProperty(display, window, netWmWindowType, XA_ATOM, 32,
-                  PropModeReplace, (unsigned char *)&netWmWindowTypeDock, 1);
+  windowType = XInternAtom(display, "_NET_WM_WINDOW_TYPE", False);
+  windowTypeDock = XInternAtom(display, "_NET_WM_WINDOW_TYPE_DOCK", False);
+  state = XInternAtom(display, "_NET_WM_STATE", False);
+  states[0] = XInternAtom(display, "_NET_WM_STATE_SKIP_TASKBAR", False);
+  states[1] = XInternAtom(display, "_NET_WM_STATE_SKIP_PAGER", False);
+  states[2] = XInternAtom(display, "_NET_WM_STATE_STICKY", False);
+  desktop = XInternAtom(display, "_NET_WM_DESKTOP", False);
 
-  /* _NET_WM_STATE: SKIP_TASKBAR | SKIP_PAGER | STICKY */
-  Atom netWmState = XInternAtom(display, "_NET_WM_STATE", False);
-  Atom skipTaskbar = XInternAtom(display, "_NET_WM_STATE_SKIP_TASKBAR", False);
-  Atom skipPager = XInternAtom(display, "_NET_WM_STATE_SKIP_PAGER", False);
-  Atom sticky = XInternAtom(display, "_NET_WM_STATE_STICKY", False);
-  Atom states[3] = { skipTaskbar, skipPager, sticky };
-  XChangeProperty(display, window, netWmState, XA_ATOM, 32,
+  [self clearX11Error];
+  XChangeProperty(display, (Window)xWindow, windowType, XA_ATOM, 32,
+                  PropModeReplace, (unsigned char *)&windowTypeDock, 1);
+  XChangeProperty(display, (Window)xWindow, state, XA_ATOM, 32,
                   PropModeReplace, (unsigned char *)states, 3);
-
-  /* _NET_WM_DESKTOP: all desktops */
-  Atom netWmDesktop = XInternAtom(display, "_NET_WM_DESKTOP", False);
-  unsigned long allDesktops = 0xFFFFFFFFUL;
-  XChangeProperty(display, window, netWmDesktop, XA_CARDINAL, 32,
+  XChangeProperty(display, (Window)xWindow, desktop, XA_CARDINAL, 32,
                   PropModeReplace, (unsigned char *)&allDesktops, 1);
+  if ([self x11ErrorOccurred])
+    {
+      NSLog(@"Unable to set the EWMH Dock properties of window 0x%lx.", xWindow);
+    }
+}
 
-  /* _NET_WM_STRUT and _NET_WM_STRUT_PARTIAL */
-  {
-    unsigned long strutPartial[12] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+- (void) setStrutForDockWindow: (unsigned long)xWindow
+                         frame: (NSRect)frame
+                     placement: (DockPlacement)placement
+           reservesScreenSpace: (BOOL)reserves
+{
+  Display *display = (Display *)_display;
+  Atom strutAtom;
+  Atom strutPartialAtom;
+  unsigned long strut[12] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+  unsigned long screenWidth;
+  unsigned long screenHeight;
+  unsigned long minX;
+  unsigned long maxX;
+  unsigned long minY;
+  unsigned long maxY;
 
-    strutPartial[3] = (unsigned long)frame.size.height;
-    strutPartial[10] = (unsigned long)frame.origin.x;
-    strutPartial[11] = (unsigned long)(frame.origin.x + frame.size.width);
+  if (!display || !xWindow)
+    {
+      return;
+    }
 
-    Atom netWmStrut = XInternAtom(display, "_NET_WM_STRUT", False);
-    Atom netWmStrutPartial = XInternAtom(display, "_NET_WM_STRUT_PARTIAL", False);
+  strutAtom = XInternAtom(display, "_NET_WM_STRUT", False);
+  strutPartialAtom = XInternAtom(display, "_NET_WM_STRUT_PARTIAL", False);
+  if (!reserves)
+    {
+      XDeleteProperty(display, (Window)xWindow, strutPartialAtom);
+      XDeleteProperty(display, (Window)xWindow, strutAtom);
+      XFlush(display);
+      return;
+    }
 
-    XChangeProperty(display, window, netWmStrut, XA_CARDINAL, 32,
-                    PropModeReplace, (unsigned char *)strutPartial, 4);
-    XChangeProperty(display, window, netWmStrutPartial, XA_CARDINAL, 32,
-                    PropModeReplace, (unsigned char *)strutPartial, 12);
-  }
+  /* Struts are measured from the screen edges in root window coordinates,
+   * whose y axis points down, and their start/end values are inclusive. */
+  screenWidth = (unsigned long)DisplayWidth(display, DefaultScreen(display));
+  screenHeight = (unsigned long)DisplayHeight(display, DefaultScreen(display));
+  minX = (unsigned long)MAX(0.0, NSMinX(frame));
+  maxX = (unsigned long)MIN((CGFloat)screenWidth, NSMaxX(frame));
+  minY = (unsigned long)MAX(0.0, (CGFloat)screenHeight - NSMaxY(frame));
+  maxY = (unsigned long)MIN((CGFloat)screenHeight,
+                            (CGFloat)screenHeight - NSMinY(frame));
+  if (maxX <= minX || maxY <= minY)
+    {
+      return;
+    }
 
-  XFlush(display);
+  switch (placement)
+    {
+    case DockPlacementLeftTop:
+    case DockPlacementLeftCenter:
+      strut[0] = maxX;
+      strut[4] = minY;
+      strut[5] = maxY - 1;
+      break;
+    case DockPlacementRightTop:
+    case DockPlacementRightCenter:
+      strut[1] = screenWidth - minX;
+      strut[6] = minY;
+      strut[7] = maxY - 1;
+      break;
+    case DockPlacementTopCenter:
+      strut[2] = maxY;
+      strut[8] = minX;
+      strut[9] = maxX - 1;
+      break;
+    case DockPlacementBottomCenter:
+      strut[3] = screenHeight - minY;
+      strut[10] = minX;
+      strut[11] = maxX - 1;
+      break;
+    }
+
+  [self clearX11Error];
+  XChangeProperty(display, (Window)xWindow, strutAtom, XA_CARDINAL, 32,
+                  PropModeReplace, (unsigned char *)strut, 4);
+  XChangeProperty(display, (Window)xWindow, strutPartialAtom, XA_CARDINAL, 32,
+                  PropModeReplace, (unsigned char *)strut, 12);
+  if ([self x11ErrorOccurred])
+    {
+      NSLog(@"Unable to set the strut of Dock window 0x%lx.", xWindow);
+    }
 }
 
 - (BOOL) x11ErrorOccurred
@@ -221,28 +290,6 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 - (void) clearX11Error
 {
   X11DockManagerLastErrorCode = 0;
-}
-
-- (void) makeWindowSticky: (unsigned long)xWindow
-{
-  Display *display = (Display *)_display;
-  Atom desktopProperty;
-  unsigned long allDesktops = 0xFFFFFFFFUL;
-
-  if (!display || !xWindow)
-    {
-      return;
-    }
-
-  desktopProperty = XInternAtom(display, "_NET_WM_DESKTOP", False);
-  [self clearX11Error];
-  XChangeProperty(display, (Window)xWindow, desktopProperty, XA_CARDINAL, 32,
-		  PropModeReplace, (unsigned char *)&allDesktops, 1);
-  XFlush(display);
-  if ([self x11ErrorOccurred])
-    {
-      NSLog(@"Unable to mark DockWM window %lu as sticky.", xWindow);
-    }
 }
 
 - (NSString *) procFilesystemPath

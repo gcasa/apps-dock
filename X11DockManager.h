@@ -74,7 +74,12 @@ typedef enum
 - (void) setDelegate: (id)delegate;
 - (BOOL) start;
 - (void) setDockPlacement: (DockPlacement)placement;
-- (void) makeWindowSticky: (unsigned long)xWindow;
+- (void) setDockWindowProperties: (unsigned long)xWindow;
+/* frame is the Dock window frame in GNUstep screen coordinates. */
+- (void) setStrutForDockWindow: (unsigned long)xWindow
+                         frame: (NSRect)frame
+                     placement: (DockPlacement)placement
+           reservesScreenSpace: (BOOL)reserves;
 - (void) processPendingEvents;
 - (void) drainTransientIconEvents;
 - (void) scanForDockApps;
