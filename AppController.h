@@ -26,6 +26,7 @@
 @class DockApplicationStore;
 @class DockItem;
 @class DockPreferences;
+@class ProcessMonitor;
 @class RecyclerController;
 @class RunningApplicationScanner;
 
@@ -42,6 +43,7 @@
   NSMutableArray *_items;
   NSMutableSet *_launchedApplicationPaths;
   X11DockManager *_x11;
+  ProcessMonitor *_processMonitor;
   NSTimer *_x11EventTimer;
   NSTimer *_scanTimer;
   NSTimer *_processScanTimer;

@@ -22,6 +22,7 @@
 #import "DockApplicationStore.h"
 #import "DockItem.h"
 #import "DockPreferences.h"
+#import "ProcessMonitor.h"
 #import "RecyclerController.h"
 #import "RunningApplicationScanner.h"
 #import <GNUstepBase/GNUstep.h>
@@ -52,6 +53,8 @@
 		   useIconManager: (BOOL)useIconManager;
 - (void) performInitialApplicationScans;
 - (void) scanRunningApplications;
+- (void) watchProcessesOfRunningItems: (NSDictionary *)processes;
+- (void) processDidExit: (NSNumber *)processIdentifier;
 - (void) updateRecyclerState;
 - (NSRect) dockWindowFrameForPlacement: (DockPlacement)placement;
 - (NSMenu *) dockMenu;
@@ -146,6 +149,9 @@
       [_x11 setDockPlacement:_dockPlacement];
     }
 
+  _processMonitor = [[ProcessMonitor alloc] initWithTarget:self
+						   action:@selector(processDidExit:)];
+
   [self performSelector:@selector(performInitialApplicationScans)
 	     withObject:nil
 	     afterDelay:0.5];
@@ -156,6 +162,8 @@
   [_x11EventTimer invalidate];
   [_scanTimer invalidate];
   [_processScanTimer invalidate];
+  [_processMonitor stop];
+  DESTROY(_processMonitor);
   DESTROY(_settingsController);
   DESTROY(_recyclerController);
   DESTROY(_preferences);
@@ -1138,7 +1146,9 @@
 
 - (void) scanRunningApplications
 {
-  NSArray *processPaths = [self runningProcessExecutablePaths];
+  NSDictionary *processes =
+    [_applicationScanner runningProcessExecutablePathsByProcessIdentifier];
+  NSArray *processPaths = [_applicationScanner executablePathsOfProcesses:processes];
   BOOL changed = NO;
   NSUInteger i;
 
@@ -1230,7 +1240,50 @@
       [self refreshDock];
     }
 
+  [self watchProcessesOfRunningItems:processes];
   [self updateRecyclerState];
+}
+
+/* The kernel tells about the exit of these processes at once, so a quitting
+ * application leaves the Dock without waiting for the next periodic scan. */
+- (void) watchProcessesOfRunningItems: (NSDictionary *)processes
+{
+  NSMutableSet *processIdentifiers = [NSMutableSet set];
+  NSEnumerator *enumerator = [processes keyEnumerator];
+  NSNumber *processIdentifier;
+
+  while ((processIdentifier = [enumerator nextObject]) != nil)
+    {
+      NSString *path = [processes objectForKey:processIdentifier];
+      NSUInteger i;
+
+      for (i = 0; i < [_items count]; i++)
+	{
+	  DockItem *item = [_items objectAtIndex:i];
+
+	  if ([item kind] == DockItemApplication &&
+	      [item state] != DockItemNotRunning &&
+	      [self applicationItem:item matchesRunningProcessPath:path])
+	    {
+	      [processIdentifiers addObject:processIdentifier];
+	      break;
+	    }
+	}
+    }
+
+  [_processMonitor setProcessIdentifiers:processIdentifiers];
+}
+
+- (void) processDidExit: (NSNumber *)processIdentifier
+{
+  /* An application often ends several processes at once; one scan after
+   * all of their notifications have arrived covers them all. */
+  [NSObject cancelPreviousPerformRequestsWithTarget:self
+					   selector:@selector(scanRunningApplications)
+					     object:nil];
+  [self performSelector:@selector(scanRunningApplications)
+	     withObject:nil
+	     afterDelay:0.0];
 }
 
 - (NSArray *) recyclerPaths
@@ -2562,6 +2615,12 @@ didChangeItemWigglesOnAttentionRequest: (BOOL)wiggles
     }
 
   [self refreshDock];
+  if (!dockApp)
+    {
+      /* An application started after the last scan must be watched too. */
+      [self watchProcessesOfRunningItems:
+	      [_applicationScanner runningProcessExecutablePathsByProcessIdentifier]];
+    }
   if (dockApp)
     {
       if ([item kind] == DockItemApplication)
