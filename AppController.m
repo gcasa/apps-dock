@@ -146,6 +146,9 @@
       [_x11 setDockPlacement:_dockPlacement];
     }
 
+  _dockService = [[DockService alloc] initWithDelegate:self];
+  [_dockService start];
+
   [self performSelector:@selector(performInitialApplicationScans)
 	     withObject:nil
 	     afterDelay:0.5];
@@ -160,6 +163,7 @@
   DESTROY(_recyclerController);
   DESTROY(_preferences);
   DESTROY(_dockMenu);
+  DESTROY(_dockService);
   DESTROY(_x11);
   DESTROY(_dockView);
   DESTROY(_window);
@@ -2611,6 +2615,21 @@ didChangeItemWigglesOnAttentionRequest: (BOOL)wiggles
 	  [_dockView setNeedsDisplay:YES];
 	}
     }
+}
+
+/* Only icons that are in the Dock already: processes which stay out of the
+ * Dock report through the service too (Eau mirrors every progress
+ * indicator, also those of the window manager). */
+- (DockItem *) dockService: (DockService *)service
+  itemForProcessIdentifier: (int)processIdentifier
+{
+  return [self applicationItemMatchingProcessIdentifier:
+		 [NSNumber numberWithInt:processIdentifier]];
+}
+
+- (void) dockService: (DockService *)service didChangeItem: (DockItem *)item
+{
+  [_dockView setNeedsDisplay:YES];
 }
 
 @end
