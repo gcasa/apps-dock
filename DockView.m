@@ -1358,6 +1358,16 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   NSImage *icon = [item icon];
   CGFloat angle = 0.0;
 
+  if ([item urgent])
+    {
+      CGFloat glowSize = size + 6.0;
+      NSRect glowRect = NSMakeRect(NSMidX(cell) - glowSize / 2.0,
+                                   NSMidY(cell) - glowSize / 2.0,
+                                   glowSize, glowSize);
+      [[[NSColor orangeColor] colorWithAlphaComponent:0.25] set];
+      [[NSBezierPath bezierPathWithOvalInRect:glowRect] fill];
+    }
+
   if (item == _wiggleItem)
     {
       NSTimeInterval elapsed = [NSDate timeIntervalSinceReferenceDate] - _wiggleStartTime;
@@ -1372,6 +1382,26 @@ DockViewCalibratedBackgroundColor (NSColor *color)
       [self drawFallbackIconForItem:item inCell:cell];
     }
   [self drawBadgeForItem:item inCell:cell iconSize:size];
+
+  if ([item progressVisible])
+    {
+      /* On the bottom edge of the icon, not of the cell: the running dot
+       * occupies the bottom of the cell. */
+      NSRect iconRect = [self iconRectInCell:cell size:size];
+      CGFloat barHeight = 3.0;
+      CGFloat barX = NSMinX(iconRect) + 1.0;
+      CGFloat barY = NSMinY(iconRect) + 1.0;
+      CGFloat barWidth = NSWidth(iconRect) - 2.0;
+
+      [[[NSColor darkGrayColor] colorWithAlphaComponent:0.6] set];
+      NSRectFill(NSMakeRect(barX, barY, barWidth, barHeight));
+      if ([item progressValue] >= 0.0)
+        {
+          [[NSColor greenColor] set];
+          NSRectFill(NSMakeRect(barX, barY,
+                                barWidth * [item progressValue], barHeight));
+        }
+    }
 }
 
 - (void) drawStateForItem: (DockItem *)item inCell: (NSRect)cell
