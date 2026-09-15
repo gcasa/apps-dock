@@ -30,9 +30,9 @@ enum
 static CGFloat
 SettingsClampedWindowAlpha(CGFloat alpha)
 {
-  if (alpha < 0.2)
+  if (alpha < 0.0)
     {
-      return 0.2;
+      return 0.0;
     }
   if (alpha > 1.0)
     {
@@ -304,7 +304,7 @@ SettingsClampedWindowAlpha(CGFloat alpha)
 
   _transparencySlider =
     [[NSSlider alloc] initWithFrame:NSMakeRect(150, 218, 220, 24)];
-  [_transparencySlider setMinValue:0.2];
+  [_transparencySlider setMinValue:0.0];
   [_transparencySlider setMaxValue:1.0];
   [_transparencySlider setContinuous:YES];
   [_transparencySlider setTarget:self];

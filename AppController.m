@@ -43,7 +43,13 @@
 - (BOOL) applicationBundlePathIsDockWM: (NSString *)path;
 - (DockItem *) applicationItemMatchingTitle: (NSString *)title;
 - (BOOL) launchApplicationItem: (DockItem *)item;
+- (BOOL) launchApplicationItem: (DockItem *)item useIconManager: (BOOL)useIconManager;
 - (NSArray *) launchArgumentsFromString: (NSString *)arguments;
+- (NSArray *) iconManagerLaunchArgumentsByAddingToArguments: (NSArray *)arguments;
+- (NSDictionary *) explicitApplicationLaunchEnvironment;
+- (void) launchTaskWithLaunchPath: (NSString *)path
+			arguments: (NSArray *)arguments
+		   useIconManager: (BOOL)useIconManager;
 - (void) performInitialApplicationScans;
 - (void) scanRunningApplications;
 - (void) updateRecyclerState;
@@ -59,7 +65,9 @@
 - (BOOL) itemWigglesOnAttentionRequest: (DockItem *)item;
 - (void) refreshDock;
 - (void) restoreApplicationItemAfterExit: (DockItem *)item;
-- (BOOL) launchDesktopFile: (NSString *)path arguments: (NSArray *)arguments;
+- (BOOL) launchDesktopFile: (NSString *)path
+		 arguments: (NSArray *)arguments
+	    useIconManager: (BOOL)useIconManager;
 @end
 
 @implementation AppController
@@ -102,7 +110,7 @@
   [_window setCollectionBehavior:(NSWindowCollectionBehaviorCanJoinAllSpaces |
                                   NSWindowCollectionBehaviorStationary)];
   [_window setOpaque:NO];
-  [_window setAlphaValue:_windowAlpha];
+  [_window setAlphaValue:1.0];
   [_window setBackgroundColor:[NSColor clearColor]];
   [_window setTitle:@"AppsDockWM"];
   [_window setAcceptsMouseMovedEvents:YES];
@@ -869,10 +877,15 @@
 - (BOOL) launchApplicationAtPath: (NSString *)path
 {
   DockItem *item = [DockItem applicationItemWithPath:path];
-  return [self launchApplicationItem:item];
+  return [self launchApplicationItem:item useIconManager:YES];
 }
 
 - (BOOL) launchApplicationItem: (DockItem *)item
+{
+  return [self launchApplicationItem:item useIconManager:NO];
+}
+
+- (BOOL) launchApplicationItem: (DockItem *)item useIconManager: (BOOL)useIconManager
 {
   NSString *path = [item path];
   NSArray *arguments = [self launchArgumentsFromString:[item launchArguments]];
@@ -882,7 +895,9 @@
   [[NSFileManager defaultManager] fileExistsAtPath:path isDirectory:&isDir];
   if ([extension isEqualToString:@"desktop"])
     {
-      return [self launchDesktopFile:path arguments:arguments];
+      return [self launchDesktopFile:path
+			    arguments:arguments
+		       useIconManager:useIconManager];
     }
   else if ([extension isEqualToString:@"app"])
     {
@@ -890,8 +905,14 @@
 
       if ([[NSFileManager defaultManager] isExecutableFileAtPath:executablePath])
 	{
-	  [NSTask launchedTaskWithLaunchPath:executablePath
-				   arguments:arguments];
+	  if (useIconManager)
+	    {
+	      arguments = [self iconManagerLaunchArgumentsByAddingToArguments:
+				  arguments];
+	    }
+	  [self launchTaskWithLaunchPath:executablePath
+			       arguments:arguments
+			  useIconManager:useIconManager];
 	  return YES;
 	}
       if (![arguments count] &&
@@ -907,11 +928,53 @@
     }
   else if ([[NSFileManager defaultManager] isExecutableFileAtPath:path])
     {
-      [NSTask launchedTaskWithLaunchPath:path arguments:arguments];
+      [self launchTaskWithLaunchPath:path
+			       arguments:arguments
+			  useIconManager:useIconManager];
       return YES;
     }
 
   return [[NSWorkspace sharedWorkspace] openFile:path];
+}
+
+- (NSArray *) iconManagerLaunchArgumentsByAddingToArguments: (NSArray *)arguments
+{
+  NSMutableArray *launchArguments = [NSMutableArray arrayWithArray:arguments];
+
+  [launchArguments addObject:@"-GSUseIconManager"];
+  [launchArguments addObject:@"YES"];
+  [launchArguments addObject:@"-GSIconManager"];
+  [launchArguments addObject:@"YES"];
+
+  return launchArguments;
+}
+
+- (NSDictionary *) explicitApplicationLaunchEnvironment
+{
+  NSMutableDictionary *environment =
+    [NSMutableDictionary dictionaryWithDictionary:
+			   [[NSProcessInfo processInfo] environment]];
+
+  [environment setObject:@"YES" forKey:@"GSUseIconManager"];
+  [environment setObject:@"YES" forKey:@"GSIconManager"];
+
+  return environment;
+}
+
+- (void) launchTaskWithLaunchPath: (NSString *)path
+			arguments: (NSArray *)arguments
+		   useIconManager: (BOOL)useIconManager
+{
+  NSTask *task = [NSTask new];
+
+  [task setLaunchPath:path];
+  [task setArguments:arguments];
+  if (useIconManager)
+    {
+      [task setEnvironment:[self explicitApplicationLaunchEnvironment]];
+    }
+  [task launch];
+  RELEASE(task);
 }
 
 - (NSArray *) launchArgumentsFromString: (NSString *)arguments
@@ -1034,7 +1097,7 @@
 	}
 
       [self rememberLaunchedApplicationPath:path];
-      [self launchApplicationItem:item];
+      [self launchApplicationItem:item useIconManager:YES];
       [_x11 drainTransientIconEvents];
     }
 }
@@ -1559,7 +1622,7 @@ itemWigglesOnAttentionRequest: (DockItem *)item
        didChangeWindowAlpha: (CGFloat)alpha
 {
   _windowAlpha = alpha;
-  [_window setAlphaValue:_windowAlpha];
+  [_window setAlphaValue:1.0];
   [_dockView setBackgroundAlpha:_windowAlpha];
   [self saveWindowAlpha];
 }
@@ -2285,7 +2348,7 @@ didChangeItemWigglesOnAttentionRequest: (BOOL)wiggles
 	}
 
       [self rememberLaunchedApplicationPath:path];
-      launched = [self launchApplicationItem:item];
+      launched = [self launchApplicationItem:item useIconManager:YES];
       [_x11 drainTransientIconEvents];
 
       if (launched)
@@ -2317,8 +2380,26 @@ didChangeItemWigglesOnAttentionRequest: (BOOL)wiggles
 			 stringByAppendingPathComponent:@"GWorkspace.app"];
       if ([[NSFileManager defaultManager] fileExistsAtPath:path])
 	{
+	  NSArray *arguments =
+	    [self iconManagerLaunchArgumentsByAddingToArguments:
+		    [NSArray array]];
+	  NSString *executablePath = [self executablePathForApplicationPath:path];
+	  BOOL launched = NO;
+
 	  [self rememberLaunchedApplicationPath:path];
-	  if (![[NSWorkspace sharedWorkspace] launchApplication:path])
+	  if ([[NSFileManager defaultManager]
+		isExecutableFileAtPath:executablePath])
+	    {
+	      [self launchTaskWithLaunchPath:executablePath
+				   arguments:arguments
+			      useIconManager:YES];
+	      launched = YES;
+	    }
+	  else
+	    {
+	      launched = [[NSWorkspace sharedWorkspace] launchApplication:path];
+	    }
+	  if (!launched)
 	    {
 	      [[NSWorkspace sharedWorkspace] openFile:path];
 	    }
@@ -2328,7 +2409,9 @@ didChangeItemWigglesOnAttentionRequest: (BOOL)wiggles
     }
 }
 
-- (BOOL) launchDesktopFile: (NSString *)path arguments: (NSArray *)arguments
+- (BOOL) launchDesktopFile: (NSString *)path
+		 arguments: (NSArray *)arguments
+	    useIconManager: (BOOL)useIconManager
 {
   NSString *contents = [NSString stringWithContentsOfFile:path];
   NSArray *lines = [contents componentsSeparatedByCharactersInSet:
@@ -2360,8 +2443,9 @@ didChangeItemWigglesOnAttentionRequest: (BOOL)wiggles
 				 [self shellQuotedArgument:
 					 [arguments objectAtIndex:j]]];
 		    }
-		  [NSTask launchedTaskWithLaunchPath:shellPath
-					   arguments:[NSArray arrayWithObjects:@"-lc", command, nil]];
+		  [self launchTaskWithLaunchPath:shellPath
+				       arguments:[NSArray arrayWithObjects:@"-lc", command, nil]
+				  useIconManager:useIconManager];
 		  return YES;
 		}
 	    }

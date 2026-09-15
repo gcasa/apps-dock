@@ -187,9 +187,9 @@ static NSString *DockSingleClickLaunchesApplicationsDefaultsKey = @"DockSingleCl
     }
 
   alpha = [defaults floatForKey:DockWindowAlphaDefaultsKey];
-  if (alpha < 0.2)
+  if (alpha < 0.0)
     {
-      alpha = 0.2;
+      alpha = 0.0;
     }
   else if (alpha > 1.0)
     {

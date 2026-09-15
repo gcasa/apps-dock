@@ -219,6 +219,11 @@ DockViewCalibratedBackgroundColor (NSColor *color)
   return YES;
 }
 
+- (BOOL) isOpaque
+{
+  return NO;
+}
+
 - (void) setItems: (NSArray *)items
 {
   [_items setArray:items];
@@ -368,9 +373,9 @@ DockViewCalibratedBackgroundColor (NSColor *color)
 
 - (void) setBackgroundAlpha: (CGFloat)alpha
 {
-  if (alpha < 0.2)
+  if (alpha < 0.0)
     {
-      alpha = 0.2;
+      alpha = 0.0;
     }
   else if (alpha > 1.0)
     {
@@ -1671,6 +1676,8 @@ DockViewCalibratedBackgroundColor (NSColor *color)
 
   backgroundColor = DockViewCalibratedBackgroundColor(_backgroundColor);
   [backgroundColor getRed:&red green:&green blue:&blue alpha:&alpha];
+  NSRectFillUsingOperation(dirtyRect, NSCompositeClear);
+
   [[NSColor colorWithCalibratedRed:red
                              green:green
                               blue:blue
