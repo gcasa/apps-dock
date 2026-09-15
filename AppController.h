@@ -29,7 +29,7 @@
 @class RecyclerController;
 @class RunningApplicationScanner;
 
-@interface AppController : NSObject <DockViewDelegate, SettingsControllerDelegate, X11DockManagerDelegate>
+@interface AppController : NSObject
 {
   NSWindow *_window;
   SettingsController *_settingsController;

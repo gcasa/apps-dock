@@ -5,6 +5,16 @@ APP_NAME = DockWM
 DockWM_OBJC_FILES = \
 main.m \
 AppController.m \
+AppController+Applications.m \
+AppController+DockViewDelegate.m \
+AppController+Icons.m \
+AppController+Launching.m \
+AppController+Layout.m \
+AppController+Preferences.m \
+AppController+Recycler.m \
+AppController+Scanning.m \
+AppController+Settings.m \
+AppController+X11Delegate.m \
 SettingsController.m \
 DockPreferences.m \
 RunningApplicationScanner.m \
