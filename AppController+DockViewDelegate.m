@@ -412,9 +412,6 @@
 			 stringByAppendingPathComponent:@"GWorkspace.app"];
       if ([[NSFileManager defaultManager] fileExistsAtPath:path])
 	{
-	  NSArray *arguments =
-	    [self iconManagerLaunchArgumentsByAddingToArguments:
-		    [NSArray array]];
 	  NSString *executablePath = [self executablePathForApplicationPath:path];
 	  BOOL launched = NO;
 
@@ -423,7 +420,7 @@
 		isExecutableFileAtPath:executablePath])
 	    {
 	      [self launchTaskWithLaunchPath:executablePath
-				   arguments:arguments
+				   arguments:[NSArray array]
 			      useIconManager:YES];
 	      launched = YES;
 	    }

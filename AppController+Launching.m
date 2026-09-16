@@ -52,11 +52,6 @@
 
       if ([[NSFileManager defaultManager] isExecutableFileAtPath:executablePath])
 	{
-	  if (useIconManager)
-	    {
-	      arguments = [self iconManagerLaunchArgumentsByAddingToArguments:
-				  arguments];
-	    }
 	  [self launchTaskWithLaunchPath:executablePath
 			       arguments:arguments
 			  useIconManager:useIconManager];
@@ -82,18 +77,6 @@
     }
 
   return [[NSWorkspace sharedWorkspace] openFile:path];
-}
-
-- (NSArray *) iconManagerLaunchArgumentsByAddingToArguments: (NSArray *)arguments
-{
-  NSMutableArray *launchArguments = [NSMutableArray arrayWithArray:arguments];
-
-  [launchArguments addObject:@"-GSUseIconManager"];
-  [launchArguments addObject:@"YES"];
-  [launchArguments addObject:@"-GSIconManager"];
-  [launchArguments addObject:@"YES"];
-
-  return launchArguments;
 }
 
 - (NSDictionary *) explicitApplicationLaunchEnvironment
