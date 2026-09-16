@@ -210,6 +210,12 @@ itemWigglesOnAttentionRequest: (DockItem *)item
     _wigglesOnAttentionRequest : [item wigglesOnAttentionRequest];
 }
 
+- (BOOL) settingsController: (SettingsController *)controller
+       canDeleteItemAtIndex: (NSUInteger)index
+{
+  return [self canRemoveDockItemAtIndex:index];
+}
+
 - (void) settingsController: (SettingsController *)controller
      didChangeDockPlacement: (DockPlacement)placement
 {
@@ -458,6 +464,11 @@ didChangeItemWigglesOnAttentionRequest: (BOOL)wiggles
     }
 
   item = [_items objectAtIndex:index];
+  if (![self canRemoveDockItemAtIndex:index])
+    {
+      return;
+    }
+
   if (([item kind] == DockItemApplication ||
        [item kind] == DockItemX11Window) &&
       [[item path] length])

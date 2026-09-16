@@ -382,6 +382,35 @@
   [_applicationStore setApplicationPath:path openAtLogin:openAtLogin];
 }
 
+- (BOOL) canRemoveDockItemAtIndex: (NSUInteger)index
+{
+  DockItem *item;
+
+  if (index >= [_items count])
+    {
+      return NO;
+    }
+
+  item = [_items objectAtIndex:index];
+  if ([item kind] == DockItemApplication || [item kind] == DockItemX11Window)
+    {
+      if ([item state] != DockItemNotRunning)
+	{
+	  return NO;
+	}
+
+      [self resolvePathForX11WindowItem:item];
+      if ([[item path] length] &&
+	  [self applicationItemHasRunningProcess:item
+					   paths:[self runningProcessExecutablePaths]])
+	{
+	  return NO;
+	}
+    }
+
+  return YES;
+}
+
 
 - (DockItem *) itemForXWindow: (unsigned long)xWindow
 {

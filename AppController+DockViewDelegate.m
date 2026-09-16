@@ -213,6 +213,11 @@
     }
 
   item = [_items objectAtIndex:index];
+  if (![self canRemoveDockItemAtIndex:index])
+    {
+      return;
+    }
+
   if (([item kind] == DockItemApplication ||
        [item kind] == DockItemX11Window) &&
       [[item path] length])
@@ -224,6 +229,11 @@
   [self savePersistedApplications];
   [self refreshDock];
   [self playDockRemovalSoundIfEnabled];
+}
+
+- (BOOL) dockView: (id)dockView canRemoveItemAtIndex: (NSUInteger)index
+{
+  return [self canRemoveDockItemAtIndex:index];
 }
 
 - (BOOL) dockView: (id)dockView itemIsOpenAtLogin: (DockItem *)item

@@ -182,6 +182,8 @@
 	[[item path] length] > 0;
       BOOL usesDockBehaviorDefaults =
 	[_delegate settingsController:self itemUsesDockBehaviorDefaults:item];
+      BOOL canDelete =
+	[_delegate settingsController:self canDeleteItemAtIndex:selectedIndex];
 
       [_applicationPathField setStringValue:
 	  ([item path] ? [item path] : @"")];
@@ -215,7 +217,7 @@
       [_moveApplicationDownButton setEnabled:
 	  (selectedIndex + 1 < [items count] &&
 	   (![item isPinned] || selectedIndex + 1 < pinnedCount))];
-      [_deleteApplicationButton setEnabled:YES];
+      [_deleteApplicationButton setEnabled:canDelete];
     }
   else
     {

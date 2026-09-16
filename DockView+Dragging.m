@@ -85,6 +85,22 @@
   return NSDragOperationMove | NSDragOperationDelete;
 }
 
+- (BOOL) canRemoveItemAtIndex: (NSUInteger)index
+{
+  if (index == NSNotFound || index >= [_items count])
+    {
+      return NO;
+    }
+
+  if ([_delegate respondsToSelector:
+		 @selector(dockView:canRemoveItemAtIndex:)])
+    {
+      return [_delegate dockView:self canRemoveItemAtIndex:index];
+    }
+
+  return YES;
+}
+
 
 - (BOOL) screenPointIsInsideDock: (NSPoint)screenPoint
 {
@@ -109,6 +125,7 @@
   if (remove &&
       draggedIndex != NSNotFound &&
       draggedIndex < [_items count] &&
+      [self canRemoveItemAtIndex:draggedIndex] &&
       [_delegate respondsToSelector:
 		   @selector(dockViewDidRemoveItemAtIndex:)])
     {
@@ -153,7 +170,8 @@
 	{
 	  _dropIndex = NSNotFound;
 	  [self setNeedsDisplay:YES];
-	  return NSDragOperationDelete;
+	  return [self canRemoveItemAtIndex:_draggedItemIndex]
+	    ? NSDragOperationDelete : NSDragOperationNone;
 	}
       _dropIndex = [self reorderInsertionIndexAtPoint:location
 					    fromIndex:_draggedItemIndex];
@@ -183,7 +201,8 @@
 	{
 	  _dropIndex = NSNotFound;
 	  [self setNeedsDisplay:YES];
-	  return NSDragOperationDelete;
+	  return [self canRemoveItemAtIndex:_draggedItemIndex]
+	    ? NSDragOperationDelete : NSDragOperationNone;
 	}
       _dropIndex = [self reorderInsertionIndexAtPoint:location
 					    fromIndex:_draggedItemIndex];
@@ -247,6 +266,7 @@
 	  _draggedItemIndex = NSNotFound;
 	  _performedDragOperation = YES;
 	  if (fromIndex < [_items count] &&
+	      [self canRemoveItemAtIndex:fromIndex] &&
 	      [_delegate respondsToSelector:
 			   @selector(dockViewDidRemoveItemAtIndex:)])
 	    {

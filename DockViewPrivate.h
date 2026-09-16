@@ -182,6 +182,7 @@ DockViewCalibratedBackgroundColor(NSColor *color)
 - (void) mouseDragged: (NSEvent *)event;
 - (NSDragOperation) draggingSourceOperationMaskForLocal: (BOOL)isLocal;
 - (BOOL) screenPointIsInsideDock: (NSPoint)screenPoint;
+- (BOOL) canRemoveItemAtIndex: (NSUInteger)index;
 - (void) finishDraggingItemWithRemove: (BOOL)remove;
 - (void) draggedImage: (NSImage *)image
 	      endedAt: (NSPoint)screenPoint

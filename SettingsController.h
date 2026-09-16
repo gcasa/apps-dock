@@ -55,6 +55,8 @@ itemUsesDockBehaviorDefaults: (DockItem *)item;
     itemWigglesOnActivation: (DockItem *)item;
 - (BOOL) settingsController: (SettingsController *)controller
 itemWigglesOnAttentionRequest: (DockItem *)item;
+- (BOOL) settingsController: (SettingsController *)controller
+       canDeleteItemAtIndex: (NSUInteger)index;
 - (void) settingsController: (SettingsController *)controller
      didChangeDockPlacement: (DockPlacement)placement;
 - (void) settingsController: (SettingsController *)controller

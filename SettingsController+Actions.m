@@ -318,6 +318,11 @@ didChangeItemWigglesOnAttentionRequest:[_applicationWiggleOnAttentionRequestButt
       return;
     }
 
+  if (![_delegate settingsController:self canDeleteItemAtIndex:index])
+    {
+      return;
+    }
+
   [_delegate settingsController:self didDeleteItemAtIndex:index];
   [self updateControls];
 }

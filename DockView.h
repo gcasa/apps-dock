@@ -38,6 +38,7 @@ typedef enum
 - (void) dockViewDidMoveItemFromIndex: (NSUInteger)fromIndex
                               toIndex: (NSUInteger)toIndex;
 - (void) dockViewDidRemoveItemAtIndex: (NSUInteger)index;
+- (BOOL) dockView: (id)dockView canRemoveItemAtIndex: (NSUInteger)index;
 - (BOOL) dockView: (id)dockView itemIsOpenAtLogin: (DockItem *)item;
 - (void) dockView: (id)dockView didToggleOpenAtLoginForItem: (DockItem *)item;
 - (void) dockView: (id)dockView didShowItemInFileViewer: (DockItem *)item;

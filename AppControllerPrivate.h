@@ -110,6 +110,7 @@ matchesRunningProcessPath: (NSString *)processPath;
 - (NSArray *) openAtLoginApplicationPaths;
 - (BOOL) applicationPathIsOpenAtLogin: (NSString *)path;
 - (void) setApplicationPath: (NSString *)path openAtLogin: (BOOL)openAtLogin;
+- (BOOL) canRemoveDockItemAtIndex: (NSUInteger)index;
 - (BOOL) launchApplicationAtPath: (NSString *)path;
 - (BOOL) launchApplicationItem: (DockItem *)item;
 - (BOOL) launchApplicationItem: (DockItem *)item useIconManager: (BOOL)useIconManager;
