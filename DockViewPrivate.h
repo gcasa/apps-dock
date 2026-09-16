@@ -82,6 +82,7 @@ DockViewCalibratedBackgroundColor(NSColor *color)
 - (void) dealloc;
 - (NSImage *) loadGNUstepIcon;
 - (NSImage *) loadRecyclerIcon;
+- (NSImage *) standardRecyclerIcon;
 - (NSImage *) loadCellBackgroundImage;
 - (void) updateTrackingRect;
 - (void) viewDidMoveToWindow;

@@ -96,11 +96,32 @@
 
 - (NSImage *) loadRecyclerIcon
 {
-  NSString *path = [[NSBundle mainBundle] pathForResource:@"Recycler.GNUstep"
-                                                   ofType:@"xpm"];
+  NSImage *standardImage = [self standardRecyclerIcon];
+  NSString *path;
   NSImage *image;
 
+  if (standardImage)
+    {
+      return standardImage;
+    }
+
+  path = [[NSBundle mainBundle] pathForResource:@"Recycler.GNUstep"
+                                         ofType:@"xpm"];
   image = AUTORELEASE([[NSImage alloc] initWithContentsOfFile:path]);
+  if (image)
+    {
+      return image;
+    }
+
+  return nil;
+}
+
+- (NSImage *) standardRecyclerIcon
+{
+  NSImage *image = [NSImage imageNamed:
+			    (_recyclerHasContents
+			     ? NSImageNameTrashFull : NSImageNameTrashEmpty)];
+
   if (image)
     {
       return image;

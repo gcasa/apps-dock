@@ -344,6 +344,8 @@
 {
   NSRect cell = [self recyclerTileRect];
   CGFloat angle = 0.0;
+  NSImage *standardRecyclerIcon = [self standardRecyclerIcon];
+  NSImage *recyclerIcon = standardRecyclerIcon ? standardRecyclerIcon : _recyclerIcon;
 
   [self drawCellBackgroundInCell:cell];
 
@@ -357,7 +359,7 @@
       angle = sin(progress * 8.0 * M_PI) * 8.0 * decay;
     }
 
-  if (![self drawImage:_recyclerIcon inCell:cell size:46.0 angle:angle])
+  if (![self drawImage:recyclerIcon inCell:cell size:46.0 angle:angle])
     {
       if (angle != 0.0)
 	{
@@ -376,7 +378,10 @@
 	  [self drawRecyclerFallbackInCell:cell];
 	}
     }
-  [self drawRecyclerContentsIndicatorInCell:cell];
+  if (!standardRecyclerIcon)
+    {
+      [self drawRecyclerContentsIndicatorInCell:cell];
+    }
 }
 
 
