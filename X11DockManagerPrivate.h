@@ -79,11 +79,11 @@
 - (NSImage *) iconForIdentifier: (id)identifier;
 - (BOOL) windowHasGNUstepStyleMask: (unsigned long)styleMask
                              window: (Window)window;
-- (BOOL) windowHasGNUstepWindowAttributes: (Window)window;
 - (BOOL) windowHasGNUstepIconStyle: (Window)window;
 - (BOOL) windowIsIconSized: (Window)window;
 - (BOOL) windowIsSmallIconSized: (Window)window;
 - (BOOL) windowHasGNUstepMiniWindowStyle: (Window)window;
+- (BOOL) windowIsGNUstepMainMenu: (Window)window;
 - (BOOL) windowIsSmallGNUstepIconOrMiniWindow: (Window)window;
 - (BOOL) windowIsSmallRootOverrideRedirectWindow: (Window)window;
 - (BOOL) windowIsSmallDockedOverrideRedirectWindow: (Window)window;
@@ -135,5 +135,7 @@
 - (Window) activatableWindowForProcessIdentifiers: (NSArray *)processIdentifiers
                                       underWindow: (Window)parentWindow;
 - (BOOL) activateApplicationWithProcessIdentifiers: (NSArray *)processIdentifiers;
+- (Window) mainMenuWindowForProcessIdentifiers: (NSArray *)processIdentifiers
+                                  underWindow: (Window)parentWindow;
 - (void) closeWindow: (unsigned long)xWindow;
 @end

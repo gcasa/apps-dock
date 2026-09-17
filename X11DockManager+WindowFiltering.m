@@ -65,38 +65,6 @@
 }
 
 
-- (BOOL) windowHasGNUstepWindowAttributes: (Window)window
-{
-  Display *display = (Display *)_display;
-  Atom property = XInternAtom(display, "_GNUSTEP_WM_ATTR", False);
-  Atom actualType;
-  int actualFormat;
-  unsigned long itemCount;
-  unsigned long bytesAfter;
-  unsigned char *data = NULL;
-  BOOL result = NO;
-
-  [self clearX11Error];
-  if (XGetWindowProperty(display, window, property, 0,
-                         2,
-                         False, property, &actualType, &actualFormat,
-                         &itemCount, &bytesAfter, &data) == Success && data)
-    {
-      if (![self x11ErrorOccurred] &&
-	  actualFormat == 32 &&
-	  itemCount >= 2)
-	{
-	  unsigned long *attrs = (unsigned long *)data;
-
-	  result = (attrs[0] & DockGSWindowStyleAttr) ? YES : NO;
-	}
-      XFree(data);
-    }
-
-  return result;
-}
-
-
 - (BOOL) windowHasGNUstepIconStyle: (Window)window
 {
   return [self windowHasGNUstepStyleMask:DockNSIconWindowMask
@@ -144,24 +112,76 @@
 }
 
 
+- (BOOL) windowIsGNUstepMainMenu: (Window)window
+{
+  Display *display = (Display *)_display;
+  Atom property = XInternAtom(display, "_GNUSTEP_WM_ATTR", False);
+  Atom dockType = XInternAtom(display, "_NET_WM_WINDOW_TYPE_DOCK", False);
+  Atom windowType = XInternAtom(display, "_NET_WM_WINDOW_TYPE", False);
+  Atom actualType;
+  int actualFormat;
+  unsigned long itemCount;
+  unsigned long bytesAfter;
+  unsigned char *data = NULL;
+  BOOL isMenu = NO;
+
+  [self clearX11Error];
+  if (XGetWindowProperty(display, window, property, 0, 2, False, property,
+                         &actualType, &actualFormat, &itemCount, &bytesAfter,
+                         &data) == Success && data)
+    {
+      if (![self x11ErrorOccurred] && actualFormat == 32 && itemCount >= 2)
+        {
+          unsigned long *attrs = (unsigned long *)data;
+          isMenu = (attrs[0] & DockGSWindowStyleAttr) && attrs[1] == 0;
+        }
+      XFree(data);
+    }
+  if (!isMenu)
+    {
+      return NO;
+    }
+
+  data = NULL;
+  [self clearX11Error];
+  if (XGetWindowProperty(display, window, windowType, 0, 8, False, XA_ATOM,
+                         &actualType, &actualFormat, &itemCount, &bytesAfter,
+                         &data) == Success && data)
+    {
+      unsigned long i;
+      isMenu = NO;
+      if (![self x11ErrorOccurred] && actualFormat == 32)
+        {
+          Atom *types = (Atom *)data;
+          for (i = 0; i < itemCount; i++)
+            {
+              if (types[i] == dockType)
+                {
+                  isMenu = YES;
+                  break;
+                }
+            }
+        }
+      XFree(data);
+    }
+  else
+    {
+      isMenu = NO;
+    }
+
+  return isMenu;
+}
+
+
 - (BOOL) windowIsSmallGNUstepIconOrMiniWindow: (Window)window
 {
-  long state = NormalState;
-
   if (![self windowIsSmallIconSized:window])
     {
       return NO;
     }
 
-  if ([self windowHasGNUstepIconStyle:window] ||
-      [self windowHasGNUstepMiniWindowStyle:window])
-    {
-      return YES;
-    }
-
-  return [self windowIsSmallIconSized:window] &&
-    ![self wmStateForWindow:window state:&state] &&
-    [self windowHasGNUstepWindowAttributes:window];
+  return [self windowHasGNUstepIconStyle:window] ||
+    [self windowHasGNUstepMiniWindowStyle:window];
 }
 
 

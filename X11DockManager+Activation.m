@@ -267,11 +267,54 @@
                                             underWindow:root];
   if (window == None)
     {
-      return activated;
+      window = [self mainMenuWindowForProcessIdentifiers:processIdentifiers
+                                            underWindow:root];
+      if (window == None)
+        {
+          return activated;
+        }
     }
 
   [self activateWindow:(unsigned long)window];
   return YES;
+}
+
+
+- (Window) mainMenuWindowForProcessIdentifiers: (NSArray *)processIdentifiers
+                                  underWindow: (Window)parentWindow
+{
+  Display *display = (Display *)_display;
+  Window root, parent, *children = NULL;
+  unsigned int count = 0, i;
+  Window match = None;
+
+  [self clearX11Error];
+  if (!XQueryTree(display, parentWindow, &root, &parent, &children, &count) ||
+      [self x11ErrorOccurred])
+    {
+      if (children) XFree(children);
+      return None;
+    }
+
+  for (i = count; i > 0 && match == None; i--)
+    {
+      Window child = children[i - 1];
+      int pid = [self processIdentifierForWindow:child];
+
+      if (pid > 0 &&
+          [processIdentifiers containsObject:[NSNumber numberWithInt:pid]] &&
+          [self windowIsGNUstepMainMenu:child])
+        {
+          match = child;
+        }
+      else
+        {
+          match = [self mainMenuWindowForProcessIdentifiers:processIdentifiers
+                                               underWindow:child];
+        }
+    }
+  if (children) XFree(children);
+  return match;
 }
 
 
