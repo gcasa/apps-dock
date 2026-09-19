@@ -79,16 +79,49 @@
   return [[NSWorkspace sharedWorkspace] openFile:path];
 }
 
-- (NSDictionary *) explicitApplicationLaunchEnvironment
+- (NSString *) defaultsDomainForApplicationPath: (NSString *)path
 {
-  NSMutableDictionary *environment =
-    [NSMutableDictionary dictionaryWithDictionary:
-			   [[NSProcessInfo processInfo] environment]];
+  NSString *bundlePath = [DockItem applicationBundlePathForPath:path];
+  NSDictionary *info = nil;
+  NSString *identifier = nil;
 
-  [environment setObject:@"YES" forKey:@"GSUseIconManager"];
-  [environment setObject:@"YES" forKey:@"GSIconManager"];
+  if ([bundlePath length])
+    {
+      info = [[NSBundle bundleWithPath:bundlePath] infoDictionary];
+      identifier = [info objectForKey:@"CFBundleIdentifier"];
+      if (![identifier isKindOfClass:[NSString class]] || ![identifier length])
+	{
+	  identifier = [info objectForKey:@"NSExecutable"];
+	}
+    }
+  if (![identifier isKindOfClass:[NSString class]] || ![identifier length])
+    {
+      identifier = [[path lastPathComponent] stringByDeletingPathExtension];
+    }
 
-  return environment;
+  return identifier;
+}
+
+- (void) enableIconManagerForApplicationPath: (NSString *)path
+{
+  NSString *domain = [self defaultsDomainForApplicationPath:path];
+  NSUserDefaults *defaults;
+  NSDictionary *existingValues;
+  NSMutableDictionary *values;
+
+  if (![domain length])
+    {
+      return;
+    }
+
+  defaults = AUTORELEASE([[NSUserDefaults alloc] initWithUser:NSUserName()]);
+  existingValues = [defaults persistentDomainForName:domain];
+  values = existingValues
+    ? [NSMutableDictionary dictionaryWithDictionary:existingValues]
+    : [NSMutableDictionary dictionary];
+  [values setObject:[NSNumber numberWithBool:YES] forKey:@"GSUseIconManager"];
+  [defaults setPersistentDomain:values forName:domain];
+  [defaults synchronize];
 }
 
 - (void) launchTaskWithLaunchPath: (NSString *)path
@@ -101,7 +134,7 @@
   [task setArguments:arguments];
   if (useIconManager)
     {
-      [task setEnvironment:[self explicitApplicationLaunchEnvironment]];
+      [self enableIconManagerForApplicationPath:path];
     }
   [task launch];
   RELEASE(task);
@@ -239,11 +272,17 @@
   NSString *contents = [NSString stringWithContentsOfFile:path];
   NSArray *lines = [contents componentsSeparatedByCharactersInSet:
 			       [NSCharacterSet newlineCharacterSet]];
+  NSString *executablePath = [self executablePathForDesktopFile:path];
   NSUInteger i;
 
   if (![contents length])
     {
       return NO;
+    }
+
+  if (useIconManager && [executablePath length])
+    {
+      [self enableIconManagerForApplicationPath:executablePath];
     }
 
   for (i = 0; i < [lines count]; i++)
@@ -268,7 +307,7 @@
 		    }
 		  [self launchTaskWithLaunchPath:shellPath
 				       arguments:[NSArray arrayWithObjects:@"-lc", command, nil]
-				  useIconManager:useIconManager];
+				  useIconManager:NO];
 		  return YES;
 		}
 	    }

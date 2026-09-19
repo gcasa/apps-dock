@@ -114,7 +114,8 @@ matchesRunningProcessPath: (NSString *)processPath;
 - (BOOL) launchApplicationAtPath: (NSString *)path;
 - (BOOL) launchApplicationItem: (DockItem *)item;
 - (BOOL) launchApplicationItem: (DockItem *)item useIconManager: (BOOL)useIconManager;
-- (NSDictionary *) explicitApplicationLaunchEnvironment;
+- (NSString *) defaultsDomainForApplicationPath: (NSString *)path;
+- (void) enableIconManagerForApplicationPath: (NSString *)path;
 - (void) launchTaskWithLaunchPath: (NSString *)path
 			arguments: (NSArray *)arguments
 		   useIconManager: (BOOL)useIconManager;
