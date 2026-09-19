@@ -547,7 +547,6 @@
 
   [self drawDropIndicator];
   [self drawRecyclerTile];
-  [self drawTooltip];
   [self drawDockBorder];
 }
 

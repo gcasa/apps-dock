@@ -32,7 +32,6 @@
       _lastMouseDownIndex = NSNotFound;
       _lastMouseDownTime = 0.0;
       _hoveredItemIndex = DockHoverNone;
-      _tooltipItemIndex = DockHoverNone;
       _trackingRectTag = 0;
       _mouseDownItemIndex = NSNotFound;
       _draggedItemIndex = NSNotFound;
@@ -65,8 +64,6 @@
 
 - (void) dealloc
 {
-  [_tooltipTimer invalidate];
-  DESTROY(_tooltipTimer);
   [_wiggleTimer invalidate];
   DESTROY(_wiggleTimer);
   [_recyclerWiggleTimer invalidate];
@@ -153,12 +150,14 @@
 {
   [super viewDidMoveToWindow];
   [self updateTrackingRect];
+  [self updateToolTips];
 }
 
 - (void) setFrame: (NSRect)frame
 {
   [super setFrame:frame];
   [self updateTrackingRect];
+  [self updateToolTips];
 }
 
 - (void) setDelegate: (id)delegate
@@ -183,7 +182,7 @@
     {
       _pinnedItemCount = [_items count];
     }
-  [self hideTooltip];
+  [self updateToolTips];
   [self setNeedsDisplay:YES];
 }
 
@@ -302,6 +301,7 @@
       _cellSize = cellSize;
       _dockGap = gap;
       _dockPad = padding;
+      [self updateToolTips];
       [self setNeedsDisplay:YES];
     }
 }
@@ -374,6 +374,7 @@
   if (_horizontal != horizontal)
     {
       _horizontal = horizontal;
+      [self updateToolTips];
       [self setNeedsDisplay:YES];
     }
 }

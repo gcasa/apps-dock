@@ -56,8 +56,6 @@
 
   _draggedItemIndex = _mouseDownItemIndex;
   _dropIndex = _mouseDownItemIndex;
-  [self hideTooltip];
-
   {
     NSPasteboard *pasteboard = [NSPasteboard pasteboardWithName:NSDragPboard];
     NSImage *dragImage = [self dragImageForItemAtIndex:_mouseDownItemIndex];
@@ -161,8 +159,6 @@
 {
   NSPoint location = [self convertPoint:[sender draggingLocation] fromView:nil];
   NSPasteboard *pasteboard = [sender draggingPasteboard];
-
-  [self hideTooltip];
 
   if ([self pasteboardHasReorderType:pasteboard])
     {

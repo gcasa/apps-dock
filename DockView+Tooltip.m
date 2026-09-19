@@ -43,120 +43,41 @@
 }
 
 
-- (void) hideTooltip
+- (void) updateToolTips
 {
-  [_tooltipTimer invalidate];
-  DESTROY(_tooltipTimer);
-  if (_tooltipItemIndex != DockHoverNone)
+  NSInteger index;
+  NSString *title;
+  NSRect rect;
+
+  [self removeAllToolTips];
+
+  for (index = DockHoverRecycler; index < (NSInteger)[_items count]; index++)
     {
-      _tooltipItemIndex = DockHoverNone;
-      [self setNeedsDisplay:YES];
+      if (index == DockHoverNone)
+        {
+          continue;
+        }
+
+      title = [self tooltipTitleForHoverIndex:index];
+      rect = NSIntersectionRect([self cellRectForHoverIndex:index], [self bounds]);
+      if ([title length] && !NSIsEmptyRect(rect))
+        {
+          [self addToolTipRect:rect
+                        owner:self
+                     userData:(void *)(intptr_t)index];
+        }
     }
 }
 
 
-- (void) scheduleTooltipForHoverIndex: (NSInteger)index
+- (NSString *) view: (NSView *)view
+ stringForToolTip: (NSToolTipTag)tag
+             point: (NSPoint)point
+          userData: (void *)userData
 {
-  [_tooltipTimer invalidate];
-  DESTROY(_tooltipTimer);
-  _tooltipItemIndex = DockHoverNone;
+  NSInteger index = (NSInteger)(intptr_t)userData;
 
-  if (index == DockHoverNone)
-    {
-      [self setNeedsDisplay:YES];
-      return;
-    }
-
-  _tooltipTimer = [NSTimer scheduledTimerWithTimeInterval:0.5
-                                                   target:self
-                                                 selector:@selector(showTooltip:)
-                                                 userInfo:nil
-						  repeats:NO];
-  _tooltipTimer = RETAIN(_tooltipTimer);
-  [self setNeedsDisplay:YES];
-}
-
-
-- (void) drawTooltip
-{
-  NSString *title = [self tooltipTitleForHoverIndex:_tooltipItemIndex];
-  NSRect cell;
-  NSDictionary *attrs;
-  NSSize textSize;
-  CGFloat padX = 7.0;
-  CGFloat padY = 4.0;
-  NSRect tooltipRect;
-  NSPoint textPoint;
-  NSRect bounds = [self bounds];
-
-  if (![title length])
-    {
-      return;
-    }
-
-  cell = [self cellRectForHoverIndex:_tooltipItemIndex];
-  if (NSIsEmptyRect(cell))
-    {
-      return;
-    }
-
-  attrs = [NSDictionary dictionaryWithObjectsAndKeys:
-			    [NSFont systemFontOfSize:11.0], NSFontAttributeName,
-			[NSColor whiteColor], NSForegroundColorAttributeName,
-			nil];
-  textSize = [title sizeWithAttributes:attrs];
-
-  tooltipRect = NSMakeRect(0.0, 0.0,
-                           textSize.width + padX * 2.0,
-                           textSize.height + padY * 2.0);
-  if (_horizontal)
-    {
-      tooltipRect.origin.x = NSMidX(cell) - NSWidth(tooltipRect) / 2.0;
-      tooltipRect.origin.y = NSMaxY(cell) - NSHeight(tooltipRect) - 2.0;
-    }
-  else
-    {
-      tooltipRect.origin.x = NSMaxX(cell) - NSWidth(tooltipRect) - 2.0;
-      tooltipRect.origin.y = NSMidY(cell) - NSHeight(tooltipRect) / 2.0;
-    }
-
-  if (NSMinX(tooltipRect) < NSMinX(bounds) + 2.0)
-    {
-      tooltipRect.origin.x = NSMinX(bounds) + 2.0;
-    }
-  if (NSMaxX(tooltipRect) > NSMaxX(bounds) - 2.0)
-    {
-      tooltipRect.origin.x = NSMaxX(bounds) - NSWidth(tooltipRect) - 2.0;
-    }
-  if (NSMinY(tooltipRect) < NSMinY(bounds) + 2.0)
-    {
-      tooltipRect.origin.y = NSMinY(bounds) + 2.0;
-    }
-  if (NSMaxY(tooltipRect) > NSMaxY(bounds) - 2.0)
-    {
-      tooltipRect.origin.y = NSMaxY(bounds) - NSHeight(tooltipRect) - 2.0;
-    }
-
-  [[NSColor colorWithCalibratedWhite:0.0 alpha:0.82] set];
-  [[NSBezierPath bezierPathWithRoundedRect:tooltipRect
-                                   xRadius:4.0
-                                   yRadius:4.0] fill];
-
-  textPoint = NSMakePoint(NSMinX(tooltipRect) + padX,
-                          NSMinY(tooltipRect) + padY);
-  [title drawAtPoint:textPoint withAttributes:attrs];
-}
-
-
-- (void) showTooltip: (NSTimer *)timer
-{
-  DESTROY(_tooltipTimer);
-
-  if (_hoveredItemIndex != DockHoverNone)
-    {
-      _tooltipItemIndex = _hoveredItemIndex;
-      [self setNeedsDisplay:YES];
-    }
+  return [self tooltipTitleForHoverIndex:index];
 }
 
 

@@ -29,7 +29,6 @@
   if (hoverIndex != _hoveredItemIndex)
     {
       _hoveredItemIndex = hoverIndex;
-      [self scheduleTooltipForHoverIndex:hoverIndex];
       [self setNeedsDisplay:YES];
     }
 }
@@ -38,7 +37,6 @@
 - (void) mouseExited: (NSEvent *)event
 {
   _hoveredItemIndex = DockHoverNone;
-  [self hideTooltip];
   [self setNeedsDisplay:YES];
 }
 
@@ -48,8 +46,6 @@
   NSPoint location = [self convertPoint:[event locationInWindow] fromView:nil];
   NSUInteger index = [self indexAtPoint:location];
   NSMenu *contextMenu = nil;
-
-  [self hideTooltip];
 
   if ([self topIconContainsPoint:location])
     {

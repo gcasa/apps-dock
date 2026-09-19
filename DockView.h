@@ -69,7 +69,6 @@ typedef enum
   DockRunningIndicatorMode _runningIndicatorMode;
   BOOL _recyclerHasContents;
   BOOL _horizontal;
-  NSTimer *_tooltipTimer;
   NSTimer *_wiggleTimer;
   NSTimer *_recyclerWiggleTimer;
   DockItem *_wiggleItem;
@@ -77,7 +76,6 @@ typedef enum
   BOOL _wiggleRepeatsUntilAcknowledged;
   NSTimeInterval _recyclerWiggleStartTime;
   NSInteger _hoveredItemIndex;
-  NSInteger _tooltipItemIndex;
   NSTrackingRectTag _trackingRectTag;
   NSPoint _mouseDownPoint;
   NSUInteger _mouseDownItemIndex;

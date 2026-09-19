@@ -134,7 +134,11 @@ DockViewCalibratedBackgroundColor(NSColor *color)
 - (NSInteger) hoverIndexAtPoint: (NSPoint)p;
 - (NSRect) cellRectForHoverIndex: (NSInteger)index;
 - (NSString *) tooltipTitleForHoverIndex: (NSInteger)index;
-- (void) hideTooltip;
+- (NSString *) view: (NSView *)view
+ stringForToolTip: (NSToolTipTag)tag
+             point: (NSPoint)point
+          userData: (void *)userData;
+- (void) updateToolTips;
 - (NSMenuItem *) menuItemWithTitle: (NSString *)title
                             action: (SEL)action
                               item: (DockItem *)item;
@@ -145,9 +149,6 @@ DockViewCalibratedBackgroundColor(NSColor *color)
 - (void) showItemSettings: (id)sender;
 - (void) quitItem: (id)sender;
 - (void) emptyRecycler: (id)sender;
-- (void) scheduleTooltipForHoverIndex: (NSInteger)index;
-- (void) drawTooltip;
-- (void) showTooltip: (NSTimer *)timer;
 - (NSArray *) pathsFromPasteboard: (NSPasteboard *)pb;
 - (BOOL) pasteboardHasSupportedType: (NSPasteboard *)pb;
 - (void) addPathsFromPasteboardObject: (id)object toArray: (NSMutableArray *)paths;
