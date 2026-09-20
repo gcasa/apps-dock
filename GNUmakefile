@@ -21,6 +21,7 @@ SettingsController+Updates.m \
 SettingsController+Actions.m \
 SettingsController.m \
 DockPreferences.m \
+DockProcFS.m \
 RunningApplicationScanner.m \
 RecyclerController.m \
 DockApplicationStore.m \

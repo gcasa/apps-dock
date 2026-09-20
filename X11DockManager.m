@@ -26,7 +26,7 @@
 #import <X11/Xutil.h>
 #import <X11/extensions/shape.h>
 #import <limits.h>
-#import <mntent.h>
+#import "DockProcFS.h"
 #import <paths.h>
 #import <stdlib.h>
 #import <string.h>
@@ -194,28 +194,7 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 
 - (NSString *) procFilesystemPath
 {
-  FILE *mounts;
-  struct mntent *entry;
-  NSString *path = nil;
-
-  mounts = setmntent(_PATH_MOUNTED, "r");
-  if (!mounts)
-    {
-      return nil;
-    }
-
-  while ((entry = getmntent(mounts)) != NULL)
-    {
-      if (entry->mnt_type && strcmp(entry->mnt_type, "proc") == 0 &&
-	  entry->mnt_dir)
-	{
-	  path = [NSString stringWithUTF8String:entry->mnt_dir];
-	  break;
-	}
-    }
-
-  endmntent(mounts);
-  return [path length] ? path : nil;
+  return DockProcFilesystemPath();
 }
 
 - (void) setDockPlacement: (DockPlacement)placement
