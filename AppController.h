@@ -52,6 +52,7 @@
   NSColor *_backgroundColor;
   CGFloat _windowAlpha;
   CGFloat _hoverIconScale;
+  CGFloat _dockScale;
   BOOL _useCellTileBackground;
   BOOL _showDockBorder;
   BOOL _magnifiesHoveredIcons;
@@ -60,6 +61,7 @@
   BOOL _wigglesOnAttentionRequest;
   BOOL _playsSoundOnRemove;
   BOOL _singleClickLaunchesApplications;
+  BOOL _hidesMiniwindows;
 }
 
 @end

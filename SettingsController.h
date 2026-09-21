@@ -35,11 +35,13 @@
 - (BOOL) settingsControllerShowsDockBorder: (SettingsController *)controller;
 - (BOOL) settingsControllerMagnifiesHoveredIcons: (SettingsController *)controller;
 - (CGFloat) settingsControllerHoverIconScale: (SettingsController *)controller;
+- (CGFloat) settingsControllerDockScale: (SettingsController *)controller;
 - (BOOL) settingsControllerWigglesOnLaunch: (SettingsController *)controller;
 - (BOOL) settingsControllerWigglesOnActivation: (SettingsController *)controller;
 - (BOOL) settingsControllerWigglesOnAttentionRequest: (SettingsController *)controller;
 - (BOOL) settingsControllerPlaysSoundOnRemove: (SettingsController *)controller;
 - (BOOL) settingsControllerSingleClickLaunchesApplications: (SettingsController *)controller;
+- (BOOL) settingsControllerHidesMiniwindows: (SettingsController *)controller;
 - (BOOL) settingsControllerRecyclerHasContents: (SettingsController *)controller;
 - (NSArray *) settingsControllerDockItems: (SettingsController *)controller;
 - (NSUInteger) settingsControllerPinnedItemCount: (SettingsController *)controller;
@@ -72,6 +74,8 @@ didChangeMagnifiesHoveredIcons: (BOOL)magnifiesHoveredIcons;
 - (void) settingsController: (SettingsController *)controller
 didChangeHoverIconScale: (CGFloat)scale;
 - (void) settingsController: (SettingsController *)controller
+       didChangeDockScale: (CGFloat)scale;
+- (void) settingsController: (SettingsController *)controller
   didChangeWigglesOnLaunch: (BOOL)wiggles;
 - (void) settingsController: (SettingsController *)controller
 didChangeWigglesOnActivation: (BOOL)wiggles;
@@ -81,6 +85,8 @@ didChangeWigglesOnAttentionRequest: (BOOL)wiggles;
 didChangePlaysSoundOnRemove: (BOOL)playsSound;
 - (void) settingsController: (SettingsController *)controller
 didChangeSingleClickLaunchesApplications: (BOOL)singleClickLaunches;
+- (void) settingsController: (SettingsController *)controller
+ didChangeHidesMiniwindows: (BOOL)hidesMiniwindows;
 - (void) settingsController: (SettingsController *)controller
   didChangeDockCellSizeMode: (NSInteger)mode;
 - (void) settingsController: (SettingsController *)controller
@@ -124,6 +130,8 @@ didChangeItemWigglesOnAttentionRequest: (BOOL)wiggles
   NSButton *_cellSize64Button;
   NSButton *_runningDotButton;
   NSButton *_notRunningDotsButton;
+  NSSlider *_dockScaleSlider;
+  NSTextField *_dockScaleValueLabel;
   NSButton *_useCellTileButton;
   NSButton *_showBorderButton;
   NSButton *_magnifyHoveredIconsButton;
@@ -135,6 +143,7 @@ didChangeItemWigglesOnAttentionRequest: (BOOL)wiggles
   NSButton *_wiggleOnAttentionRequestButton;
   NSButton *_playSoundOnRemoveButton;
   NSButton *_singleClickLaunchButton;
+  NSButton *_hideMiniwindowsButton;
   NSButton *_emptyRecyclerButton;
   NSPopUpButton *_applicationPopup;
   NSTextField *_applicationPathField;

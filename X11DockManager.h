@@ -66,6 +66,7 @@ typedef enum
   NSMutableDictionary *_iconImageDataByProcessID;
   NSMutableDictionary *_dockedWindowFrames;
   NSMutableSet *_dockAppWindows;
+  BOOL _hidesMiniwindows;
   BOOL _scanPending;
   NSTimeInterval _lastEventScanTime;
 }
@@ -74,6 +75,7 @@ typedef enum
 - (void) setDelegate: (id)delegate;
 - (BOOL) start;
 - (void) setDockPlacement: (DockPlacement)placement;
+- (void) setHidesMiniwindows: (BOOL)hidesMiniwindows;
 - (void) makeWindowSticky: (unsigned long)xWindow;
 
 @end

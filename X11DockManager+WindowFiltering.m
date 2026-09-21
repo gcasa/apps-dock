@@ -318,7 +318,10 @@
 			    processIdentifier:[self processIdentifierForWindow:window]
 					title:[self classNameForWindow:window]])
 	{
-	  [self unmapIconWindow:window];
+	  if (![self windowHasGNUstepMiniWindowStyle:window] || _hidesMiniwindows)
+	    {
+	      [self unmapIconWindow:window];
+	    }
 	}
       return NO;
     }

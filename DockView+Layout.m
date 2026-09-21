@@ -239,7 +239,7 @@
 
 - (CGFloat) iconSizeForItemAtIndex: (NSUInteger)index
 {
-  CGFloat size = 46.0;
+  CGFloat size = 46.0 * (_cellSize / DockCell);
 
   if (_magnifiesHoveredIcons &&
       _hoveredItemIndex == (NSInteger)index &&

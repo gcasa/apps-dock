@@ -174,7 +174,10 @@
 	{
 	  return;
 	}
-      [self unmapIconWindow:window];
+      if (![self windowHasGNUstepMiniWindowStyle:window] || _hidesMiniwindows)
+	{
+	  [self unmapIconWindow:window];
+	}
       return;
     }
 

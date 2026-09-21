@@ -82,6 +82,7 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
       _iconImageDataByProcessID = [NSMutableDictionary new];
       _dockedWindowFrames = [NSMutableDictionary new];
       _dockAppWindows = [NSMutableSet new];
+      _hidesMiniwindows = YES;
     }
   return self;
 }
@@ -112,6 +113,11 @@ static int X11DockManagerHandleError(Display *display, XErrorEvent *event)
 - (void) setDelegate: (id)delegate
 {
   _delegate = delegate;
+}
+
+- (void) setHidesMiniwindows: (BOOL)hidesMiniwindows
+{
+  _hidesMiniwindows = hidesMiniwindows;
 }
 
 - (BOOL) start

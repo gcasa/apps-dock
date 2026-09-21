@@ -47,6 +47,7 @@ SettingsClampedWindowAlpha(CGFloat alpha)
 - (NSTextField *) valueLabelWithFrame: (NSRect)frame;
 - (void) updateTransparencyValueLabel;
 - (void) updateHoverIconScaleValueLabel;
+- (void) updateDockScaleValueLabel;
 - (NSTextField *) labelWithTitle: (NSString *)title frame: (NSRect)frame;
 - (NSButton *) buttonWithTitle: (NSString *)title
 			 frame: (NSRect)frame
@@ -69,11 +70,13 @@ SettingsClampedWindowAlpha(CGFloat alpha)
 - (void) useCellTileChanged: (id)sender;
 - (void) magnifyHoveredIconsChanged: (id)sender;
 - (void) hoverIconScaleChanged: (id)sender;
+- (void) dockScaleChanged: (id)sender;
 - (void) wiggleOnLaunchChanged: (id)sender;
 - (void) wiggleOnActivationChanged: (id)sender;
 - (void) wiggleOnAttentionRequestChanged: (id)sender;
 - (void) playSoundOnRemoveChanged: (id)sender;
 - (void) singleClickLaunchChanged: (id)sender;
+- (void) hideMiniwindowsChanged: (id)sender;
 - (void) dockCellSizeChanged: (id)sender;
 - (void) runningIndicatorModeChanged: (id)sender;
 - (void) applicationSelectionChanged: (id)sender;

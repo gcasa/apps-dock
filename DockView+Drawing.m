@@ -117,8 +117,9 @@
 
 - (void) drawFallbackIconForItem: (DockItem *)item inCell: (NSRect)cell
 {
+  CGFloat scale = _cellSize / DockCell;
   NSDictionary *attrs = [NSDictionary dictionaryWithObjectsAndKeys:
-				      [NSFont boldSystemFontOfSize:18], NSFontAttributeName,
+				      [NSFont boldSystemFontOfSize:18.0 * scale], NSFontAttributeName,
 				 [NSColor colorWithCalibratedWhite:0.95 alpha:1.0], NSForegroundColorAttributeName,
 				      nil];
   NSString *title = [[item title] length] ? [item title] : @"?";
@@ -207,9 +208,10 @@
 
 - (void) drawStateForItem: (DockItem *)item inCell: (NSRect)cell
 {
-  CGFloat dotSize = 5.0;
+  CGFloat scale = _cellSize / DockCell;
+  CGFloat dotSize = 5.0 * scale;
   CGFloat x;
-  CGFloat y = NSMinY(cell) + 2.0;
+  CGFloat y = NSMinY(cell) + 2.0 * scale;
 
   if ([item kind] != DockItemApplication)
     {
@@ -219,12 +221,12 @@
   if (_runningIndicatorMode == DockRunningIndicatorModeNotRunningDots)
     {
       NSUInteger i;
-      CGFloat iconSize = 46.0;
+      CGFloat iconSize = 46.0 * scale;
       NSRect iconRect = NSMakeRect(NSMidX(cell) - iconSize / 2.0,
 				   NSMidY(cell) - iconSize / 2.0,
 				   iconSize,
 				   iconSize);
-      CGFloat spacing = dotSize + 3.0;
+      CGFloat spacing = dotSize + 3.0 * scale;
       CGFloat startX;
 
       if ([item state] != DockItemNotRunning)
@@ -232,8 +234,8 @@
 	  return;
 	}
 
-      startX = NSMinX(iconRect) + 2.0;
-      y = NSMinY(iconRect) - 7.0;
+      startX = NSMinX(iconRect) + 2.0 * scale;
+      y = NSMinY(iconRect) - 7.0 * scale;
 
       for (i = 0; i < 3; i++)
 	{
@@ -273,14 +275,15 @@
   NSRect cell = [self topTileRect];
 
   [self drawCellBackgroundInCell:cell];
-  [self drawImage:_gnustepIcon inCell:cell size:50.0];
+  [self drawImage:_gnustepIcon inCell:cell size:50.0 * (_cellSize / DockCell)];
 }
 
 
 - (void) drawRecyclerFallbackInCell: (NSRect)cell
 {
   NSPoint center = NSMakePoint(NSMidX(cell), NSMidY(cell));
-  CGFloat radius = 18.0;
+  CGFloat scale = _cellSize / DockCell;
+  CGFloat radius = 18.0 * scale;
   NSUInteger i;
 
   [[NSColor colorWithCalibratedWhite:0.88 alpha:0.95] set];
@@ -300,7 +303,7 @@
 				      radius:radius
 				  startAngle:start
 				    endAngle:end];
-      [arc setLineWidth:3.0];
+      [arc setLineWidth:3.0 * scale];
       [arc stroke];
 
       [head moveToPoint:arrowPoint];
@@ -318,7 +321,7 @@
 
 - (void) drawRecyclerContentsIndicatorInCell: (NSRect)cell
 {
-  CGFloat dotSize = 8.0;
+  CGFloat dotSize = 8.0 * (_cellSize / DockCell);
   CGFloat x = NSMidX(cell) - dotSize / 2.0;
   CGFloat y = NSMidY(cell) - dotSize / 2.0;
 
@@ -359,7 +362,10 @@
       angle = sin(progress * 8.0 * M_PI) * 8.0 * decay;
     }
 
-  if (![self drawImage:recyclerIcon inCell:cell size:46.0 angle:angle])
+  if (![self drawImage:recyclerIcon
+		 inCell:cell
+		   size:46.0 * (_cellSize / DockCell)
+		  angle:angle])
     {
       if (angle != 0.0)
 	{

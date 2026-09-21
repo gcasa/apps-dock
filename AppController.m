@@ -43,11 +43,13 @@
   _showDockBorder = [self savedShowDockBorder];
   _magnifiesHoveredIcons = [_preferences savedMagnifiesHoveredIcons];
   _hoverIconScale = [_preferences savedHoverIconScale];
+  _dockScale = [_preferences savedDockScale];
   _wigglesOnLaunch = [_preferences savedWigglesOnLaunch];
   _wigglesOnActivation = [_preferences savedWigglesOnActivation];
   _wigglesOnAttentionRequest = [_preferences savedWigglesOnAttentionRequest];
   _playsSoundOnRemove = [_preferences savedPlaysSoundOnRemove];
   _singleClickLaunchesApplications = [self savedSingleClickLaunchesApplications];
+  _hidesMiniwindows = [_preferences savedHidesMiniwindows];
   [self loadPersistedApplications];
   frame = [self dockWindowFrameForPlacement:_dockPlacement];
 
@@ -89,6 +91,7 @@
 
   _x11 = [[X11DockManager alloc] initWithDockView:_dockView];
   [_x11 setDelegate:self];
+  [_x11 setHidesMiniwindows:_hidesMiniwindows];
   if ([_x11 start])
     {
       [_x11 makeWindowSticky:(unsigned long)[_window windowNumber]];

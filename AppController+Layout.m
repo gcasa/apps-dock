@@ -27,7 +27,7 @@
   NSUInteger cellCount = [_items count] + 2;
   CGFloat pad = [self activeDockPad];
   CGFloat gap = [self activeDockGap];
-  CGFloat length = pad * 2.0 + cellCount * [DockPreferences dockCellSize] + (cellCount - 1) * gap;
+  CGFloat length = pad * 2.0 + cellCount * [DockPreferences dockCellSize] * _dockScale + (cellCount - 1) * gap;
   CGFloat thickness = [self activeDockWindowWidth];
   CGFloat width = [DockPreferences placementIsHorizontal:placement] ? length : thickness;
   CGFloat height = [DockPreferences placementIsHorizontal:placement] ? thickness : length;

@@ -103,6 +103,15 @@ didChangeUseCellTileBackground:[(NSButton *)sender state] == NSOnState];
   [self updateHoverIconScaleValueLabel];
 }
 
+- (void) dockScaleChanged: (id)sender
+{
+  [_delegate settingsController:self
+	       didChangeDockScale:[(NSSlider *)sender floatValue]];
+  [_dockScaleSlider setFloatValue:
+      [_delegate settingsControllerDockScale:self]];
+  [self updateDockScaleValueLabel];
+}
+
 
 - (void) wiggleOnLaunchChanged: (id)sender
 {
@@ -136,6 +145,12 @@ didChangeWigglesOnAttentionRequest:[(NSButton *)sender state] == NSOnState];
 {
   [_delegate settingsController:self
 didChangeSingleClickLaunchesApplications:[(NSButton *)sender state] == NSOnState];
+}
+
+- (void) hideMiniwindowsChanged: (id)sender
+{
+  [_delegate settingsController:self
+	 didChangeHidesMiniwindows:[(NSButton *)sender state] == NSOnState];
 }
 
 

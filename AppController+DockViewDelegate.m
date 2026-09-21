@@ -23,6 +23,8 @@
 
 - (void) applyDockPlacement
 {
+  NSUInteger i;
+
   [[NSUserDefaults standardUserDefaults] setInteger:_dockPlacement forKey:@"DockPlacement"];
   [self applyDockCellSizeToView];
   [_dockView setHorizontal:[DockPreferences placementIsHorizontal:_dockPlacement]];
@@ -32,6 +34,15 @@
                                  NSWidth([_window frame]),
                                  NSHeight([_window frame]))];
   [_x11 setDockPlacement:_dockPlacement];
+  for (i = 0; i < [_items count]; i++)
+    {
+      DockItem *item = [_items objectAtIndex:i];
+
+      if ([item xWindow])
+	{
+	  [_x11 dockWindow:[item xWindow] atIndex:i];
+	}
+    }
   [self updateDockBackground];
   [self updateDockMenu];
 }

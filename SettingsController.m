@@ -49,6 +49,7 @@
   DESTROY(_applicationPathField);
   DESTROY(_applicationPopup);
   DESTROY(_singleClickLaunchButton);
+  DESTROY(_hideMiniwindowsButton);
   DESTROY(_wiggleOnAttentionRequestButton);
   DESTROY(_playSoundOnRemoveButton);
   DESTROY(_wiggleOnActivationButton);
@@ -60,6 +61,8 @@
   DESTROY(_showBorderButton);
   DESTROY(_useCellTileButton);
   DESTROY(_notRunningDotsButton);
+  DESTROY(_dockScaleValueLabel);
+  DESTROY(_dockScaleSlider);
   DESTROY(_runningDotButton);
   DESTROY(_cellSize64Button);
   DESTROY(_currentCellSizeButton);

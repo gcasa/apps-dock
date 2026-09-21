@@ -44,6 +44,14 @@
       [NSString stringWithFormat:@"Hover Size +%ld%%", (long)percent]];
 }
 
+- (void) updateDockScaleValueLabel
+{
+  NSInteger percent = (NSInteger)([_dockScaleSlider floatValue] * 100.0 + 0.5);
+
+  [_dockScaleValueLabel setStringValue:
+      [NSString stringWithFormat:@"%ld%%", (long)percent]];
+}
+
 
 - (void) updateControls
 {
@@ -86,6 +94,9 @@
   [_notRunningDotsButton setState:
       (runningIndicatorMode == DockRunningIndicatorModeNotRunningDots ?
        NSOnState : NSOffState)];
+  [_dockScaleSlider setFloatValue:
+      [_delegate settingsControllerDockScale:self]];
+  [self updateDockScaleValueLabel];
 
   [_useCellTileButton setState:
       ([_delegate settingsControllerUsesCellTileBackground:self] ?
@@ -123,6 +134,9 @@
        NSOnState : NSOffState)];
   [_singleClickLaunchButton setState:
       ([_delegate settingsControllerSingleClickLaunchesApplications:self] ?
+       NSOnState : NSOffState)];
+  [_hideMiniwindowsButton setState:
+      ([_delegate settingsControllerHidesMiniwindows:self] ?
        NSOnState : NSOffState)];
   [_emptyRecyclerButton setEnabled:
       [_delegate settingsControllerRecyclerHasContents:self]];

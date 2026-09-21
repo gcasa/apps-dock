@@ -29,6 +29,8 @@ static NSString *DockWigglesOnActivationDefaultsKey = @"DockWigglesOnActivation"
 static NSString *DockWigglesOnAttentionRequestDefaultsKey = @"DockWigglesOnAttentionRequest";
 static NSString *DockPlaysSoundOnRemoveDefaultsKey = @"DockPlaysSoundOnRemove";
 static NSString *DockSingleClickLaunchesApplicationsDefaultsKey = @"DockSingleClickLaunchesApplications";
+static NSString *DockHidesMiniwindowsDefaultsKey = @"DockHidesMiniwindows";
+static NSString *DockScaleDefaultsKey = @"DockScale";
 
 @implementation DockPreferences
 
@@ -408,6 +410,44 @@ static NSString *DockSingleClickLaunchesApplicationsDefaultsKey = @"DockSingleCl
 {
   [[NSUserDefaults standardUserDefaults] setBool:singleClickLaunches
 					  forKey:DockSingleClickLaunchesApplicationsDefaultsKey];
+}
+
+- (BOOL) savedHidesMiniwindows
+{
+  NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+
+  if (![defaults objectForKey:DockHidesMiniwindowsDefaultsKey])
+    {
+      return YES;
+    }
+
+  return [defaults boolForKey:DockHidesMiniwindowsDefaultsKey];
+}
+
+- (void) saveHidesMiniwindows: (BOOL)hidesMiniwindows
+{
+  [[NSUserDefaults standardUserDefaults] setBool:hidesMiniwindows
+					  forKey:DockHidesMiniwindowsDefaultsKey];
+}
+
+- (CGFloat) savedDockScale
+{
+  NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+  CGFloat scale;
+
+  if (![defaults objectForKey:DockScaleDefaultsKey])
+    {
+      return 1.0;
+    }
+
+  scale = [defaults floatForKey:DockScaleDefaultsKey];
+  return MIN(1.5, MAX(0.5, scale));
+}
+
+- (void) saveDockScale: (CGFloat)scale
+{
+  [[NSUserDefaults standardUserDefaults] setFloat:MIN(1.5, MAX(0.5, scale))
+					   forKey:DockScaleDefaultsKey];
 }
 
 @end

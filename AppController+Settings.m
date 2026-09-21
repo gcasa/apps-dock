@@ -125,6 +125,11 @@
   return _hoverIconScale;
 }
 
+- (CGFloat) settingsControllerDockScale: (SettingsController *)controller
+{
+  return _dockScale;
+}
+
 - (BOOL) settingsControllerWigglesOnLaunch: (SettingsController *)controller
 {
   return _wigglesOnLaunch;
@@ -148,6 +153,11 @@
 - (BOOL) settingsControllerSingleClickLaunchesApplications: (SettingsController *)controller
 {
   return _singleClickLaunchesApplications;
+}
+
+- (BOOL) settingsControllerHidesMiniwindows: (SettingsController *)controller
+{
+  return _hidesMiniwindows;
 }
 
 - (BOOL) settingsControllerRecyclerHasContents: (SettingsController *)controller
@@ -282,6 +292,18 @@ didChangeHoverIconScale: (CGFloat)scale
 }
 
 - (void) settingsController: (SettingsController *)controller
+       didChangeDockScale: (CGFloat)scale
+{
+  scale = MIN(1.5, MAX(0.5, scale));
+  if (_dockScale != scale)
+    {
+      _dockScale = scale;
+      [_preferences saveDockScale:_dockScale];
+      [self applyDockPlacement];
+    }
+}
+
+- (void) settingsController: (SettingsController *)controller
   didChangeWigglesOnLaunch: (BOOL)wiggles
 {
   _wigglesOnLaunch = wiggles;
@@ -315,6 +337,14 @@ didChangeSingleClickLaunchesApplications: (BOOL)singleClickLaunches
   _singleClickLaunchesApplications = singleClickLaunches;
   [_dockView setSingleClickLaunchesApplications:_singleClickLaunchesApplications];
   [_preferences saveSingleClickLaunchesApplications:_singleClickLaunchesApplications];
+}
+
+- (void) settingsController: (SettingsController *)controller
+ didChangeHidesMiniwindows: (BOOL)hidesMiniwindows
+{
+  _hidesMiniwindows = hidesMiniwindows;
+  [_x11 setHidesMiniwindows:_hidesMiniwindows];
+  [_preferences saveHidesMiniwindows:_hidesMiniwindows];
 }
 
 - (void) settingsController: (SettingsController *)controller

@@ -93,24 +93,24 @@
 
 - (CGFloat) activeDockPad
 {
-  return [DockPreferences padForCellSizeMode:_dockCellSizeMode];
+  return [DockPreferences padForCellSizeMode:_dockCellSizeMode] * _dockScale;
 }
 
 - (CGFloat) activeDockGap
 {
-  return [DockPreferences gapForCellSizeMode:_dockCellSizeMode];
+  return [DockPreferences gapForCellSizeMode:_dockCellSizeMode] * _dockScale;
 }
 
 - (CGFloat) activeDockWindowWidth
 {
-  return [DockPreferences windowWidthForCellSizeMode:_dockCellSizeMode];
+  return [DockPreferences windowWidthForCellSizeMode:_dockCellSizeMode] * _dockScale;
 }
 
 - (void) applyDockCellSizeToView
 {
   if (_dockView)
     {
-      [_dockView setIconCellSize:[DockPreferences dockCellSize]
+      [_dockView setIconCellSize:[DockPreferences dockCellSize] * _dockScale
 			      gap:[self activeDockGap]
 			  padding:[self activeDockPad]];
     }

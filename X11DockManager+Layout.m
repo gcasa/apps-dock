@@ -156,6 +156,7 @@
 {
   Display *display = (Display *)_display;
   NSPoint origin;
+  NSSize cellSize;
   int x;
   int y;
 
@@ -167,14 +168,16 @@
       return;
     }
   origin = [_dockView cellOriginAtIndex:index];
+  cellSize = [_dockView cellSize];
   x = (int)origin.x;
-  y = (int)(NSHeight([_dockView bounds]) - origin.y - 64.0);
-  [_dockedWindowFrames setObject:[NSValue valueWithRect:NSMakeRect(x, y, 64, 64)]
+  y = (int)(NSHeight([_dockView bounds]) - origin.y - cellSize.height);
+  [_dockedWindowFrames setObject:[NSValue valueWithRect:NSMakeRect(x, y, cellSize.width, cellSize.height)]
 			   forKey:[NSNumber numberWithUnsignedLong:xWindow]];
   [self updateHostWindowShape];
   XRaiseWindow(display, (Window)_hostWindow);
   XReparentWindow(display, (Window)xWindow, (Window)_hostWindow, x, y);
-  XResizeWindow(display, (Window)xWindow, 64, 64);
+  XResizeWindow(display, (Window)xWindow,
+		(unsigned int)cellSize.width, (unsigned int)cellSize.height);
   XMapRaised(display, (Window)xWindow);
   XFlush(display);
 }
@@ -184,18 +187,21 @@
 {
   Display *display = (Display *)_display;
   NSPoint origin;
+  NSSize cellSize;
   int x;
   int y;
 
   if (!display || !_hostWindow) return;
   origin = [_dockView cellOriginAtIndex:index];
+  cellSize = [_dockView cellSize];
   x = (int)origin.x;
-  y = (int)(NSHeight([_dockView bounds]) - origin.y - 64.0);
-  [_dockedWindowFrames setObject:[NSValue valueWithRect:NSMakeRect(x, y, 64, 64)]
+  y = (int)(NSHeight([_dockView bounds]) - origin.y - cellSize.height);
+  [_dockedWindowFrames setObject:[NSValue valueWithRect:NSMakeRect(x, y, cellSize.width, cellSize.height)]
 			   forKey:[NSNumber numberWithUnsignedLong:xWindow]];
   [self updateHostWindowShape];
   XRaiseWindow(display, (Window)_hostWindow);
-  XMoveWindow(display, (Window)xWindow, x, y);
+  XMoveResizeWindow(display, (Window)xWindow, x, y,
+		    (unsigned int)cellSize.width, (unsigned int)cellSize.height);
   XFlush(display);
 }
 

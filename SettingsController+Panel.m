@@ -193,6 +193,22 @@
   [_notRunningDotsButton setTag:DockRunningIndicatorModeNotRunningDots];
   [dockView addSubview:_notRunningDotsButton];
 
+  label = [self labelWithTitle:@"Size"
+			 frame:NSMakeRect(18, 72, 110, 20)];
+  [dockView addSubview:label];
+
+  _dockScaleSlider =
+    [[NSSlider alloc] initWithFrame:NSMakeRect(132, 68, 220, 24)];
+  [_dockScaleSlider setMinValue:0.5];
+  [_dockScaleSlider setMaxValue:1.5];
+  [_dockScaleSlider setContinuous:YES];
+  [_dockScaleSlider setTarget:self];
+  [_dockScaleSlider setAction:@selector(dockScaleChanged:)];
+  [dockView addSubview:_dockScaleSlider];
+  _dockScaleValueLabel =
+    [self valueLabelWithFrame:NSMakeRect(360, 70, 54, 20)];
+  [dockView addSubview:_dockScaleValueLabel];
+
   label = [self labelWithTitle:@"Color"
 			 frame:NSMakeRect(18, 264, 110, 20)];
   [appearanceView addSubview:label];
@@ -297,6 +313,13 @@
 	       buttonType:NSSwitchButton
 		   action:@selector(singleClickLaunchChanged:)];
   [behaviorView addSubview:_singleClickLaunchButton];
+
+  _hideMiniwindowsButton =
+    [self buttonWithTitle:@"Hide Miniwindows"
+		    frame:NSMakeRect(18, 98, 220, 24)
+	       buttonType:NSSwitchButton
+		   action:@selector(hideMiniwindowsChanged:)];
+  [behaviorView addSubview:_hideMiniwindowsButton];
 
   label = [self labelWithTitle:@"App"
 			 frame:NSMakeRect(18, 296, 110, 20)];
