@@ -21,6 +21,8 @@
 				 recyclerPath: (NSString *)recyclerPath;
 - (BOOL) movePathToRecyclerFallback: (NSString *)path
 		       recyclerPath: (NSString *)recyclerPath;
+- (BOOL) pathIsMountPoint: (NSString *)path;
+- (BOOL) unmountPath: (NSString *)path error: (NSString **)errorMessage;
 - (void) emptyRecyclerPath: (NSString *)path;
 
 @end

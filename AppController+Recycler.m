@@ -55,19 +55,25 @@
 					    recyclerPath:recyclerPath];
 }
 
+- (BOOL) pathIsMountPoint: (NSString *)path
+{
+  return [_recyclerController pathIsMountPoint:path];
+}
+
+- (BOOL) unmountPath: (NSString *)path error: (NSString **)errorMessage
+{
+  return [_recyclerController unmountPath:path error:errorMessage];
+}
+
 - (void) dockViewDidReceivePathsInRecycler: (NSArray *)paths
 {
   NSFileManager *fileManager = [NSFileManager defaultManager];
   NSString *recyclerPath = [self recyclerPathForDropping];
   NSString *normalizedRecyclerPath = [self normalizedPath:recyclerPath];
   BOOL recycled = NO;
+  BOOL unmounted = NO;
+  BOOL failed = NO;
   NSUInteger i;
-
-  if (![recyclerPath length])
-    {
-      NSBeep();
-      return;
-    }
 
   for (i = 0; i < [paths count]; i++)
     {
@@ -80,9 +86,33 @@
 	  continue;
 	}
 
-      if ([self path:normalizedPath
+      if ([self pathIsMountPoint:normalizedPath])
+	{
+	  NSString *errorMessage = nil;
+
+	  if ([self unmountPath:normalizedPath error:&errorMessage])
+	    {
+	      unmounted = YES;
+	    }
+	  else
+	    {
+	      failed = YES;
+	      NSRunAlertPanel(@"Unable to Unmount",
+			      @"%@",
+			      @"OK",
+			      nil,
+			      nil,
+			      [errorMessage length] ? errorMessage
+			      : @"The mounted filesystem could not be unmounted.");
+	    }
+	  continue;
+	}
+
+      if (![recyclerPath length] ||
+	  [self path:normalizedPath
 	isEqualToOrDescendantOfPath:normalizedRecyclerPath])
 	{
+	  failed = YES;
 	  continue;
 	}
 
@@ -99,7 +129,12 @@
       [self refreshDock];
       [[NSSound soundNamed:@"Pop"] play];
     }
-  else
+  else if (unmounted)
+    {
+      [self refreshDock];
+      [[NSSound soundNamed:@"Pop"] play];
+    }
+  else if (failed || [paths count])
     {
       NSBeep();
     }

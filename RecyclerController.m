@@ -11,9 +11,195 @@
 
 #import "RecyclerController.h"
 #import <dirent.h>
+#import <mntent.h>
+#import <paths.h>
 #import <string.h>
 
 @implementation RecyclerController
+
+- (NSDictionary *) mountEntryForPath: (NSString *)path
+{
+  FILE *mounts;
+  struct mntent *entry;
+  NSString *normalizedPath;
+  NSDictionary *result = nil;
+
+  if (![path length])
+    {
+      return nil;
+    }
+
+  normalizedPath = [[path stringByStandardizingPath]
+			 stringByResolvingSymlinksInPath];
+  mounts = setmntent(_PATH_MOUNTED, "r");
+  if (!mounts)
+    {
+      return nil;
+    }
+
+  while ((entry = getmntent(mounts)) != NULL)
+    {
+      NSString *mountPath;
+
+      if (!entry->mnt_dir)
+	{
+	  continue;
+	}
+
+      mountPath = [[[NSString stringWithUTF8String:entry->mnt_dir]
+			 stringByStandardizingPath] stringByResolvingSymlinksInPath];
+      if ([normalizedPath isEqualToString:mountPath])
+	{
+	  NSString *type = entry->mnt_type
+	    ? [NSString stringWithUTF8String:entry->mnt_type] : @"";
+
+	  result = [NSDictionary dictionaryWithObjectsAndKeys:
+			 mountPath, @"path", type, @"type", nil];
+	  break;
+	}
+    }
+
+  endmntent(mounts);
+  return result;
+}
+
+- (BOOL) pathIsMountPoint: (NSString *)path
+{
+  return [self mountEntryForPath:path] != nil;
+}
+
+- (BOOL) mountPathIsProtected: (NSString *)path type: (NSString *)type
+{
+  static NSArray *protectedPaths = nil;
+  static NSArray *protectedPathTrees = nil;
+  static NSArray *protectedTypes = nil;
+  NSUInteger i;
+
+  if (!protectedPaths)
+    {
+      protectedPaths = [[NSArray alloc] initWithObjects:
+	@"/", @"/boot", @"/dev", @"/proc", @"/sys", @"/run", nil];
+      protectedPathTrees = [[NSArray alloc] initWithObjects:
+	@"/boot", @"/dev", @"/proc", @"/sys", nil];
+      protectedTypes = [[NSArray alloc] initWithObjects:
+	@"proc", @"sysfs", @"devtmpfs", @"devpts", @"securityfs",
+	@"cgroup", @"cgroup2", @"debugfs", @"tracefs", @"configfs",
+	@"pstore", @"efivarfs", @"mqueue", @"hugetlbfs", nil];
+    }
+
+  if ([protectedTypes containsObject:type])
+    {
+      return YES;
+    }
+
+  for (i = 0; i < [protectedPaths count]; i++)
+    {
+      NSString *protectedPath = [protectedPaths objectAtIndex:i];
+
+      if ([path isEqualToString:protectedPath])
+	{
+	  return YES;
+	}
+    }
+
+  for (i = 0; i < [protectedPathTrees count]; i++)
+    {
+      NSString *protectedPath = [protectedPathTrees objectAtIndex:i];
+
+      if ([path hasPrefix:[protectedPath stringByAppendingString:@"/"]])
+	{
+	  return YES;
+	}
+    }
+
+  return NO;
+}
+
+- (BOOL) unmountPath: (NSString *)path error: (NSString **)errorMessage
+{
+  NSDictionary *entry = [self mountEntryForPath:path];
+  NSString *mountPath = [entry objectForKey:@"path"];
+  NSString *type = [entry objectForKey:@"type"];
+  NSString *gioPath = @"/usr/bin/gio";
+  NSTask *task;
+  NSPipe *errorPipe;
+  NSData *errorData;
+  NSString *taskError = nil;
+
+  if (![mountPath length])
+    {
+      if (errorMessage)
+	{
+	  *errorMessage = @"The dropped item is no longer a mounted filesystem.";
+	}
+      return NO;
+    }
+
+  if ([self mountPathIsProtected:mountPath type:type])
+    {
+      if (errorMessage)
+	{
+	  *errorMessage = [NSString stringWithFormat:
+	    @"The system mount at %@ cannot be unmounted from the Recycler.",
+	    mountPath];
+	}
+      return NO;
+    }
+
+  if (![[NSFileManager defaultManager] isExecutableFileAtPath:gioPath])
+    {
+      if (errorMessage)
+	{
+	  *errorMessage = @"The GIO unmount service is not installed.";
+	}
+      return NO;
+    }
+
+  task = AUTORELEASE([[NSTask alloc] init]);
+  errorPipe = [NSPipe pipe];
+  [task setLaunchPath:gioPath];
+  [task setArguments:[NSArray arrayWithObjects:@"mount", @"-u",
+			 [[NSURL fileURLWithPath:mountPath] absoluteString], nil]];
+  [task setStandardError:errorPipe];
+
+  NS_DURING
+    {
+      [task launch];
+      [task waitUntilExit];
+    }
+  NS_HANDLER
+    {
+      taskError = [localException reason];
+    }
+  NS_ENDHANDLER
+
+  errorData = taskError ? nil
+    : [[[errorPipe fileHandleForReading] readDataToEndOfFile] retain];
+  if ([errorData length])
+    {
+      NSString *output = AUTORELEASE([[NSString alloc] initWithData:errorData
+							 encoding:NSUTF8StringEncoding]);
+      output = [output stringByTrimmingCharactersInSet:
+			 [NSCharacterSet whitespaceAndNewlineCharacterSet]];
+      if ([output length])
+	{
+	  taskError = output;
+	}
+    }
+  RELEASE(errorData);
+
+  if (!taskError && [task terminationStatus] == 0)
+    {
+      return YES;
+    }
+
+  if (errorMessage)
+    {
+      *errorMessage = [taskError length] ? taskError
+	: [NSString stringWithFormat:@"GIO could not unmount %@.", mountPath];
+    }
+  return NO;
+}
 
 - (NSArray *) recyclerPaths
 {

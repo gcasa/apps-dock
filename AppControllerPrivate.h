@@ -133,6 +133,8 @@ matchesRunningProcessPath: (NSString *)processPath;
 				 recyclerPath: (NSString *)recyclerPath;
 - (BOOL) movePathToRecyclerFallback: (NSString *)path
                        recyclerPath: (NSString *)recyclerPath;
+- (BOOL) pathIsMountPoint: (NSString *)path;
+- (BOOL) unmountPath: (NSString *)path error: (NSString **)errorMessage;
 - (void) updateRecyclerState;
 - (void) emptyRecyclerPath: (NSString *)path;
 - (void) emptyRecycler: (id)sender;
