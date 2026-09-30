@@ -333,4 +333,28 @@
   _wigglesOnAttentionRequest = wiggles;
 }
 
+- (BOOL) isMissing
+{
+  return _missing;
+}
+
+- (BOOL) refreshMissingState
+{
+  BOOL missing = (_kind == DockItemApplication && [_path length] &&
+    ![[NSFileManager defaultManager] fileExistsAtPath:_path]);
+
+  if (_missing == missing)
+    {
+      return NO;
+    }
+  _missing = missing;
+  if (!missing)
+    {
+      DockItem *restoredItem = [DockItem applicationItemWithPath:_path];
+      [self setOriginalIcon:[restoredItem icon]];
+      [self restoreOriginalIcon];
+    }
+  return YES;
+}
+
 @end

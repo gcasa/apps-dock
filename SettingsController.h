@@ -41,6 +41,9 @@
 - (BOOL) settingsControllerWigglesOnAttentionRequest: (SettingsController *)controller;
 - (BOOL) settingsControllerPlaysSoundOnRemove: (SettingsController *)controller;
 - (BOOL) settingsControllerSingleClickLaunchesApplications: (SettingsController *)controller;
+- (BOOL) settingsControllerKeepsMissingApplications: (SettingsController *)controller;
+- (void) settingsController: (SettingsController *)controller
+ didChangeKeepsMissingApplications: (BOOL)keep;
 - (BOOL) settingsControllerHidesMiniwindows: (SettingsController *)controller;
 - (BOOL) settingsControllerRecyclerHasContents: (SettingsController *)controller;
 - (NSArray *) settingsControllerDockItems: (SettingsController *)controller;
@@ -144,6 +147,7 @@ didChangeItemWigglesOnAttentionRequest: (BOOL)wiggles
   NSButton *_playSoundOnRemoveButton;
   NSButton *_singleClickLaunchButton;
   NSButton *_hideMiniwindowsButton;
+  NSButton *_keepMissingApplicationsButton;
   NSButton *_emptyRecyclerButton;
   NSPopUpButton *_applicationPopup;
   NSTextField *_applicationPathField;

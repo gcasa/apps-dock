@@ -50,6 +50,7 @@
   DESTROY(_applicationPopup);
   DESTROY(_singleClickLaunchButton);
   DESTROY(_hideMiniwindowsButton);
+  DESTROY(_keepMissingApplicationsButton);
   DESTROY(_wiggleOnAttentionRequestButton);
   DESTROY(_playSoundOnRemoveButton);
   DESTROY(_wiggleOnActivationButton);

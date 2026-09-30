@@ -321,6 +321,13 @@
 		   action:@selector(hideMiniwindowsChanged:)];
   [behaviorView addSubview:_hideMiniwindowsButton];
 
+  _keepMissingApplicationsButton =
+    [self buttonWithTitle:@"Keep placeholders for missing applications"
+                    frame:NSMakeRect(18, 60, 390, 24)
+               buttonType:NSSwitchButton
+                   action:@selector(keepMissingApplicationsChanged:)];
+  [behaviorView addSubview:_keepMissingApplicationsButton];
+
   label = [self labelWithTitle:@"App"
 			 frame:NSMakeRect(18, 296, 110, 20)];
   [applicationsView addSubview:label];

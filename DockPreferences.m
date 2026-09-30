@@ -450,4 +450,17 @@ static NSString *DockScaleDefaultsKey = @"DockScale";
 					   forKey:DockScaleDefaultsKey];
 }
 
+- (BOOL) savedKeepsMissingApplications
+{
+  NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+  return [defaults objectForKey:@"DockKeepsMissingApplications"] == nil ||
+    [defaults boolForKey:@"DockKeepsMissingApplications"];
+}
+
+- (void) saveKeepsMissingApplications: (BOOL)keep
+{
+  [[NSUserDefaults standardUserDefaults] setBool:keep
+                                        forKey:@"DockKeepsMissingApplications"];
+}
+
 @end

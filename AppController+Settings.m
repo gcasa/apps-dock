@@ -516,4 +516,16 @@ didChangeItemWigglesOnAttentionRequest: (BOOL)wiggles
   [self emptyRecycler:self];
 }
 
+- (BOOL) settingsControllerKeepsMissingApplications: (SettingsController *)controller
+{
+  return [_preferences savedKeepsMissingApplications];
+}
+
+- (void) settingsController: (SettingsController *)controller
+ didChangeKeepsMissingApplications: (BOOL)keep
+{
+  [_preferences saveKeepsMissingApplications:keep];
+  [self scanRunningApplications];
+}
+
 @end

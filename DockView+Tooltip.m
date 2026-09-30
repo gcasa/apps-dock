@@ -36,6 +36,10 @@
   if (index >= 0 && index < (NSInteger)[_items count])
     {
       DockItem *item = [_items objectAtIndex: (NSUInteger)index];
+      if ([item isMissing])
+        {
+          return [NSString stringWithFormat:@"%@ (Missing)", [item title]];
+        }
       return [[item title] length] ? [item title] : [[item path] lastPathComponent];
     }
 

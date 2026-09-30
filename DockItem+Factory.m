@@ -86,6 +86,7 @@
     [iconView setTitle:item->_title];
     [item->_dockTile setContentView:iconView];
   }
+  [item refreshMissingState];
   return item;
 }
 

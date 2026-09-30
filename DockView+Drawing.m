@@ -189,6 +189,23 @@
   NSImage *icon = [item icon];
   CGFloat angle = 0.0;
 
+  if ([item isMissing])
+    {
+      NSRect rect = [self iconRectInCell:cell size:size];
+      NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
+        [NSFont boldSystemFontOfSize:size * 0.7], NSFontAttributeName,
+        [NSColor whiteColor], NSForegroundColorAttributeName, nil];
+      NSSize textSize = [@"?" sizeWithAttributes:attributes];
+      [[NSColor colorWithCalibratedWhite:0.35 alpha:0.9] set];
+      [[NSBezierPath bezierPathWithRoundedRect:rect
+                                     xRadius:size * 0.15
+                                     yRadius:size * 0.15] fill];
+      [@"?" drawAtPoint:NSMakePoint(NSMidX(rect) - textSize.width / 2.0,
+                                    NSMidY(rect) - textSize.height / 2.0)
+          withAttributes:attributes];
+      return;
+    }
+
   if (item == _wiggleItem)
     {
       NSTimeInterval elapsed = [NSDate timeIntervalSinceReferenceDate] - _wiggleStartTime;

@@ -350,4 +350,10 @@ didChangeItemWigglesOnAttentionRequest:[_applicationWiggleOnAttentionRequestButt
 }
 
 
+- (void) keepMissingApplicationsChanged: (id)sender
+{
+  [_delegate settingsController:self
+    didChangeKeepsMissingApplications:[(NSButton *)sender state] == NSOnState];
+}
+
 @end

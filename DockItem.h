@@ -46,6 +46,7 @@ typedef enum
   NSDockTile *_dockTile;
   unsigned long _xWindow;
   BOOL _pinned;
+  BOOL _missing;
   BOOL _usesDockBehaviorDefaults;
   BOOL _wigglesOnLaunch;
   BOOL _wigglesOnActivation;
@@ -71,6 +72,8 @@ typedef enum
 - (NSDockTile *) dockTile;
 - (unsigned long) xWindow;
 - (void) setXWindow: (unsigned long)xWindow;
+- (BOOL) isMissing;
+- (BOOL) refreshMissingState;
 - (BOOL) isPinned;
 - (void) setPinned: (BOOL)pinned;
 - (BOOL) usesDockBehaviorDefaults;

@@ -135,6 +135,9 @@
   [_singleClickLaunchButton setState:
       ([_delegate settingsControllerSingleClickLaunchesApplications:self] ?
        NSOnState : NSOffState)];
+  [_keepMissingApplicationsButton setState:
+      ([_delegate settingsControllerKeepsMissingApplications:self] ?
+       NSOnState : NSOffState)];
   [_hideMiniwindowsButton setState:
       ([_delegate settingsControllerHidesMiniwindows:self] ?
        NSOnState : NSOffState)];

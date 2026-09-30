@@ -74,6 +74,11 @@
 	  continue;
 	}
 
+      if ([item refreshMissingState])
+        {
+          changed = YES;
+        }
+
       running = [self applicationItemHasRunningProcess:item paths:processPaths];
       if (!running && [item xWindow])
 	{
@@ -127,7 +132,13 @@
     {
       DockItem *item = [_items objectAtIndex:i - 1];
 
-      if ([item kind] == DockItemApplication &&
+      if ([item kind] == DockItemApplication && [item isPinned] &&
+          [item isMissing] && ![_preferences savedKeepsMissingApplications])
+        {
+          [_items removeObjectAtIndex:i - 1];
+          changed = YES;
+        }
+      else if ([item kind] == DockItemApplication &&
 	  ![item isPinned] &&
 	  ![self applicationItemHasRunningProcess:item paths:processPaths])
 	{

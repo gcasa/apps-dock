@@ -39,7 +39,13 @@
   NSString *extension = [[path pathExtension] lowercaseString];
   BOOL isDir = NO;
 
-  [[NSFileManager defaultManager] fileExistsAtPath:path isDirectory:&isDir];
+  if (![[NSFileManager defaultManager] fileExistsAtPath:path isDirectory:&isDir])
+    {
+      NSRunAlertPanel(@"Application Missing",
+        @"The application could not be found at %@. It may have been moved or removed.",
+        @"OK", nil, nil, path);
+      return NO;
+    }
   if ([extension isEqualToString:@"desktop"])
     {
       return [self launchDesktopFile:path

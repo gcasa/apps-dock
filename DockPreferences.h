@@ -56,6 +56,8 @@ enum
 - (void) savePlaysSoundOnRemove: (BOOL)playsSound;
 - (BOOL) savedSingleClickLaunchesApplications;
 - (void) saveSingleClickLaunchesApplications: (BOOL)singleClickLaunches;
+- (BOOL) savedKeepsMissingApplications;
+- (void) saveKeepsMissingApplications: (BOOL)keep;
 - (BOOL) savedHidesMiniwindows;
 - (void) saveHidesMiniwindows: (BOOL)hidesMiniwindows;
 - (CGFloat) savedDockScale;

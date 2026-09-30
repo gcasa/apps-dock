@@ -11,6 +11,7 @@
 
 #import "DockApplicationStore.h"
 #import "DockItem.h"
+#import "DockPreferences.h"
 #import "RunningApplicationScanner.h"
 #import <GNUstepBase/GNUstep.h>
 
@@ -82,6 +83,7 @@ static NSString *DockOpenAtLoginApplicationsDefaultsKey = @"DockOpenAtLoginAppli
   NSArray *paths = [[NSUserDefaults standardUserDefaults]
 		     objectForKey:DockApplicationsDefaultsKey];
   NSUInteger i;
+  DockPreferences *preferences = AUTORELEASE([[DockPreferences alloc] init]);
 
   if (![paths isKindOfClass:[NSArray class]])
     {
@@ -106,8 +108,9 @@ static NSString *DockOpenAtLoginApplicationsDefaultsKey = @"DockOpenAtLoginAppli
       bundlePath = [DockItem applicationBundlePathForPath:path];
       applicationPath = [bundlePath length] ? bundlePath : path;
 
-      if ([[NSFileManager defaultManager] fileExistsAtPath:applicationPath
-					       isDirectory:&isDir] &&
+      if (([preferences savedKeepsMissingApplications] ||
+           [[NSFileManager defaultManager] fileExistsAtPath:applicationPath
+                                               isDirectory:&isDir]) &&
 	  ![self items:items haveApplicationPath:applicationPath])
 	{
 	  transientItem = [self transientApplicationItemMatchingBundlePath:applicationPath
