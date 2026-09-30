@@ -13,7 +13,13 @@
 #import "DockItem.h"
 #import <ctype.h>
 #import <limits.h>
+#ifdef __linux__
 #import <mntent.h>
+#else
+#import <sys/param.h>
+#import <sys/ucred.h>
+#import <sys/mount.h>
+#endif
 #import <paths.h>
 #import <stdlib.h>
 #import <string.h>
@@ -72,6 +78,7 @@
 
 - (NSString *) procFilesystemPath
 {
+#ifdef __linux__
   FILE *mounts;
   struct mntent *entry;
   NSString *path = nil;
@@ -94,6 +101,22 @@
 
   endmntent(mounts);
   return [path length] ? path : nil;
+#else
+  struct statfs *mounts;
+  int count;
+  int i;
+
+  count = getmntinfo(&mounts, MNT_NOWAIT);
+  for (i = 0; i < count; i++)
+    {
+      if (strcmp(mounts[i].f_fstypename, "procfs") == 0)
+	{
+	  return [NSString stringWithUTF8String:mounts[i].f_mntonname];
+	}
+    }
+
+  return nil;
+#endif
 }
 
 - (NSString *) procPathForProcessIdentifierString: (NSString *)identifier

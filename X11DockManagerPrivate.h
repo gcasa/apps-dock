@@ -26,7 +26,6 @@
 #import <X11/Xutil.h>
 #import <X11/extensions/shape.h>
 #import <limits.h>
-#import <mntent.h>
 #import <paths.h>
 #import <stdlib.h>
 #import <string.h>
