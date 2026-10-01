@@ -71,7 +71,13 @@
       return;
     }
 
-  _tooltipTimer = [NSTimer scheduledTimerWithTimeInterval:0.5
+  if (_tooltipDelay == 0.0)
+    {
+      [self showTooltip:nil];
+      return;
+    }
+
+  _tooltipTimer = [NSTimer scheduledTimerWithTimeInterval:_tooltipDelay
                                                    target:self
                                                  selector:@selector(showTooltip:)
                                                  userInfo:nil

@@ -94,6 +94,14 @@ didChangeUseCellTileBackground:[(NSButton *)sender state] == NSOnState];
 }
 
 
+- (void) tooltipDelayChanged: (id)sender
+{
+  NSTimeInterval delay = (NSInteger)([sender doubleValue] * 100.0 + 0.5) / 100.0;
+  [_delegate settingsController:self didChangeTooltipDelay:delay];
+  [_tooltipDelaySlider setDoubleValue:[_delegate settingsControllerTooltipDelay:self]];
+  [self updateTooltipDelayValueLabel];
+}
+
 - (void) hoverIconScaleChanged: (id)sender
 {
   [_delegate settingsController:self

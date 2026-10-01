@@ -33,6 +33,12 @@
 }
 
 
+- (void) updateTooltipDelayValueLabel
+{
+  [_tooltipDelayValueLabel setStringValue:
+      [NSString stringWithFormat:@"%.2f s", [_tooltipDelaySlider doubleValue]]];
+}
+
 - (void) updateHoverIconScaleValueLabel
 {
   NSInteger percent =
@@ -97,6 +103,8 @@
   [_dockScaleSlider setFloatValue:
       [_delegate settingsControllerDockScale:self]];
   [self updateDockScaleValueLabel];
+  [_tooltipDelaySlider setDoubleValue:[_delegate settingsControllerTooltipDelay:self]];
+  [self updateTooltipDelayValueLabel];
 
   [_useCellTileButton setState:
       ([_delegate settingsControllerUsesCellTileBackground:self] ?

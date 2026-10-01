@@ -120,6 +120,18 @@
   return _magnifiesHoveredIcons;
 }
 
+- (NSTimeInterval) settingsControllerTooltipDelay: (SettingsController *)controller
+{
+  return [_dockView tooltipDelay];
+}
+
+- (void) settingsController: (SettingsController *)controller
+     didChangeTooltipDelay: (NSTimeInterval)delay
+{
+  [_dockView setTooltipDelay:delay];
+  [_preferences saveTooltipDelay:[_dockView tooltipDelay]];
+}
+
 - (CGFloat) settingsControllerHoverIconScale: (SettingsController *)controller
 {
   return _hoverIconScale;

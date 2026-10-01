@@ -289,6 +289,22 @@ static NSString *DockScaleDefaultsKey = @"DockScale";
 					  forKey:DockMagnifiesHoveredIconsDefaultsKey];
 }
 
+- (NSTimeInterval) savedTooltipDelay
+{
+  NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+  if (![defaults objectForKey:@"DockTooltipDelay"])
+    {
+      return 0.25;
+    }
+  return MIN(2.0, MAX(0.0, [defaults doubleForKey:@"DockTooltipDelay"]));
+}
+
+- (void) saveTooltipDelay: (NSTimeInterval)delay
+{
+  [[NSUserDefaults standardUserDefaults] setDouble:MIN(2.0, MAX(0.0, delay))
+                                           forKey:@"DockTooltipDelay"];
+}
+
 - (CGFloat) savedHoverIconScale
 {
   NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];

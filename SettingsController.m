@@ -55,6 +55,8 @@
   DESTROY(_playSoundOnRemoveButton);
   DESTROY(_wiggleOnActivationButton);
   DESTROY(_wiggleOnLaunchButton);
+  DESTROY(_tooltipDelaySlider);
+  DESTROY(_tooltipDelayValueLabel);
   DESTROY(_hoverIconScaleSlider);
   DESTROY(_hoverIconScaleValueLabel);
   DESTROY(_hoverIconScaleLabel);

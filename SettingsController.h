@@ -34,6 +34,9 @@
 - (BOOL) settingsControllerUsesCellTileBackground: (SettingsController *)controller;
 - (BOOL) settingsControllerShowsDockBorder: (SettingsController *)controller;
 - (BOOL) settingsControllerMagnifiesHoveredIcons: (SettingsController *)controller;
+- (NSTimeInterval) settingsControllerTooltipDelay: (SettingsController *)controller;
+- (void) settingsController: (SettingsController *)controller
+     didChangeTooltipDelay: (NSTimeInterval)delay;
 - (CGFloat) settingsControllerHoverIconScale: (SettingsController *)controller;
 - (CGFloat) settingsControllerDockScale: (SettingsController *)controller;
 - (BOOL) settingsControllerWigglesOnLaunch: (SettingsController *)controller;
@@ -139,6 +142,8 @@ didChangeItemWigglesOnAttentionRequest: (BOOL)wiggles
   NSButton *_showBorderButton;
   NSButton *_magnifyHoveredIconsButton;
   NSTextField *_hoverIconScaleLabel;
+  NSSlider *_tooltipDelaySlider;
+  NSTextField *_tooltipDelayValueLabel;
   NSSlider *_hoverIconScaleSlider;
   NSTextField *_hoverIconScaleValueLabel;
   NSButton *_wiggleOnLaunchButton;

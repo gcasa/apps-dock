@@ -44,6 +44,8 @@ enum
 - (void) saveUseCellTileBackground: (BOOL)useCellTileBackground;
 - (BOOL) savedMagnifiesHoveredIcons;
 - (void) saveMagnifiesHoveredIcons: (BOOL)magnifiesHoveredIcons;
+- (NSTimeInterval) savedTooltipDelay;
+- (void) saveTooltipDelay: (NSTimeInterval)delay;
 - (CGFloat) savedHoverIconScale;
 - (void) saveHoverIconScale: (CGFloat)scale;
 - (BOOL) savedWigglesOnLaunch;

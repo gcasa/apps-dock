@@ -63,6 +63,7 @@ typedef enum
   CGFloat _dockGap;
   CGFloat _dockPad;
   CGFloat _hoverIconScale;
+  NSTimeInterval _tooltipDelay;
   BOOL _usesCellBackgroundTile;
   BOOL _showsBorder;
   BOOL _magnifiesHoveredIcons;
@@ -106,6 +107,8 @@ typedef enum
 - (BOOL) magnifiesHoveredIcons;
 - (void) setHoverIconScale: (CGFloat)scale;
 - (CGFloat) hoverIconScale;
+- (void) setTooltipDelay: (NSTimeInterval)delay;
+- (NSTimeInterval) tooltipDelay;
 - (void) setSingleClickLaunchesApplications: (BOOL)singleClickLaunches;
 - (BOOL) singleClickLaunchesApplications;
 - (void) setUsesCellBackgroundTile: (BOOL)usesTile;

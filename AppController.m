@@ -78,6 +78,7 @@
   [_dockView setRunningIndicatorMode:_runningIndicatorMode];
   [_dockView setMagnifiesHoveredIcons:_magnifiesHoveredIcons];
   [_dockView setHoverIconScale:_hoverIconScale];
+  [_dockView setTooltipDelay:[_preferences savedTooltipDelay]];
   [_dockView setSingleClickLaunchesApplications:_singleClickLaunchesApplications];
   [_dockView setItems:_items];
   [_dockView setPinnedItemCount:[self pinnedApplicationCount]];

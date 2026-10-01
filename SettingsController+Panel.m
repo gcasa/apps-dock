@@ -279,6 +279,21 @@
     [self valueLabelWithFrame:NSMakeRect(378, 70, 54, 20)];
   [appearanceView addSubview:_hoverIconScaleValueLabel];
 
+  label = [self labelWithTitle:@"App Name Delay"
+                         frame:NSMakeRect(18, 30, 130, 20)];
+  [appearanceView addSubview:label];
+  _tooltipDelaySlider =
+    [[NSSlider alloc] initWithFrame:NSMakeRect(150, 28, 190, 24)];
+  [_tooltipDelaySlider setMinValue:0.0];
+  [_tooltipDelaySlider setMaxValue:2.0];
+  [_tooltipDelaySlider setContinuous:YES];
+  [_tooltipDelaySlider setTarget:self];
+  [_tooltipDelaySlider setAction:@selector(tooltipDelayChanged:)];
+  [appearanceView addSubview:_tooltipDelaySlider];
+  _tooltipDelayValueLabel =
+    [self valueLabelWithFrame:NSMakeRect(346, 30, 66, 20)];
+  [appearanceView addSubview:_tooltipDelayValueLabel];
+
   _wiggleOnLaunchButton =
     [self buttonWithTitle:@"Wiggle On Launch"
 		    frame:NSMakeRect(18, 264, 180, 24)

@@ -44,6 +44,7 @@
       _dockGap = DockGap;
       _dockPad = DockPad;
       _hoverIconScale = 1.2;
+      _tooltipDelay = 0.25;
       _runningIndicatorMode = DockRunningIndicatorModeRunningDot;
       _gnustepIcon = RETAIN([self loadGNUstepIcon]);
       _recyclerIcon = RETAIN([self loadRecyclerIcon]);
@@ -318,6 +319,20 @@
 - (BOOL) magnifiesHoveredIcons
 {
   return _magnifiesHoveredIcons;
+}
+
+- (NSTimeInterval) tooltipDelay
+{
+  return _tooltipDelay;
+}
+
+- (void) setTooltipDelay: (NSTimeInterval)delay
+{
+  _tooltipDelay = MIN(2.0, MAX(0.0, delay));
+  if (_tooltipTimer)
+    {
+      [self scheduleTooltipForHoverIndex:_hoveredItemIndex];
+    }
 }
 
 - (void) setHoverIconScale: (CGFloat)scale

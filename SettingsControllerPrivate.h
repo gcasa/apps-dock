@@ -69,6 +69,8 @@ SettingsClampedWindowAlpha(CGFloat alpha)
 - (void) showBorderChanged: (id)sender;
 - (void) useCellTileChanged: (id)sender;
 - (void) magnifyHoveredIconsChanged: (id)sender;
+- (void) tooltipDelayChanged: (id)sender;
+- (void) updateTooltipDelayValueLabel;
 - (void) hoverIconScaleChanged: (id)sender;
 - (void) dockScaleChanged: (id)sender;
 - (void) wiggleOnLaunchChanged: (id)sender;
